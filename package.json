@@ -1,0 +1,67 @@
+{
+  "name": "gratis-reader",
+  "version": "1.7.4",
+  "description": "",
+  "homepage": "https://github.com/actuallymentor/gratis-reader#readme",
+  "bugs": {
+    "url": "https://github.com/actuallymentor/gratis-reader/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/actuallymentor/gratis-reader.git"
+  },
+  "license": "MIT",
+  "author": "actuallymentor",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint --fix src",
+    "test": "npx playwright test",
+    "test:live": "LIVE_API=1 npx playwright test --grep @live",
+    "test:headed": "npx playwright test --headed",
+    "gutenberg": "node scripts/gutenberg.js",
+    "gutenberg:variants": "node scripts/gutenberg.js --variants-only",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@babel/eslint-parser": "^7.28.6",
+    "@babel/preset-react": "^7.28.5",
+    "@eslint/js": "^9.39.4",
+    "@playwright/test": "^1.59.1",
+    "@vitejs/plugin-react": "^6.0.1",
+    "airier": "^0.1.1",
+    "eslint": "^9.39.4",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-unused-imports": "^4.4.1",
+    "globals": "^15.15.0",
+    "husky": "^9.1.7",
+    "less-lazy": "^0.0.2",
+    "sharp": "^0.34.5",
+    "vite": "^8.0.9",
+    "vite-plugin-pwa": "^1.2.0"
+  },
+  "overrides": {
+    "vite-plugin-pwa": {
+      "vite": "$vite"
+    }
+  },
+  "dependencies": {
+    "epubjs": "^0.4.2",
+    "hash.js": "^1.1.7",
+    "marked": "^18.0.2",
+    "mentie": "^0.5.4",
+    "promise-parallel-throttle": "^3.5.0",
+    "promise-retry": "^2.0.1",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
+    "react-hot-toast": "^2.6.0",
+    "react-router": "^7.14.1",
+    "react-router-dom": "^7.14.1",
+    "styled-components": "^6.4.0",
+    "use-query-params": "^2.2.2",
+    "zustand": "^5.0.12"
+  }
+}
