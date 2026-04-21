@@ -4,6 +4,7 @@ import { writeFileSync, readFileSync, mkdirSync, existsSync, readdirSync, statSy
 import { resolve, dirname, extname, basename } from 'path'
 import { fileURLToPath } from 'url'
 import sharp from 'sharp'
+import JSZip from 'jszip'
 
 const __dirname = dirname( fileURLToPath( import.meta.url ) )
 const OUTPUT_PATH = resolve( __dirname, `../public/gutenberg.json` )
@@ -18,6 +19,12 @@ const MIN_BOOKS = parseInt( process.env.GUTENBERG_MIN_BOOKS ) || 500
 const DOWNLOAD_CONCURRENCY = 5
 
 const MAX_EPUB_BYTES = 25 * 1024 * 1024 // 25 MiB
+
+const MAX_RETRY_ATTEMPTS = 5
+const INITIAL_RETRY_DELAY_MS = 10_000       // 10s base for network/5xx errors
+const RATE_LIMIT_MIN_DELAY_MS = 60_000      // 429 always waits at least 60s
+const RETRY_BACKOFF_FACTOR = 2
+const RETRY_JITTER_MAX_MS = 3_000           // random 0-3s jitter per delay
 
 const REQUIRED_KEYS = [ `count`, `next`, `previous`, `results` ]
 const EPUB_MIME = `application/epub+zip`
@@ -55,9 +62,134 @@ function extension_from_url( url ) {
     return ext || `.jpg`
 }
 
+function sleep( ms ) {
+    return new Promise( resolve => setTimeout( resolve, ms ) )
+}
+
+async function validate_epub( epub_path ) {
+
+    try {
+        const buffer = readFileSync( epub_path )
+        if( buffer.length === 0 ) return false
+        const zip = await JSZip.loadAsync( buffer )
+        return zip.file( `META-INF/container.xml` ) !== null
+    } catch {
+        return false
+    }
+
+}
+
+function delete_book_files( book_id ) {
+
+    const suffixes = [ `.epub`, `.jpg`, `-xs.webp`, `-sm.webp`, `-md.webp` ]
+
+    for( const suffix of suffixes ) {
+        const file_path = resolve( EPUB_DIR, `${ book_id }${ suffix }` )
+        if( existsSync( file_path ) ) unlinkSync( file_path )
+    }
+
+}
+
+async function scan_and_purge_corrupt_epubs() {
+
+    if( !existsSync( EPUB_DIR ) ) return new Set()
+
+    const files = readdirSync( EPUB_DIR ).filter( f => f.endsWith( `.epub` ) )
+    if( files.length === 0 ) return new Set()
+
+    console.log( `\nValidating ${ files.length } existing epub files...` )
+
+    const corrupt_ids = new Set()
+
+    for( let i = 0; i < files.length; i += DOWNLOAD_CONCURRENCY ) {
+
+        const batch = files.slice( i, i + DOWNLOAD_CONCURRENCY )
+
+        const results = await Promise.all( batch.map( async file => {
+            const epub_path = resolve( EPUB_DIR, file )
+            const valid = await validate_epub( epub_path )
+            return { file, valid }
+        } ) )
+
+        for( const { file, valid } of results ) {
+            if( !valid ) {
+                const book_id = basename( file, `.epub` )
+                delete_book_files( book_id )
+                corrupt_ids.add( parseInt( book_id ) )
+            }
+        }
+
+        const progress = Math.min( i + DOWNLOAD_CONCURRENCY, files.length )
+        process.stdout.write( `  Validated: ${ progress }/${ files.length } (${ corrupt_ids.size } corrupt)\r` )
+
+    }
+
+    if( corrupt_ids.size > 0 ) {
+        console.log( `\n  Purged ${ corrupt_ids.size } corrupt epub(s) and their associated files.` )
+    } else {
+        console.log( `\n  All ${ files.length } epubs are valid.` )
+    }
+
+    return corrupt_ids
+
+}
+
+async function fetch_with_retry( url, label = url ) {
+
+    let delay = INITIAL_RETRY_DELAY_MS
+    let last_error = null
+
+    for( let attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt++ ) {
+
+        try {
+
+            const response = await fetch( url )
+
+            // Success or non-retryable client error — return immediately
+            if( response.ok || ( response.status >= 400 && response.status < 500 && response.status !== 429 ) ) {
+                return response
+            }
+
+            // Retryable: 429 or 5xx
+            const reason = response.status === 429 ? `rate-limited` : `server error ${ response.status }`
+            const effective_delay = response.status === 429
+                ? Math.max( delay, RATE_LIMIT_MIN_DELAY_MS )
+                : delay
+
+            if( attempt < MAX_RETRY_ATTEMPTS ) {
+                const jitter = Math.floor( Math.random() * RETRY_JITTER_MAX_MS )
+                console.warn( `\n  ${ reason } (${ label }), attempt ${ attempt }/${ MAX_RETRY_ATTEMPTS } — retrying in ${ ( effective_delay + jitter ) / 1000 }s...` )
+                await sleep( effective_delay + jitter )
+                delay *= RETRY_BACKOFF_FACTOR
+            } else {
+                console.warn( `\n  ${ reason } (${ label }), attempt ${ attempt }/${ MAX_RETRY_ATTEMPTS } — retries exhausted` )
+                return response
+            }
+
+        } catch( err ) {
+
+            // Network errors: DNS failure, connection reset, timeout
+            last_error = err
+
+            if( attempt < MAX_RETRY_ATTEMPTS ) {
+                const jitter = Math.floor( Math.random() * RETRY_JITTER_MAX_MS )
+                console.warn( `\n  Network error (${ label }): ${ err.message }, attempt ${ attempt }/${ MAX_RETRY_ATTEMPTS } — retrying in ${ ( delay + jitter ) / 1000 }s...` )
+                await sleep( delay + jitter )
+                delay *= RETRY_BACKOFF_FACTOR
+            }
+
+        }
+
+    }
+
+    // All retries exhausted with network errors
+    throw last_error
+
+}
+
 async function fetch_page( url ) {
 
-    const response = await fetch( url )
+    const response = await fetch_with_retry( url, `page` )
 
     if( !response.ok ) {
         throw new Error( `HTTP ${ response.status } fetching ${ url }` )
@@ -72,7 +204,7 @@ async function fetch_page( url ) {
 
 async function download_file( url, filepath ) {
 
-    const response = await fetch( url )
+    const response = await fetch_with_retry( url, `download ${ basename( filepath ) }` )
 
     if( !response.ok ) return false
 
@@ -235,7 +367,10 @@ async function download_all_assets( books ) {
         )
 
         for( const result of results ) {
-            if( result.status !== `fulfilled` ) continue
+            if( result.status !== `fulfilled` ) {
+                console.warn( `\n  Download failed for batch item: ${ result.reason?.message || result.reason }` )
+                continue
+            }
             const v = result.value
 
             if( v.epub_too_large ) {
@@ -328,6 +463,10 @@ async function main() {
 
     const existing = load_existing_catalog()
 
+    // Pre-download: validate existing epubs and purge corrupt/empty ones
+    const purged_ids = await scan_and_purge_corrupt_epubs()
+    for( const id of purged_ids ) existing.delete( id )
+
     const use_pages = PAGES > 0
     const target_label = use_pages ? `${ PAGES } pages` : `${ MIN_BOOKS } books minimum`
 
@@ -372,7 +511,48 @@ async function main() {
                 if( pattern.test( file ) ) unlinkSync( resolve( EPUB_DIR, file ) )
             }
         }
-        console.log( `Removed files for ${ excluded_ids.size } oversized books.` )
+        console.log( `Removed files for ${ excluded_ids.size } oversized/failed books.` )
+    }
+
+    // Post-download: validate all fetched epubs that exist on disk
+    const downloadable = fetched_books.filter( book =>
+        !excluded_ids.has( book.id ) && existsSync( resolve( EPUB_DIR, `${ book.id }.epub` ) )
+    )
+
+    if( downloadable.length > 0 ) {
+
+        console.log( `\nValidating ${ downloadable.length } downloaded epub files...` )
+        let post_corrupt = 0
+
+        for( let i = 0; i < downloadable.length; i += DOWNLOAD_CONCURRENCY ) {
+
+            const batch = downloadable.slice( i, i + DOWNLOAD_CONCURRENCY )
+
+            const results = await Promise.all( batch.map( async book => {
+                const epub_path = resolve( EPUB_DIR, `${ book.id }.epub` )
+                const valid = await validate_epub( epub_path )
+                return { id: book.id, valid }
+            } ) )
+
+            for( const { id, valid } of results ) {
+                if( !valid ) {
+                    delete_book_files( id )
+                    excluded_ids.add( id )
+                    post_corrupt++
+                }
+            }
+
+            const progress = Math.min( i + DOWNLOAD_CONCURRENCY, downloadable.length )
+            process.stdout.write( `  Validated: ${ progress }/${ downloadable.length } (${ post_corrupt } corrupt)\r` )
+
+        }
+
+        if( post_corrupt > 0 ) {
+            console.log( `\n  Removed ${ post_corrupt } corrupt epub(s) from this download batch.` )
+        } else {
+            console.log( `\n  All ${ downloadable.length } downloaded epubs are valid.` )
+        }
+
     }
 
     // Merge: new books update existing entries, existing-only books are preserved
