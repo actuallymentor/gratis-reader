@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { log } from 'mentie'
-import { get_book, save_book } from '../modules/cache.js'
+import { get_book, save_book, delete_book } from '../modules/cache.js'
 import { parse_epub, extract_chapter_content, hash_buffer } from '../modules/epub_parser.js'
 
 /**
@@ -59,7 +59,12 @@ export const use_book = ( book_id ) => {
                     log.info( `Broken epub for Gutenberg book ${ gutenberg_match[1] }, re-fetching` )
                     try {
                         const response = await fetch( `/gutenberg_epubs/${ gutenberg_match[1] }.epub` )
-                        if( response.ok ) {
+
+                        // Vite SPA fallback serves index.html for missing files — check Content-Type
+                        const content_type = response.headers.get( `content-type` ) || ``
+                        const is_epub = content_type.includes( `epub` ) || content_type.includes( `octet-stream` )
+
+                        if( response.ok && is_epub ) {
                             const fresh_buffer = await response.arrayBuffer()
                             const fresh_parsed = await parse_epub( fresh_buffer )
                             if( cancelled ) return
@@ -75,6 +80,12 @@ export const use_book = ( book_id ) => {
                     } catch ( heal_error ) {
                         log.debug( `Self-heal failed:`, heal_error.message )
                     }
+                }
+
+                // If still broken after self-heal, remove the stale IndexedDB entry so the user can re-import
+                if( ( !parsed || parsed.spine.length === 0 ) && gutenberg_match ) {
+                    log.info( `Removing stale IndexedDB entry for ${ book_id }` )
+                    await delete_book( book_id ).catch( () => {} )
                 }
 
                 if( !parsed || parsed.spine.length === 0 ) {

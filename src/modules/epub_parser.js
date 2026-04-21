@@ -5,12 +5,20 @@ import { split_sentences } from './sentence_splitter.js'
 /**
  * Parses an EPUB file and extracts metadata + content structure
  * @param {ArrayBuffer} array_buffer - The EPUB file data
+ * @param {number} [timeout_ms=15000] - Max time to wait for epubjs to parse
  * @returns {Promise<Object>} { metadata, toc, spine, cover_url, book }
  */
-export const parse_epub = async ( array_buffer ) => {
+export const parse_epub = async ( array_buffer, timeout_ms = 15_000 ) => {
 
     const book = ePub( array_buffer )
-    await book.ready
+
+    // epubjs hangs forever on corrupt/non-epub data — race against a timeout
+    let timeout_id
+    const timeout = new Promise( ( _, reject ) =>
+        timeout_id = setTimeout( () => reject( new Error( `epub parse timed out after ${ timeout_ms }ms` ) ), timeout_ms )
+    )
+    await Promise.race( [ book.ready, timeout ] )
+    clearTimeout( timeout_id )
 
     // Load metadata — guard against epubjs failing to parse (e.g. image-heavy epubs)
     const metadata = await book.loaded?.metadata || {}
