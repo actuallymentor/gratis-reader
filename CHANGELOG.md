@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.7.5] - 2026-04-20
+
+### Fixed
+- Guard against Vite SPA fallback serving HTML for missing epub files (uncommitted)
+- Null-safety in epub parser for image-heavy epubs crashing epubjs (uncommitted)
+- Self-heal stale IndexedDB entries by re-fetching Gutenberg epubs from static assets (uncommitted)
+- Gutenberg script excludes failed downloads and validates catalog against disk (uncommitted)
+- Replace 36 bloated epubs with noimages variants, remove 49 orphaned catalog entries (uncommitted)
+
 ## [1.7.4] - 2026-04-20
 
 ### Changed

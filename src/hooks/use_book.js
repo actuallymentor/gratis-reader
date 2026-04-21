@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { log } from 'mentie'
-import { get_book } from '../modules/cache.js'
+import { get_book, save_book } from '../modules/cache.js'
 import { parse_epub, extract_chapter_content, hash_buffer } from '../modules/epub_parser.js'
 
 /**
@@ -41,18 +41,53 @@ export const use_book = ( book_id ) => {
 
                 set_book_meta( book_record )
 
-                // Parse the EPUB
-                const array_buffer = await book_record.file.arrayBuffer()
-                const hash = await hash_buffer( array_buffer )
-                book_hash_ref.current = hash
+                // Parse the EPUB — if it fails or has an empty spine, Gutenberg books self-heal from static assets
+                let array_buffer = await book_record.file.arrayBuffer()
+                let parsed = null
 
-                const parsed = await parse_epub( array_buffer )
+                try {
+                    parsed = await parse_epub( array_buffer )
+                } catch ( parse_error ) {
+                    log.debug( `Initial parse failed:`, parse_error.message )
+                }
                 if( cancelled ) return
 
+                const gutenberg_match = book_id.match( /^book_gutenberg_(\d+)$/ )
+                const needs_heal = !parsed || parsed.spine.length === 0
+
+                if( needs_heal && gutenberg_match ) {
+                    log.info( `Broken epub for Gutenberg book ${ gutenberg_match[1] }, re-fetching` )
+                    try {
+                        const response = await fetch( `/gutenberg_epubs/${ gutenberg_match[1] }.epub` )
+                        if( response.ok ) {
+                            const fresh_buffer = await response.arrayBuffer()
+                            const fresh_parsed = await parse_epub( fresh_buffer )
+                            if( cancelled ) return
+
+                            if( fresh_parsed.spine.length > 0 ) {
+                                const updated = { ...book_record, file: new Blob( [ fresh_buffer ], { type: `application/epub+zip` } ) }
+                                await save_book( updated )
+                                array_buffer = fresh_buffer
+                                parsed = fresh_parsed
+                                log.info( `Re-imported Gutenberg book with ${ fresh_parsed.spine.length } spine items` )
+                            }
+                        }
+                    } catch ( heal_error ) {
+                        log.debug( `Self-heal failed:`, heal_error.message )
+                    }
+                }
+
+                if( !parsed || parsed.spine.length === 0 ) {
+                    log.error( `Book has no readable content` )
+                    set_loading( false )
+                    return
+                }
+
+                book_hash_ref.current = await hash_buffer( array_buffer )
                 set_epub_data( parsed )
                 set_loading( false )
 
-                log.info( `Book loaded:`, parsed.metadata.title, `with`, parsed.spine.length, `spine items` )
+                log.info( `Book loaded:`, parsed.metadata?.title, `with`, parsed.spine.length, `spine items` )
 
             } catch ( error ) {
                 log.error( `Failed to load book:`, error )

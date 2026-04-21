@@ -184,6 +184,12 @@ export default function GutenbergSection() {
             const response = await fetch( `/gutenberg_epubs/${ book.id }.epub` )
             if( !response.ok ) throw new Error( `Failed to fetch epub` )
 
+            // Vite's SPA fallback serves index.html (text/html) for missing files instead of 404
+            const content_type = response.headers.get( `content-type` ) || ``
+            if( !content_type.includes( `epub` ) && !content_type.includes( `octet-stream` ) ) {
+                throw new Error( `Unexpected content type: ${ content_type }` )
+            }
+
             const array_buffer = await response.arrayBuffer()
             const { metadata, cover_url } = await parse_epub( array_buffer )
 
@@ -210,9 +216,9 @@ export default function GutenbergSection() {
 
             const book_record = {
                 id: book_id,
-                title: metadata.title || book.title,
-                author: metadata.creator || book.authors?.[0]?.name || `Unknown`,
-                language: metadata.language || book.languages?.[0] || `en`,
+                title: metadata?.title || book.title,
+                author: metadata?.creator || book.authors?.[0]?.name || `Unknown`,
+                language: metadata?.language || book.languages?.[0] || `en`,
                 cover_image: cover_blob,
                 file: new Blob( [ array_buffer ], { type: `application/epub+zip` } ),
                 added_at: new Date().toISOString()

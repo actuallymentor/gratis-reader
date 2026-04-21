@@ -1903,40 +1903,6 @@
     "cover": "24141.jpg"
   },
   {
-    "id": 26471,
-    "title": "Spoon River Anthology",
-    "authors": [
-      {
-        "name": "Masters, Edgar Lee",
-        "birth_year": 1868,
-        "death_year": 1950
-      }
-    ],
-    "summaries": [],
-    "editors": [],
-    "translators": [],
-    "subjects": [
-      "American poetry"
-    ],
-    "bookshelves": [],
-    "languages": [
-      "en"
-    ],
-    "copyright": false,
-    "media_type": "Sound",
-    "formats": {
-      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/26471/26471_readme.txt",
-      "text/html": "https://www.gutenberg.org/files/26471/26471_index.html",
-      "audio/ogg": "https://www.gutenberg.org/files/26471/ogg/26471-01.ogg",
-      "audio/mp4": "https://www.gutenberg.org/files/26471/m4b/26471-01.m4b",
-      "audio/mpeg": "https://www.gutenberg.org/files/26471/mp3/26471-01.mp3",
-      "application/rdf+xml": "https://www.gutenberg.org/ebooks/26471.rdf",
-      "image/jpeg": "https://www.gutenberg.org/cache/epub/26471/pg26471.cover.medium.jpg"
-    },
-    "download_count": 30062,
-    "cover": "26471.jpg"
-  },
-  {
     "id": 1232,
     "title": "The Prince",
     "authors": [
@@ -2037,46 +2003,6 @@
     },
     "download_count": 29327,
     "cover": "1998.jpg"
-  },
-  {
-    "id": 28942,
-    "title": "The Junior Classics, Volume 1: Fairy and wonder tales",
-    "authors": [
-      {
-        "name": "Neilson, William Allan",
-        "birth_year": 1869,
-        "death_year": 1946
-      }
-    ],
-    "summaries": [],
-    "editors": [
-      {
-        "name": "Patten, William",
-        "birth_year": 1868,
-        "death_year": 1936
-      }
-    ],
-    "translators": [],
-    "subjects": [
-      "Children's literature"
-    ],
-    "bookshelves": [],
-    "languages": [
-      "en"
-    ],
-    "copyright": false,
-    "media_type": "Sound",
-    "formats": {
-      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/28942/28942_readme.txt",
-      "text/html": "https://www.gutenberg.org/files/28942/28942_index.html",
-      "audio/ogg": "https://www.gutenberg.org/files/28942/ogg/28942-01.ogg",
-      "audio/mp4": "https://www.gutenberg.org/files/28942/m4b/28942-01.m4b",
-      "audio/mpeg": "https://www.gutenberg.org/files/28942/mp3/28942-01.mp3",
-      "application/rdf+xml": "https://www.gutenberg.org/ebooks/28942.rdf",
-      "image/jpeg": "https://www.gutenberg.org/cache/epub/28942/pg28942.cover.medium.jpg"
-    },
-    "download_count": 28853,
-    "cover": "28942.jpg"
   },
   {
     "id": 1952,
@@ -3076,40 +3002,6 @@
     "cover": "2852.jpg"
   },
   {
-    "id": 26225,
-    "title": "Fifteen Thousand Useful Phrases",
-    "authors": [
-      {
-        "name": "Kleiser, Grenville",
-        "birth_year": 1868,
-        "death_year": 1953
-      }
-    ],
-    "summaries": [],
-    "editors": [],
-    "translators": [],
-    "subjects": [
-      "English language -- Terms and phrases"
-    ],
-    "bookshelves": [],
-    "languages": [
-      "en"
-    ],
-    "copyright": false,
-    "media_type": "Sound",
-    "formats": {
-      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/26225/26225-readme.txt",
-      "text/html": "https://www.gutenberg.org/files/26225/26225-index.html",
-      "audio/ogg": "https://www.gutenberg.org/files/26225/ogg/26225-01.ogg",
-      "audio/mp4": "https://www.gutenberg.org/files/26225/m4b/26225-01.m4b",
-      "audio/mpeg": "https://www.gutenberg.org/files/26225/mp3/26225-01.mp3",
-      "application/rdf+xml": "https://www.gutenberg.org/ebooks/26225.rdf",
-      "image/jpeg": "https://www.gutenberg.org/cache/epub/26225/pg26225.cover.medium.jpg"
-    },
-    "download_count": 21496,
-    "cover": "26225.jpg"
-  },
-  {
     "id": 408,
     "title": "The Souls of Black Folk",
     "authors": [
@@ -3151,41 +3043,6 @@
     },
     "download_count": 21414,
     "cover": "408.jpg"
-  },
-  {
-    "id": 20968,
-    "title": "Three Hundred Tang Poems, Volume 1",
-    "authors": [
-      {
-        "name": "Various",
-        "birth_year": null,
-        "death_year": null
-      }
-    ],
-    "summaries": [],
-    "editors": [],
-    "translators": [],
-    "subjects": [
-      "Chinese poetry -- Tang dynasty, 618-907"
-    ],
-    "bookshelves": [],
-    "languages": [
-      "zh"
-    ],
-    "copyright": false,
-    "media_type": "Sound",
-    "formats": {
-      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/20968/20968-readme.txt",
-      "text/html": "https://www.gutenberg.org/files/20968/20968-index.html",
-      "audio/ogg": "https://www.gutenberg.org/files/20968/ogg/20968-01.ogg",
-      "audio/mp4": "https://www.gutenberg.org/files/20968/m4b/20968-01.m4b",
-      "audio/mpeg": "https://www.gutenberg.org/files/20968/mp3/20968-01.mp3",
-      "application/rdf+xml": "https://www.gutenberg.org/ebooks/20968.rdf",
-      "image/jpeg": "https://www.gutenberg.org/cache/epub/20968/pg20968.cover.medium.jpg",
-      "application/octet-stream": "https://www.gutenberg.org/files/20968/20968-m4b.zip"
-    },
-    "download_count": 21390,
-    "cover": "20968.jpg"
   },
   {
     "id": 244,
@@ -3231,88 +3088,6 @@
     },
     "download_count": 21389,
     "cover": "244.jpg"
-  },
-  {
-    "id": 33283,
-    "title": "Calculus Made Easy: Being a very-simplest introduction to those beautiful methods which are generally called by the terrifying names of the Differential Calculus and the Integral Calculus",
-    "authors": [
-      {
-        "name": "Thompson, Silvanus P. (Silvanus Phillips)",
-        "birth_year": 1851,
-        "death_year": 1916
-      }
-    ],
-    "summaries": [
-      "\"Calculus Made Easy\" by Silvanus P. Thompson is a book on infinitesimal calculus originally published in 1910. Rather than relying on the traditional epsilon-delta definition of limits, Thompson takes a revolutionary approach by using direct approximation methods in the spirit of Leibniz. The book aims to demystify what are often considered terrifying mathematical concepts, making differential and integral calculus accessible through simplified explanations. Its enduring popularity is evidenced by multiple editions and numerous reprints spanning over half a century. (This is an automatically generated summary.)"
-    ],
-    "editors": [],
-    "translators": [],
-    "subjects": [
-      "Calculus"
-    ],
-    "bookshelves": [
-      "Mathematics"
-    ],
-    "languages": [
-      "en"
-    ],
-    "copyright": false,
-    "media_type": "Text",
-    "formats": {
-      "application/pdf": "https://www.gutenberg.org/files/33283/33283-pdf.pdf",
-      "application/rdf+xml": "https://www.gutenberg.org/ebooks/33283.rdf",
-      "application/prs.tex": "https://www.gutenberg.org/files/33283/33283-t/33283-t.tex",
-      "image/jpeg": "https://www.gutenberg.org/cache/epub/33283/pg33283.cover.medium.jpg"
-    },
-    "download_count": 21234,
-    "cover": "33283.jpg"
-  },
-  {
-    "id": 22788,
-    "title": "The Federalist Papers",
-    "authors": [
-      {
-        "name": "Hamilton, Alexander",
-        "birth_year": 1757,
-        "death_year": 1804
-      },
-      {
-        "name": "Jay, John",
-        "birth_year": 1745,
-        "death_year": 1829
-      },
-      {
-        "name": "Madison, James",
-        "birth_year": 1751,
-        "death_year": 1836
-      }
-    ],
-    "summaries": [],
-    "editors": [],
-    "translators": [],
-    "subjects": [
-      "Constitutional history -- United States -- Sources",
-      "Constitutional law -- United States"
-    ],
-    "bookshelves": [
-      "United States"
-    ],
-    "languages": [
-      "en"
-    ],
-    "copyright": false,
-    "media_type": "Sound",
-    "formats": {
-      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/22788/22788-readme.txt",
-      "text/html": "https://www.gutenberg.org/files/22788/22788-index.html",
-      "audio/ogg": "https://www.gutenberg.org/files/22788/ogg/22788-01.ogg",
-      "audio/mp4": "https://www.gutenberg.org/files/22788/m4b/22788-01.m4b",
-      "audio/mpeg": "https://www.gutenberg.org/files/22788/mp3/22788-01.mp3",
-      "application/rdf+xml": "https://www.gutenberg.org/ebooks/22788.rdf",
-      "image/jpeg": "https://www.gutenberg.org/cache/epub/22788/pg22788.cover.medium.jpg"
-    },
-    "download_count": 20967,
-    "cover": "22788.jpg"
   },
   {
     "id": 34901,
@@ -3755,41 +3530,6 @@
     "cover": "45917.jpg"
   },
   {
-    "id": 26296,
-    "title": "Les mille et une nuits, tome premier",
-    "authors": [],
-    "summaries": [],
-    "editors": [],
-    "translators": [
-      {
-        "name": "Galland, Antoine",
-        "birth_year": 1646,
-        "death_year": 1715
-      }
-    ],
-    "subjects": [
-      "Fairy tales",
-      "Tales -- Arab countries"
-    ],
-    "bookshelves": [],
-    "languages": [
-      "fr"
-    ],
-    "copyright": false,
-    "media_type": "Sound",
-    "formats": {
-      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/26296/26296-readme.txt",
-      "text/html": "https://www.gutenberg.org/files/26296/26296-index.html",
-      "audio/ogg": "https://www.gutenberg.org/files/26296/ogg/26296-01.ogg",
-      "audio/mp4": "https://www.gutenberg.org/files/26296/m4b/26296-01.m4b",
-      "audio/mpeg": "https://www.gutenberg.org/files/26296/mp3/26296-01.mp3",
-      "application/rdf+xml": "https://www.gutenberg.org/ebooks/26296.rdf",
-      "image/jpeg": "https://www.gutenberg.org/cache/epub/26296/pg26296.cover.medium.jpg"
-    },
-    "download_count": 19180,
-    "cover": "26296.jpg"
-  },
-  {
     "id": 219,
     "title": "Heart of Darkness",
     "authors": [
@@ -3976,43 +3716,6 @@
     },
     "download_count": 18458,
     "cover": "16.jpg"
-  },
-  {
-    "id": 22789,
-    "title": "On the Duties of the Clergy",
-    "authors": [
-      {
-        "name": "Ambrose, Saint, Bishop of Milan",
-        "birth_year": null,
-        "death_year": 397
-      }
-    ],
-    "summaries": [],
-    "editors": [],
-    "translators": [],
-    "subjects": [
-      "Ambrose, Saint, Bishop of Milan, -397",
-      "Asceticism -- History -- Early church, ca. 30-600",
-      "Christian ethics -- History -- Early church, ca. 30-600",
-      "Clergy -- Office -- Early works to 1800"
-    ],
-    "bookshelves": [],
-    "languages": [
-      "en"
-    ],
-    "copyright": false,
-    "media_type": "Sound",
-    "formats": {
-      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/22789/22789-readme.txt",
-      "text/html": "https://www.gutenberg.org/files/22789/22789-index.html",
-      "audio/ogg": "https://www.gutenberg.org/files/22789/ogg/22789-01.ogg",
-      "audio/mp4": "https://www.gutenberg.org/files/22789/m4b/22789-01.m4b",
-      "audio/mpeg": "https://www.gutenberg.org/files/22789/mp3/22789-01.mp3",
-      "application/rdf+xml": "https://www.gutenberg.org/ebooks/22789.rdf",
-      "image/jpeg": "https://www.gutenberg.org/cache/epub/22789/pg22789.cover.medium.jpg"
-    },
-    "download_count": 18332,
-    "cover": "22789.jpg"
   },
   {
     "id": 135,
@@ -5253,47 +4956,6 @@
     "cover": "35.jpg"
   },
   {
-    "id": 20000,
-    "title": "Twenty Thousand Leagues Under the Sea",
-    "authors": [
-      {
-        "name": "Verne, Jules",
-        "birth_year": 1828,
-        "death_year": 1905
-      }
-    ],
-    "summaries": [],
-    "editors": [],
-    "translators": [],
-    "subjects": [
-      "Adventure stories",
-      "Science fiction",
-      "Sea stories",
-      "Submarines (Ships) -- Fiction",
-      "Underwater exploration -- Fiction"
-    ],
-    "bookshelves": [
-      "Science Fiction"
-    ],
-    "languages": [
-      "en"
-    ],
-    "copyright": false,
-    "media_type": "Sound",
-    "formats": {
-      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/20000/20000-readme.txt",
-      "text/html": "https://www.gutenberg.org/files/20000/20000-index.html",
-      "audio/ogg": "https://www.gutenberg.org/files/20000/ogg/20000-01.ogg",
-      "audio/mp4": "https://www.gutenberg.org/files/20000/m4b/20000-01.m4b",
-      "audio/mpeg": "https://www.gutenberg.org/files/20000/mp3/20000-01.mp3",
-      "application/rdf+xml": "https://www.gutenberg.org/ebooks/20000.rdf",
-      "image/jpeg": "https://www.gutenberg.org/cache/epub/20000/pg20000.cover.medium.jpg",
-      "application/octet-stream": "https://www.gutenberg.org/files/20000/20000-m4b.zip"
-    },
-    "download_count": 15300,
-    "cover": "20000.jpg"
-  },
-  {
     "id": 15399,
     "title": "The Interesting Narrative of the Life of Olaudah Equiano, Or Gustavus Vassa, The African: Written By Himself",
     "authors": [
@@ -5551,43 +5213,6 @@
     },
     "download_count": 14798,
     "cover": "44608.jpg"
-  },
-  {
-    "id": 21436,
-    "title": "Poems Every Child Should Know",
-    "authors": [],
-    "summaries": [],
-    "editors": [
-      {
-        "name": "Burt, Mary E. (Mary Elizabeth)",
-        "birth_year": 1850,
-        "death_year": 1918
-      }
-    ],
-    "translators": [],
-    "subjects": [
-      "American poetry",
-      "English poetry"
-    ],
-    "bookshelves": [
-      "Children's Anthologies"
-    ],
-    "languages": [
-      "en"
-    ],
-    "copyright": false,
-    "media_type": "Sound",
-    "formats": {
-      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/21436/21436-readme.txt",
-      "text/html": "https://www.gutenberg.org/files/21436/21436-index.html",
-      "audio/ogg": "https://www.gutenberg.org/files/21436/ogg/21436-01.ogg",
-      "audio/mp4": "https://www.gutenberg.org/files/21436/m4b/21436-01.m4b",
-      "audio/mpeg": "https://www.gutenberg.org/files/21436/mp3/21436-01.mp3",
-      "application/rdf+xml": "https://www.gutenberg.org/ebooks/21436.rdf",
-      "image/jpeg": "https://www.gutenberg.org/cache/epub/21436/pg21436.cover.medium.jpg"
-    },
-    "download_count": 14785,
-    "cover": "21436.jpg"
   },
   {
     "id": 41445,
@@ -6614,46 +6239,6 @@
     "cover": "779.jpg"
   },
   {
-    "id": 20027,
-    "title": "Grimms' Fairy Tales",
-    "authors": [
-      {
-        "name": "Grimm, Jacob",
-        "birth_year": 1785,
-        "death_year": 1863
-      },
-      {
-        "name": "Grimm, Wilhelm",
-        "birth_year": 1786,
-        "death_year": 1859
-      }
-    ],
-    "summaries": [],
-    "editors": [],
-    "translators": [],
-    "subjects": [
-      "Fairy tales -- Germany"
-    ],
-    "bookshelves": [],
-    "languages": [
-      "en"
-    ],
-    "copyright": false,
-    "media_type": "Sound",
-    "formats": {
-      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/20027/20027-readme.txt",
-      "text/html": "https://www.gutenberg.org/files/20027/20027-index.html",
-      "audio/ogg": "https://www.gutenberg.org/files/20027/ogg/20027-01.ogg",
-      "audio/mp4": "https://www.gutenberg.org/files/20027/m4b/20027-01.m4b",
-      "audio/mpeg": "https://www.gutenberg.org/files/20027/mp3/20027-01.mp3",
-      "application/rdf+xml": "https://www.gutenberg.org/ebooks/20027.rdf",
-      "image/jpeg": "https://www.gutenberg.org/cache/epub/20027/pg20027.cover.medium.jpg",
-      "application/octet-stream": "https://www.gutenberg.org/files/20027/20027-m4b.zip"
-    },
-    "download_count": 13185,
-    "cover": "20027.jpg"
-  },
-  {
     "id": 34413,
     "title": "The Love Letters of Mary Wollstonecraft to Gilbert Imlay",
     "authors": [
@@ -7245,48 +6830,6 @@
     },
     "download_count": 12503,
     "cover": "43671.jpg"
-  },
-  {
-    "id": 20051,
-    "title": "Märchen der Gebrüder Grimm 2",
-    "authors": [
-      {
-        "name": "Grimm, Jacob",
-        "birth_year": 1785,
-        "death_year": 1863
-      },
-      {
-        "name": "Grimm, Wilhelm",
-        "birth_year": 1786,
-        "death_year": 1859
-      }
-    ],
-    "summaries": [],
-    "editors": [],
-    "translators": [],
-    "subjects": [
-      "Fairy tales -- Germany"
-    ],
-    "bookshelves": [
-      "DE Kinderbuch"
-    ],
-    "languages": [
-      "de"
-    ],
-    "copyright": false,
-    "media_type": "Sound",
-    "formats": {
-      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/20051/20051-readme.txt",
-      "text/html": "https://www.gutenberg.org/files/20051/20051-index.html",
-      "audio/ogg": "https://www.gutenberg.org/files/20051/ogg/20051-01.ogg",
-      "audio/mp4": "https://www.gutenberg.org/files/20051/m4b/20051-01.m4b",
-      "audio/mpeg": "https://www.gutenberg.org/files/20051/mp3/20051-01.mp3",
-      "application/rdf+xml": "https://www.gutenberg.org/ebooks/20051.rdf",
-      "image/jpeg": "https://www.gutenberg.org/cache/epub/20051/pg20051.cover.medium.jpg",
-      "application/octet-stream": "https://www.gutenberg.org/files/20051/20051-m4b.zip"
-    },
-    "download_count": 12471,
-    "cover": "20051.jpg"
   },
   {
     "id": 43255,
@@ -8432,43 +7975,6 @@
     "cover": "21700.jpg"
   },
   {
-    "id": 22981,
-    "title": "Letters of Two Brides",
-    "authors": [
-      {
-        "name": "Balzac, Honoré de",
-        "birth_year": 1799,
-        "death_year": 1850
-      }
-    ],
-    "summaries": [],
-    "editors": [],
-    "translators": [],
-    "subjects": [
-      "Epistolary fiction",
-      "French fiction -- Translations into English",
-      "Man-woman relationships -- Fiction",
-      "Married women -- Fiction"
-    ],
-    "bookshelves": [],
-    "languages": [
-      "en"
-    ],
-    "copyright": false,
-    "media_type": "Sound",
-    "formats": {
-      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/22981/22981-readme.txt",
-      "text/html": "https://www.gutenberg.org/files/22981/22981-index.html",
-      "audio/ogg": "https://www.gutenberg.org/files/22981/ogg/22981-01.ogg",
-      "audio/mp4": "https://www.gutenberg.org/files/22981/m4b/22981-01.m4b",
-      "audio/mpeg": "https://www.gutenberg.org/files/22981/mp3/22981-01.mp3",
-      "application/rdf+xml": "https://www.gutenberg.org/ebooks/22981.rdf",
-      "image/jpeg": "https://www.gutenberg.org/cache/epub/22981/pg22981.cover.medium.jpg"
-    },
-    "download_count": 11526,
-    "cover": "22981.jpg"
-  },
-  {
     "id": 8438,
     "title": "The Ethics of Aristotle",
     "authors": [
@@ -8907,50 +8413,6 @@
     },
     "download_count": 11320,
     "cover": "45634.jpg"
-  },
-  {
-    "id": 20265,
-    "title": "Anne of the Island",
-    "authors": [
-      {
-        "name": "Montgomery, L. M. (Lucy Maud)",
-        "birth_year": 1874,
-        "death_year": 1942
-      }
-    ],
-    "summaries": [],
-    "editors": [],
-    "translators": [],
-    "subjects": [
-      "Canada -- History -- 1914-1945 -- Fiction",
-      "Interpersonal relations -- Fiction",
-      "Nova Scotia -- History -- 20th century -- Fiction",
-      "Orphans -- Fiction",
-      "Prince Edward Island -- History -- 20th century -- Fiction",
-      "Self-perception -- Fiction",
-      "Shirley, Anne (Fictitious character) -- Fiction",
-      "Universities and colleges -- Fiction"
-    ],
-    "bookshelves": [
-      "Children's Literature"
-    ],
-    "languages": [
-      "en"
-    ],
-    "copyright": false,
-    "media_type": "Sound",
-    "formats": {
-      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/20265/20265-readme.txt",
-      "text/html": "https://www.gutenberg.org/files/20265/20265-index.html",
-      "audio/ogg": "https://www.gutenberg.org/files/20265/ogg/20265-01.ogg",
-      "audio/mp4": "https://www.gutenberg.org/files/20265/m4b/20265-01.m4b",
-      "audio/mpeg": "https://www.gutenberg.org/files/20265/mp3/20265-01.mp3",
-      "application/rdf+xml": "https://www.gutenberg.org/ebooks/20265.rdf",
-      "image/jpeg": "https://www.gutenberg.org/cache/epub/20265/pg20265.cover.medium.jpg",
-      "application/octet-stream": "https://www.gutenberg.org/files/20265/20265-m4b.zip"
-    },
-    "download_count": 11257,
-    "cover": "20265.jpg"
   },
   {
     "id": 2147,
@@ -9670,48 +9132,6 @@
     },
     "download_count": 10872,
     "cover": "45839.jpg"
-  },
-  {
-    "id": 19839,
-    "title": "Emma",
-    "authors": [
-      {
-        "name": "Austen, Jane",
-        "birth_year": 1775,
-        "death_year": 1817
-      }
-    ],
-    "summaries": [],
-    "editors": [],
-    "translators": [],
-    "subjects": [
-      "Bildungsromans",
-      "England -- Fiction",
-      "Fathers and daughters -- Fiction",
-      "Female friendship -- Fiction",
-      "Humorous stories",
-      "Love stories",
-      "Mate selection -- Fiction",
-      "Young women -- Fiction"
-    ],
-    "bookshelves": [],
-    "languages": [
-      "en"
-    ],
-    "copyright": false,
-    "media_type": "Sound",
-    "formats": {
-      "text/html": "https://www.gutenberg.org/files/19839/19839-index.html",
-      "audio/ogg": "https://www.gutenberg.org/files/19839/ogg/19839-01.ogg",
-      "audio/mp4": "https://www.gutenberg.org/files/19839/m4b/19839-01.m4b",
-      "audio/mpeg": "https://www.gutenberg.org/files/19839/mp3/19839-01.mp3",
-      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/19839/19839.txt",
-      "application/rdf+xml": "https://www.gutenberg.org/ebooks/19839.rdf",
-      "image/jpeg": "https://www.gutenberg.org/cache/epub/19839/pg19839.cover.medium.jpg",
-      "application/octet-stream": "https://www.gutenberg.org/files/19839/19839-m4b.zip"
-    },
-    "download_count": 10869,
-    "cover": "19839.jpg"
   },
   {
     "id": 7142,
@@ -10542,86 +9962,6 @@
     "cover": "32474.jpg"
   },
   {
-    "id": 28811,
-    "title": "Barchester Towers",
-    "authors": [
-      {
-        "name": "Trollope, Anthony",
-        "birth_year": 1815,
-        "death_year": 1882
-      }
-    ],
-    "summaries": [],
-    "editors": [],
-    "translators": [],
-    "subjects": [
-      "Barchester (England : Imaginary place) -- Fiction",
-      "Barsetshire (England : Imaginary place) -- Fiction",
-      "Clergy -- Fiction",
-      "Domestic fiction"
-    ],
-    "bookshelves": [],
-    "languages": [
-      "en"
-    ],
-    "copyright": false,
-    "media_type": "Sound",
-    "formats": {
-      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/28811/28811_readme.txt",
-      "text/html": "https://www.gutenberg.org/files/28811/28811_index.html",
-      "audio/ogg": "https://www.gutenberg.org/files/28811/ogg/28811-01.ogg",
-      "audio/mp4": "https://www.gutenberg.org/files/28811/m4b/28811-01.m4b",
-      "audio/mpeg": "https://www.gutenberg.org/files/28811/mp3/28811-01.mp3",
-      "application/rdf+xml": "https://www.gutenberg.org/ebooks/28811.rdf",
-      "image/jpeg": "https://www.gutenberg.org/cache/epub/28811/pg28811.cover.medium.jpg"
-    },
-    "download_count": 10568,
-    "cover": "28811.jpg"
-  },
-  {
-    "id": 20593,
-    "title": "Anne of Green Gables",
-    "authors": [
-      {
-        "name": "Montgomery, L. M. (Lucy Maud)",
-        "birth_year": 1874,
-        "death_year": 1942
-      }
-    ],
-    "summaries": [],
-    "editors": [],
-    "translators": [],
-    "subjects": [
-      "Bildungsromans",
-      "Canada -- History -- 1867-1914 -- Fiction",
-      "Country life -- Prince Edward Island -- Fiction",
-      "Friendship -- Fiction",
-      "Girls -- Fiction",
-      "Islands -- Fiction",
-      "Orphans -- Fiction",
-      "Prince Edward Island -- History -- 20th century -- Fiction",
-      "Shirley, Anne (Fictitious character) -- Fiction"
-    ],
-    "bookshelves": [],
-    "languages": [
-      "en"
-    ],
-    "copyright": false,
-    "media_type": "Sound",
-    "formats": {
-      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/20593/20593-readme.txt",
-      "text/html": "https://www.gutenberg.org/files/20593/20593-index.html",
-      "audio/ogg": "https://www.gutenberg.org/files/20593/ogg/20593-01.ogg",
-      "audio/mp4": "https://www.gutenberg.org/files/20593/m4b/20593-01.m4b",
-      "audio/mpeg": "https://www.gutenberg.org/files/20593/mp3/20593-01.mp3",
-      "application/rdf+xml": "https://www.gutenberg.org/ebooks/20593.rdf",
-      "image/jpeg": "https://www.gutenberg.org/cache/epub/20593/pg20593.cover.medium.jpg",
-      "application/octet-stream": "https://www.gutenberg.org/files/20593/anne_green_gables_38_montgomery.ogg~"
-    },
-    "download_count": 10500,
-    "cover": "20593.jpg"
-  },
-  {
     "id": 20417,
     "title": "The Outline of Science, Vol. 1 (of 4): A Plain Story Simply Told",
     "authors": [
@@ -11406,53 +10746,6 @@
     "cover": "51912.jpg"
   },
   {
-    "id": 5740,
-    "title": "Tractatus Logico-Philosophicus",
-    "authors": [
-      {
-        "name": "Wittgenstein, Ludwig",
-        "birth_year": 1889,
-        "death_year": 1951
-      }
-    ],
-    "summaries": [
-      "\"Tractatus Logico-Philosophicus\" by Ludwig Wittgenstein is a philosophical work written during World War I and published in 1921. This austere book seeks to define the relationship between language and reality and establish the limits of science. Composed of 525 hierarchically numbered declarative statements, it presents seven main propositions without traditional arguments. The work profoundly influenced twentieth-century philosophy, particularly logical positivism, though Wittgenstein later criticized many of its ideas. Its famous closing statement addresses the boundaries of meaningful expression. (This is an automatically generated summary.)"
-    ],
-    "editors": [],
-    "translators": [
-      {
-        "name": "Ogden, C. K. (Charles Kay)",
-        "birth_year": 1889,
-        "death_year": 1957
-      }
-    ],
-    "subjects": [
-      "Language and languages -- Philosophy",
-      "Logic, Symbolic and mathematical"
-    ],
-    "bookshelves": [
-      "DE Sachbuch",
-      "Mathematics",
-      "Nobel Prizes in Literature",
-      "Philosophy"
-    ],
-    "languages": [
-      "de",
-      "en"
-    ],
-    "copyright": false,
-    "media_type": "Text",
-    "formats": {
-      "application/pdf": "https://www.gutenberg.org/files/5740/5740-pdf.pdf",
-      "application/octet-stream": "https://www.gutenberg.org/files/5740/5740-page-images/f0001.png",
-      "application/rdf+xml": "https://www.gutenberg.org/ebooks/5740.rdf",
-      "application/prs.tex": "https://www.gutenberg.org/files/5740/5740-t/5740-t.tex",
-      "image/jpeg": "https://www.gutenberg.org/cache/epub/5740/pg5740.cover.medium.jpg"
-    },
-    "download_count": 10029,
-    "cover": "5740.jpg"
-  },
-  {
     "id": 5230,
     "title": "The Invisible Man: A Grotesque Romance",
     "authors": [
@@ -11986,45 +11279,6 @@
     },
     "download_count": 9897,
     "cover": "160.jpg"
-  },
-  {
-    "id": 21181,
-    "title": "Villette",
-    "authors": [
-      {
-        "name": "Brontë, Charlotte",
-        "birth_year": 1816,
-        "death_year": 1855
-      }
-    ],
-    "summaries": [],
-    "editors": [],
-    "translators": [],
-    "subjects": [
-      "Autobiographical fiction",
-      "British -- Belgium -- Fiction",
-      "Brussels (Belgium) -- Fiction",
-      "Love stories",
-      "Women teachers -- Fiction"
-    ],
-    "bookshelves": [],
-    "languages": [
-      "en"
-    ],
-    "copyright": false,
-    "media_type": "Sound",
-    "formats": {
-      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/21181/21181-readme.txt",
-      "text/html": "https://www.gutenberg.org/files/21181/21181-index.html",
-      "audio/ogg": "https://www.gutenberg.org/files/21181/ogg/21181-01.ogg",
-      "audio/mp4": "https://www.gutenberg.org/files/21181/m4b/21181-01.m4b",
-      "audio/mpeg": "https://www.gutenberg.org/files/21181/mp3/21181-01.mp3",
-      "application/rdf+xml": "https://www.gutenberg.org/ebooks/21181.rdf",
-      "image/jpeg": "https://www.gutenberg.org/cache/epub/21181/pg21181.cover.medium.jpg",
-      "application/octet-stream": "https://www.gutenberg.org/files/21181/21181-m4b.zip"
-    },
-    "download_count": 9887,
-    "cover": "21181.jpg"
   },
   {
     "id": 40058,
@@ -13503,48 +12757,6 @@
     "cover": "1112.jpg"
   },
   {
-    "id": 22962,
-    "title": "Mansfield Park",
-    "authors": [
-      {
-        "name": "Austen, Jane",
-        "birth_year": 1775,
-        "death_year": 1817
-      }
-    ],
-    "summaries": [],
-    "editors": [],
-    "translators": [],
-    "subjects": [
-      "Adoptees -- Fiction",
-      "Children of the rich -- Fiction",
-      "Country homes -- Fiction",
-      "Cousins -- Fiction",
-      "Domestic fiction",
-      "England -- Fiction",
-      "Love stories",
-      "Uncles -- Fiction",
-      "Young women -- Fiction"
-    ],
-    "bookshelves": [],
-    "languages": [
-      "en"
-    ],
-    "copyright": false,
-    "media_type": "Sound",
-    "formats": {
-      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/22962/22962-readme.txt",
-      "text/html": "https://www.gutenberg.org/files/22962/22962-index.html",
-      "audio/ogg": "https://www.gutenberg.org/files/22962/ogg/22962-01.ogg",
-      "audio/mp4": "https://www.gutenberg.org/files/22962/m4b/22962-01.m4b",
-      "audio/mpeg": "https://www.gutenberg.org/files/22962/mp3/22962-01.mp3",
-      "application/rdf+xml": "https://www.gutenberg.org/ebooks/22962.rdf",
-      "image/jpeg": "https://www.gutenberg.org/cache/epub/22962/pg22962.cover.medium.jpg"
-    },
-    "download_count": 9289,
-    "cover": "22962.jpg"
-  },
-  {
     "id": 48438,
     "title": "Rizal's own story of his life",
     "authors": [
@@ -13588,7 +12800,7 @@
       "text/plain; charset=utf-8": "https://www.gutenberg.org/ebooks/48438.txt.utf-8",
       "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/48438/48438-0.txt"
     },
-    "download_count": 9258,
+    "download_count": 10782,
     "cover": "48438.jpg"
   },
   {
@@ -13850,50 +13062,6 @@
     },
     "download_count": 9228,
     "cover": "4200.jpg"
-  },
-  {
-    "id": 28794,
-    "title": "Moby Dick; Or, The Whale",
-    "authors": [
-      {
-        "name": "Melville, Herman",
-        "birth_year": 1819,
-        "death_year": 1891
-      }
-    ],
-    "summaries": [],
-    "editors": [],
-    "translators": [],
-    "subjects": [
-      "Adventure stories",
-      "Ahab, Captain (Fictitious character) -- Fiction",
-      "Mentally ill -- Fiction",
-      "Psychological fiction",
-      "Sea stories",
-      "Ship captains -- Fiction",
-      "Whales -- Fiction",
-      "Whaling -- Fiction",
-      "Whaling ships -- Fiction"
-    ],
-    "bookshelves": [
-      "Best Books Ever Listings"
-    ],
-    "languages": [
-      "en"
-    ],
-    "copyright": false,
-    "media_type": "Sound",
-    "formats": {
-      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/28794/28794_readme.txt",
-      "text/html": "https://www.gutenberg.org/files/28794/28794_index.html",
-      "audio/ogg": "https://www.gutenberg.org/files/28794/ogg/28794-01.ogg",
-      "audio/mp4": "https://www.gutenberg.org/files/28794/m4b/28794-01.m4b",
-      "audio/mpeg": "https://www.gutenberg.org/files/28794/mp3/28794-01.mp3",
-      "application/rdf+xml": "https://www.gutenberg.org/ebooks/28794.rdf",
-      "image/jpeg": "https://www.gutenberg.org/cache/epub/28794/pg28794.cover.medium.jpg"
-    },
-    "download_count": 9198,
-    "cover": "28794.jpg"
   },
   {
     "id": 75201,
@@ -14168,51 +13336,6 @@
     "cover": "27459.jpg"
   },
   {
-    "id": 19576,
-    "title": "Anne of Green Gables",
-    "authors": [
-      {
-        "name": "Montgomery, L. M. (Lucy Maud)",
-        "birth_year": 1874,
-        "death_year": 1942
-      }
-    ],
-    "summaries": [],
-    "editors": [],
-    "translators": [],
-    "subjects": [
-      "Bildungsromans",
-      "Canada -- History -- 1867-1914 -- Fiction",
-      "Country life -- Prince Edward Island -- Fiction",
-      "Friendship -- Fiction",
-      "Girls -- Fiction",
-      "Islands -- Fiction",
-      "Orphans -- Fiction",
-      "Prince Edward Island -- History -- 20th century -- Fiction",
-      "Shirley, Anne (Fictitious character) -- Fiction"
-    ],
-    "bookshelves": [
-      "Children's Literature"
-    ],
-    "languages": [
-      "en"
-    ],
-    "copyright": false,
-    "media_type": "Sound",
-    "formats": {
-      "text/html": "https://www.gutenberg.org/files/19576/19576-index.html",
-      "audio/ogg": "https://www.gutenberg.org/files/19576/ogg/19576-01.ogg",
-      "audio/mp4": "https://www.gutenberg.org/files/19576/m4b/19576-01.m4b",
-      "audio/mpeg": "https://www.gutenberg.org/files/19576/mp3/19576-01.mp3",
-      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/19576/19576.txt",
-      "application/rdf+xml": "https://www.gutenberg.org/ebooks/19576.rdf",
-      "image/jpeg": "https://www.gutenberg.org/cache/epub/19576/pg19576.cover.medium.jpg",
-      "application/octet-stream": "https://www.gutenberg.org/files/19576/19576-m4b.zip"
-    },
-    "download_count": 9146,
-    "cover": "19576.jpg"
-  },
-  {
     "id": 140,
     "title": "The Jungle",
     "authors": [
@@ -14400,44 +13523,6 @@
     "cover": "39537.jpg"
   },
   {
-    "id": 28946,
-    "title": "Gulliver's Travels",
-    "authors": [
-      {
-        "name": "Swift, Jonathan",
-        "birth_year": 1667,
-        "death_year": 1745
-      }
-    ],
-    "summaries": [],
-    "editors": [],
-    "translators": [],
-    "subjects": [
-      "Fantasy fiction",
-      "Gulliver, Lemuel (Fictitious character) -- Fiction",
-      "Satire",
-      "Travelers -- Fiction",
-      "Voyages, Imaginary -- Early works to 1800"
-    ],
-    "bookshelves": [],
-    "languages": [
-      "en"
-    ],
-    "copyright": false,
-    "media_type": "Sound",
-    "formats": {
-      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/28946/28946_readme.txt",
-      "text/html": "https://www.gutenberg.org/files/28946/28946_index.html",
-      "audio/ogg": "https://www.gutenberg.org/files/28946/ogg/28946-01.ogg",
-      "audio/mp4": "https://www.gutenberg.org/files/28946/m4b/28946-01.m4b",
-      "audio/mpeg": "https://www.gutenberg.org/files/28946/mp3/28946-01.mp3",
-      "application/rdf+xml": "https://www.gutenberg.org/ebooks/28946.rdf",
-      "image/jpeg": "https://www.gutenberg.org/cache/epub/28946/pg28946.cover.medium.jpg"
-    },
-    "download_count": 9058,
-    "cover": "28946.jpg"
-  },
-  {
     "id": 61,
     "title": "The Communist Manifesto",
     "authors": [
@@ -14578,45 +13663,6 @@
     },
     "download_count": 9037,
     "cover": "44209.jpg"
-  },
-  {
-    "id": 26272,
-    "title": "The Spy",
-    "authors": [
-      {
-        "name": "Cooper, James Fenimore",
-        "birth_year": 1789,
-        "death_year": 1851
-      }
-    ],
-    "summaries": [],
-    "editors": [],
-    "translators": [],
-    "subjects": [
-      "Domestic fiction",
-      "Historical fiction",
-      "New York (State) -- History -- Revolution, 1775-1783 -- Fiction",
-      "Spy stories",
-      "United States -- History -- Revolution, 1775-1783 -- Fiction",
-      "War stories"
-    ],
-    "bookshelves": [],
-    "languages": [
-      "en"
-    ],
-    "copyright": false,
-    "media_type": "Sound",
-    "formats": {
-      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/26272/26272-readme.txt",
-      "text/html": "https://www.gutenberg.org/files/26272/26272-index.html",
-      "audio/ogg": "https://www.gutenberg.org/files/26272/ogg/26272-01.ogg",
-      "audio/mp4": "https://www.gutenberg.org/files/26272/m4b/26272-01.m4b",
-      "audio/mpeg": "https://www.gutenberg.org/files/26272/mp3/26272-01.mp3",
-      "application/rdf+xml": "https://www.gutenberg.org/ebooks/26272.rdf",
-      "image/jpeg": "https://www.gutenberg.org/cache/epub/26272/pg26272.cover.medium.jpg"
-    },
-    "download_count": 9036,
-    "cover": "26272.jpg"
   },
   {
     "id": 22421,
@@ -15059,84 +14105,6 @@
     "cover": "2002.jpg"
   },
   {
-    "id": 20676,
-    "title": "Genesis",
-    "authors": [],
-    "summaries": [],
-    "editors": [],
-    "translators": [],
-    "subjects": [
-      "Bible. Genesis"
-    ],
-    "bookshelves": [
-      "Judaism"
-    ],
-    "languages": [
-      "he"
-    ],
-    "copyright": false,
-    "media_type": "Sound",
-    "formats": {
-      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/20676/20676-readme.txt",
-      "text/html": "https://www.gutenberg.org/files/20676/20676-index.html",
-      "audio/ogg": "https://www.gutenberg.org/files/20676/ogg/20676-01.ogg",
-      "audio/mp4": "https://www.gutenberg.org/files/20676/m4b/20676-01.m4b",
-      "audio/mpeg": "https://www.gutenberg.org/files/20676/mp3/20676-01.mp3",
-      "application/rdf+xml": "https://www.gutenberg.org/ebooks/20676.rdf",
-      "image/jpeg": "https://www.gutenberg.org/cache/epub/20676/pg20676.cover.medium.jpg",
-      "application/octet-stream": "https://www.gutenberg.org/files/20676/20676-m4b.zip"
-    },
-    "download_count": 8918,
-    "cover": "20676.jpg"
-  },
-  {
-    "id": 19640,
-    "title": "Adventures of Huckleberry Finn",
-    "authors": [
-      {
-        "name": "Twain, Mark",
-        "birth_year": 1835,
-        "death_year": 1910
-      }
-    ],
-    "summaries": [],
-    "editors": [],
-    "translators": [],
-    "subjects": [
-      "Adventure stories",
-      "Bildungsromans",
-      "Boys -- Fiction",
-      "Finn, Huckleberry (Fictitious character) -- Fiction",
-      "Fugitive slaves -- Fiction",
-      "Humorous stories",
-      "Male friendship -- Fiction",
-      "Mississippi River -- Fiction",
-      "Missouri -- Fiction",
-      "Race relations -- Fiction",
-      "Runaway children -- Fiction"
-    ],
-    "bookshelves": [
-      "Banned Books List from the American Library Association"
-    ],
-    "languages": [
-      "en"
-    ],
-    "copyright": false,
-    "media_type": "Sound",
-    "formats": {
-      "text/html": "https://www.gutenberg.org/files/19640/19640-index.html",
-      "audio/ogg": "https://www.gutenberg.org/files/19640/ogg/19640-01.ogg",
-      "audio/mp4": "https://www.gutenberg.org/files/19640/m4b/19640-01.m4a",
-      "audio/mpeg": "https://www.gutenberg.org/files/19640/mp3/19640-01.mp3",
-      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/19640/19640.txt",
-      "application/rdf+xml": "https://www.gutenberg.org/ebooks/19640.rdf",
-      "image/jpeg": "https://www.gutenberg.org/cache/epub/19640/pg19640.cover.medium.jpg",
-      "application/octet-stream": "https://www.gutenberg.org/files/19640/19640-m4b.zip"
-    },
-    "download_count": 8916,
-    "cover": "19640.jpg"
-  },
-  {
     "id": 43296,
     "title": "A History of the Inquisition of Spain; vol. 1",
     "authors": [
@@ -15177,40 +14145,6 @@
     },
     "download_count": 8904,
     "cover": "43296.jpg"
-  },
-  {
-    "id": 23709,
-    "title": "The Burgess Bird Book for Children",
-    "authors": [
-      {
-        "name": "Burgess, Thornton W. (Thornton Waldo)",
-        "birth_year": 1874,
-        "death_year": 1965
-      }
-    ],
-    "summaries": [],
-    "editors": [],
-    "translators": [],
-    "subjects": [
-      "Birds -- Juvenile literature"
-    ],
-    "bookshelves": [],
-    "languages": [
-      "en"
-    ],
-    "copyright": false,
-    "media_type": "Sound",
-    "formats": {
-      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/23709/23709-readme.txt",
-      "text/html": "https://www.gutenberg.org/files/23709/23709-index.html",
-      "audio/ogg": "https://www.gutenberg.org/files/23709/ogg/23709-01.ogg",
-      "audio/mp4": "https://www.gutenberg.org/files/23709/m4b/23709-01.m4b",
-      "audio/mpeg": "https://www.gutenberg.org/files/23709/mp3/23709-01.mp3",
-      "application/rdf+xml": "https://www.gutenberg.org/ebooks/23709.rdf",
-      "image/jpeg": "https://www.gutenberg.org/cache/epub/23709/pg23709.cover.medium.jpg"
-    },
-    "download_count": 8895,
-    "cover": "23709.jpg"
   },
   {
     "id": 4367,
@@ -15595,174 +14529,6 @@
     "cover": "46276.jpg"
   },
   {
-    "id": 19517,
-    "title": "Le avventure di Pinocchio",
-    "authors": [
-      {
-        "name": "Collodi, Carlo",
-        "birth_year": 1826,
-        "death_year": 1890
-      }
-    ],
-    "summaries": [],
-    "editors": [],
-    "translators": [],
-    "subjects": [
-      "Fairy tales",
-      "Pinocchio (Fictitious character) -- Juvenile fiction",
-      "Puppets -- Juvenile fiction"
-    ],
-    "bookshelves": [
-      "IT Letteratura per ragazzi"
-    ],
-    "languages": [
-      "it"
-    ],
-    "copyright": false,
-    "media_type": "Sound",
-    "formats": {
-      "text/html": "https://www.gutenberg.org/files/19517/19517-index.html",
-      "audio/ogg": "https://www.gutenberg.org/files/19517/ogg/19517-01.ogg",
-      "audio/mp4": "https://www.gutenberg.org/files/19517/m4b/19517-01.m4b",
-      "audio/mpeg": "https://www.gutenberg.org/files/19517/mp3/19517-01.mp3",
-      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/19517/19517.txt",
-      "application/rdf+xml": "https://www.gutenberg.org/ebooks/19517.rdf",
-      "image/jpeg": "https://www.gutenberg.org/cache/epub/19517/pg19517.cover.medium.jpg",
-      "application/octet-stream": "https://www.gutenberg.org/files/19517/19517-m4b.zip"
-    },
-    "download_count": 8790,
-    "cover": "19517.jpg"
-  },
-  {
-    "id": 22964,
-    "title": "Sense and Sensibility",
-    "authors": [
-      {
-        "name": "Austen, Jane",
-        "birth_year": 1775,
-        "death_year": 1817
-      }
-    ],
-    "summaries": [],
-    "editors": [],
-    "translators": [],
-    "subjects": [
-      "Domestic fiction",
-      "England -- Fiction",
-      "England -- Social life and customs -- 19th century -- Fiction",
-      "Gentry -- England -- Fiction",
-      "Inheritance and succession -- Fiction",
-      "Love stories",
-      "Mate selection -- Fiction",
-      "Regency fiction",
-      "Sisters -- Fiction",
-      "Social classes -- Fiction",
-      "Young women -- Fiction"
-    ],
-    "bookshelves": [],
-    "languages": [
-      "en"
-    ],
-    "copyright": false,
-    "media_type": "Sound",
-    "formats": {
-      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/22964/22964-readme.txt",
-      "text/html": "https://www.gutenberg.org/files/22964/22964-index.html",
-      "audio/ogg": "https://www.gutenberg.org/files/22964/ogg/22964-01.ogg",
-      "audio/mp4": "https://www.gutenberg.org/files/22964/m4b/22964-01.m4b",
-      "audio/mpeg": "https://www.gutenberg.org/files/22964/mp3/22964-01.mp3",
-      "application/rdf+xml": "https://www.gutenberg.org/ebooks/22964.rdf",
-      "image/jpeg": "https://www.gutenberg.org/cache/epub/22964/pg22964.cover.medium.jpg"
-    },
-    "download_count": 8784,
-    "cover": "22964.jpg"
-  },
-  {
-    "id": 19506,
-    "title": "A Connecticut Yankee in King Arthur's Court",
-    "authors": [
-      {
-        "name": "Twain, Mark",
-        "birth_year": 1835,
-        "death_year": 1910
-      }
-    ],
-    "summaries": [],
-    "editors": [],
-    "translators": [],
-    "subjects": [
-      "Americans -- Great Britain -- Fiction",
-      "Arthurian romances -- Adaptations",
-      "Britons -- Fiction",
-      "Fantasy fiction",
-      "Kings and rulers -- Fiction",
-      "Knights and knighthood -- Fiction",
-      "Satire",
-      "Time travel -- Fiction"
-    ],
-    "bookshelves": [
-      "Precursors of Science Fiction"
-    ],
-    "languages": [
-      "en"
-    ],
-    "copyright": false,
-    "media_type": "Sound",
-    "formats": {
-      "text/html": "https://www.gutenberg.org/files/19506/19506-index.html",
-      "audio/ogg": "https://www.gutenberg.org/files/19506/ogg/19506-00.ogg",
-      "audio/mp4": "https://www.gutenberg.org/files/19506/m4b/19506-00.m4b",
-      "audio/mpeg": "https://www.gutenberg.org/files/19506/mp3/19506-00.mp3",
-      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/19506/19506.txt",
-      "application/rdf+xml": "https://www.gutenberg.org/ebooks/19506.rdf",
-      "image/jpeg": "https://www.gutenberg.org/cache/epub/19506/pg19506.cover.medium.jpg",
-      "application/octet-stream": "https://www.gutenberg.org/files/19506/19506-m4b.zip"
-    },
-    "download_count": 8777,
-    "cover": "19506.jpg"
-  },
-  {
-    "id": 22452,
-    "title": "Howards End",
-    "authors": [
-      {
-        "name": "Forster, E. M. (Edward Morgan)",
-        "birth_year": 1879,
-        "death_year": 1970
-      }
-    ],
-    "summaries": [],
-    "editors": [],
-    "translators": [],
-    "subjects": [
-      "Country homes -- Fiction",
-      "Domestic fiction",
-      "England -- Fiction",
-      "Illegitimate children -- Fiction",
-      "Inheritance and succession -- Fiction",
-      "Remarried people -- Fiction",
-      "Sisters -- Fiction",
-      "Social classes -- Fiction"
-    ],
-    "bookshelves": [],
-    "languages": [
-      "en"
-    ],
-    "copyright": false,
-    "media_type": "Sound",
-    "formats": {
-      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/22452/22452-readme.txt",
-      "text/html": "https://www.gutenberg.org/files/22452/22452-index.html",
-      "audio/ogg": "https://www.gutenberg.org/files/22452/ogg/22452-01.ogg",
-      "audio/mp4": "https://www.gutenberg.org/files/22452/m4b/22452-01.m4b",
-      "audio/mpeg": "https://www.gutenberg.org/files/22452/mp3/22452-01.mp3",
-      "application/rdf+xml": "https://www.gutenberg.org/ebooks/22452.rdf",
-      "image/jpeg": "https://www.gutenberg.org/cache/epub/22452/pg22452.cover.medium.jpg"
-    },
-    "download_count": 8724,
-    "cover": "22452.jpg"
-  },
-  {
     "id": 23841,
     "title": "漢書",
     "authors": [
@@ -16128,41 +14894,6 @@
     },
     "download_count": 8633,
     "cover": "8954.jpg"
-  },
-  {
-    "id": 28761,
-    "title": "Life in Mexico",
-    "authors": [
-      {
-        "name": "Calderón de la Barca, Madame (Frances Erskine Inglis)",
-        "birth_year": null,
-        "death_year": 1882
-      }
-    ],
-    "summaries": [],
-    "editors": [],
-    "translators": [],
-    "subjects": [
-      "Mexico -- Description and travel",
-      "Mexico -- Social life and customs"
-    ],
-    "bookshelves": [],
-    "languages": [
-      "en"
-    ],
-    "copyright": false,
-    "media_type": "Sound",
-    "formats": {
-      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/28761/28761_readme.txt",
-      "text/html": "https://www.gutenberg.org/files/28761/28761_index.html",
-      "audio/ogg": "https://www.gutenberg.org/files/28761/ogg/28761-01.ogg",
-      "audio/mp4": "https://www.gutenberg.org/files/28761/m4b/28761-01.m4b",
-      "audio/mpeg": "https://www.gutenberg.org/files/28761/mp3/28761-01.mp3",
-      "application/rdf+xml": "https://www.gutenberg.org/ebooks/28761.rdf",
-      "image/jpeg": "https://www.gutenberg.org/cache/epub/28761/pg28761.cover.medium.jpg"
-    },
-    "download_count": 8625,
-    "cover": "28761.jpg"
   },
   {
     "id": 31552,
@@ -16599,48 +15330,6 @@
     "cover": "1170.jpg"
   },
   {
-    "id": 26301,
-    "title": "Pride and Prejudice",
-    "authors": [
-      {
-        "name": "Austen, Jane",
-        "birth_year": 1775,
-        "death_year": 1817
-      }
-    ],
-    "summaries": [],
-    "editors": [],
-    "translators": [],
-    "subjects": [
-      "Courtship -- Fiction",
-      "Domestic fiction",
-      "England -- Fiction",
-      "Love stories",
-      "Sisters -- Fiction",
-      "Social classes -- Fiction",
-      "Young women -- Fiction"
-    ],
-    "bookshelves": [
-      "Best Books Ever Listings"
-    ],
-    "languages": [
-      "en"
-    ],
-    "copyright": false,
-    "media_type": "Sound",
-    "formats": {
-      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/26301/26301-readme.txt",
-      "text/html": "https://www.gutenberg.org/files/26301/26301-index.html",
-      "audio/ogg": "https://www.gutenberg.org/files/26301/ogg/26301-01.ogg",
-      "audio/mp4": "https://www.gutenberg.org/files/26301/m4b/26301-01.m4b",
-      "audio/mpeg": "https://www.gutenberg.org/files/26301/mp3/26301-01.mp3",
-      "application/rdf+xml": "https://www.gutenberg.org/ebooks/26301.rdf",
-      "image/jpeg": "https://www.gutenberg.org/cache/epub/26301/pg26301.cover.medium.jpg"
-    },
-    "download_count": 8488,
-    "cover": "26301.jpg"
-  },
-  {
     "id": 47221,
     "title": "Quintus Claudius: A Romance of Imperial Rome. Volume 1",
     "authors": [
@@ -16818,84 +15507,6 @@
     },
     "download_count": 8422,
     "cover": "147.jpg"
-  },
-  {
-    "id": 28737,
-    "title": "At the Back of the North Wind",
-    "authors": [
-      {
-        "name": "MacDonald, George",
-        "birth_year": 1824,
-        "death_year": 1905
-      }
-    ],
-    "summaries": [],
-    "editors": [],
-    "translators": [],
-    "subjects": [
-      "Fairy tales"
-    ],
-    "bookshelves": [],
-    "languages": [
-      "en"
-    ],
-    "copyright": false,
-    "media_type": "Sound",
-    "formats": {
-      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/28737/28737_readme.txt",
-      "text/html": "https://www.gutenberg.org/files/28737/28737_index.html",
-      "audio/ogg": "https://www.gutenberg.org/files/28737/ogg/28737-01.ogg",
-      "audio/mp4": "https://www.gutenberg.org/files/28737/m4b/28737-01.m4b",
-      "audio/mpeg": "https://www.gutenberg.org/files/28737/mp3/28737-01.mp3",
-      "application/rdf+xml": "https://www.gutenberg.org/ebooks/28737.rdf",
-      "image/jpeg": "https://www.gutenberg.org/cache/epub/28737/pg28737.cover.medium.jpg"
-    },
-    "download_count": 8415,
-    "cover": "28737.jpg"
-  },
-  {
-    "id": 23077,
-    "title": "Jane Eyre",
-    "authors": [
-      {
-        "name": "Brontë, Charlotte",
-        "birth_year": 1816,
-        "death_year": 1855
-      }
-    ],
-    "summaries": [],
-    "editors": [],
-    "translators": [],
-    "subjects": [
-      "Bildungsromans",
-      "Charity-schools -- Fiction",
-      "Country homes -- Fiction",
-      "England -- Fiction",
-      "Fathers and daughters -- Fiction",
-      "Governesses -- Fiction",
-      "Love stories",
-      "Married people -- Fiction",
-      "Mentally ill women -- Fiction",
-      "Orphans -- Fiction",
-      "Young women -- Fiction"
-    ],
-    "bookshelves": [],
-    "languages": [
-      "en"
-    ],
-    "copyright": false,
-    "media_type": "Sound",
-    "formats": {
-      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/23077/23077-readme.txt",
-      "text/html": "https://www.gutenberg.org/files/23077/23077-index.html",
-      "audio/ogg": "https://www.gutenberg.org/files/23077/ogg/23077-01.ogg",
-      "audio/mp4": "https://www.gutenberg.org/files/23077/m4b/23077-01.m4b",
-      "audio/mpeg": "https://www.gutenberg.org/files/23077/mp3/23077-01.mp3",
-      "application/rdf+xml": "https://www.gutenberg.org/ebooks/23077.rdf",
-      "image/jpeg": "https://www.gutenberg.org/cache/epub/23077/pg23077.cover.medium.jpg"
-    },
-    "download_count": 8409,
-    "cover": "23077.jpg"
   },
   {
     "id": 1837,
@@ -17096,46 +15707,6 @@
     },
     "download_count": 8381,
     "cover": "831.jpg"
-  },
-  {
-    "id": 19513,
-    "title": "A Journey to the Center of the Earth",
-    "authors": [
-      {
-        "name": "Verne, Jules",
-        "birth_year": 1828,
-        "death_year": 1905
-      }
-    ],
-    "summaries": [],
-    "editors": [],
-    "translators": [],
-    "subjects": [
-      "Adventure stories",
-      "Earth (Planet) -- Core -- Fiction",
-      "Science fiction",
-      "Voyages, Imaginary -- Fiction"
-    ],
-    "bookshelves": [
-      "Science Fiction"
-    ],
-    "languages": [
-      "en"
-    ],
-    "copyright": false,
-    "media_type": "Sound",
-    "formats": {
-      "text/html": "https://www.gutenberg.org/files/19513/19513-index.html",
-      "audio/ogg": "https://www.gutenberg.org/files/19513/ogg/19513-01.ogg",
-      "audio/mp4": "https://www.gutenberg.org/files/19513/m4b/19513-01.m4b",
-      "audio/mpeg": "https://www.gutenberg.org/files/19513/mp3/19513-01.mp3",
-      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/19513/19513.txt",
-      "application/rdf+xml": "https://www.gutenberg.org/ebooks/19513.rdf",
-      "image/jpeg": "https://www.gutenberg.org/cache/epub/19513/pg19513.cover.medium.jpg",
-      "application/octet-stream": "https://www.gutenberg.org/files/19513/19513-m4b.zip"
-    },
-    "download_count": 8376,
-    "cover": "19513.jpg"
   },
   {
     "id": 10615,
@@ -18484,83 +17055,6 @@
     "cover": "21006.jpg"
   },
   {
-    "id": 20050,
-    "title": "Märchen der Gebrüder Grimm 1",
-    "authors": [
-      {
-        "name": "Grimm, Jacob",
-        "birth_year": 1785,
-        "death_year": 1863
-      },
-      {
-        "name": "Grimm, Wilhelm",
-        "birth_year": 1786,
-        "death_year": 1859
-      }
-    ],
-    "summaries": [],
-    "editors": [],
-    "translators": [],
-    "subjects": [
-      "Fairy tales -- Germany"
-    ],
-    "bookshelves": [
-      "DE Kinderbuch"
-    ],
-    "languages": [
-      "de"
-    ],
-    "copyright": false,
-    "media_type": "Sound",
-    "formats": {
-      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/20050/20050-readme.txt",
-      "text/html": "https://www.gutenberg.org/files/20050/20050-index.html",
-      "audio/ogg": "https://www.gutenberg.org/files/20050/ogg/20050-01.ogg",
-      "audio/mp4": "https://www.gutenberg.org/files/20050/m4b/20050-01.m4b",
-      "audio/mpeg": "https://www.gutenberg.org/files/20050/mp3/20050-01.mp3",
-      "application/rdf+xml": "https://www.gutenberg.org/ebooks/20050.rdf",
-      "image/jpeg": "https://www.gutenberg.org/cache/epub/20050/pg20050.cover.medium.jpg",
-      "application/octet-stream": "https://www.gutenberg.org/files/20050/20050-m4b.zip"
-    },
-    "download_count": 8014,
-    "cover": "20050.jpg"
-  },
-  {
-    "id": 23079,
-    "title": "Sonnets from the Portuguese",
-    "authors": [
-      {
-        "name": "Browning, Elizabeth Barrett",
-        "birth_year": 1806,
-        "death_year": 1861
-      }
-    ],
-    "summaries": [],
-    "editors": [],
-    "translators": [],
-    "subjects": [
-      "Love poetry, English",
-      "Sonnets, English"
-    ],
-    "bookshelves": [],
-    "languages": [
-      "en"
-    ],
-    "copyright": false,
-    "media_type": "Sound",
-    "formats": {
-      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/23079/23079-readme.txt",
-      "text/html": "https://www.gutenberg.org/files/23079/23079-index.html",
-      "audio/ogg": "https://www.gutenberg.org/files/23079/ogg/23079-01.ogg",
-      "audio/mp4": "https://www.gutenberg.org/files/23079/m4b/23079-01.m4b",
-      "audio/mpeg": "https://www.gutenberg.org/files/23079/mp3/23079-01.mp3",
-      "application/rdf+xml": "https://www.gutenberg.org/ebooks/23079.rdf",
-      "image/jpeg": "https://www.gutenberg.org/cache/epub/23079/pg23079.cover.medium.jpg"
-    },
-    "download_count": 7999,
-    "cover": "23079.jpg"
-  },
-  {
     "id": 23500,
     "title": "The Car of Destiny",
     "authors": [
@@ -18700,87 +17194,6 @@
     },
     "download_count": 7992,
     "cover": "16351.jpg"
-  },
-  {
-    "id": 21163,
-    "title": "The Emerald City of Oz",
-    "authors": [
-      {
-        "name": "Baum, L. Frank (Lyman Frank)",
-        "birth_year": 1856,
-        "death_year": 1919
-      }
-    ],
-    "summaries": [],
-    "editors": [],
-    "translators": [],
-    "subjects": [
-      "Animals, Mythical -- Juvenile fiction",
-      "Aunts -- Juvenile fiction",
-      "Battles -- Juvenile fiction",
-      "Fantasy literature",
-      "Gale, Dorothy (Fictitious character) -- Juvenile fiction",
-      "Good and evil -- Juvenile fiction",
-      "Kings and rulers -- Juvenile fiction",
-      "Magic -- Juvenile fiction",
-      "Oz (Imaginary place) -- Juvenile fiction",
-      "Princess Ozma (Fictitious character) -- Juvenile fiction",
-      "Uncles -- Juvenile fiction",
-      "Voyages and travels -- Juvenile fiction"
-    ],
-    "bookshelves": [],
-    "languages": [
-      "en"
-    ],
-    "copyright": false,
-    "media_type": "Sound",
-    "formats": {
-      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/21163/21163-readme.txt",
-      "text/html": "https://www.gutenberg.org/files/21163/21163-index.html",
-      "audio/ogg": "https://www.gutenberg.org/files/21163/ogg/21163-01.ogg",
-      "audio/mp4": "https://www.gutenberg.org/files/21163/m4b/21163-01.m4b",
-      "audio/mpeg": "https://www.gutenberg.org/files/21163/mp3/21163-01.mp3",
-      "application/rdf+xml": "https://www.gutenberg.org/ebooks/21163.rdf",
-      "image/jpeg": "https://www.gutenberg.org/cache/epub/21163/pg21163.cover.medium.jpg",
-      "application/octet-stream": "https://www.gutenberg.org/files/21163/21163-m4b.zip"
-    },
-    "download_count": 7991,
-    "cover": "21163.jpg"
-  },
-  {
-    "id": 23708,
-    "title": "The Burgess Animal Book for Children",
-    "authors": [
-      {
-        "name": "Burgess, Thornton W. (Thornton Waldo)",
-        "birth_year": 1874,
-        "death_year": 1965
-      }
-    ],
-    "summaries": [],
-    "editors": [],
-    "translators": [],
-    "subjects": [
-      "Animal behavior -- Juvenile literature",
-      "Zoology -- Juvenile literature"
-    ],
-    "bookshelves": [],
-    "languages": [
-      "en"
-    ],
-    "copyright": false,
-    "media_type": "Sound",
-    "formats": {
-      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/23708/23708-readme.txt",
-      "text/html": "https://www.gutenberg.org/files/23708/23708-index.html",
-      "audio/ogg": "https://www.gutenberg.org/files/23708/ogg/23708-01.ogg",
-      "audio/mp4": "https://www.gutenberg.org/files/23708/m4b/23708-01.m4b",
-      "audio/mpeg": "https://www.gutenberg.org/files/23708/mp3/23708-01.mp3",
-      "application/rdf+xml": "https://www.gutenberg.org/ebooks/23708.rdf",
-      "image/jpeg": "https://www.gutenberg.org/cache/epub/23708/pg23708.cover.medium.jpg"
-    },
-    "download_count": 7979,
-    "cover": "23708.jpg"
   },
   {
     "id": 4517,
@@ -19189,42 +17602,6 @@
     "cover": "58585.jpg"
   },
   {
-    "id": 21160,
-    "title": "Songs of Innocence and of Experience",
-    "authors": [
-      {
-        "name": "Blake, William",
-        "birth_year": 1757,
-        "death_year": 1827
-      }
-    ],
-    "summaries": [],
-    "editors": [],
-    "translators": [],
-    "subjects": [
-      "English poetry -- 18th century",
-      "Pastoral poetry"
-    ],
-    "bookshelves": [],
-    "languages": [
-      "en"
-    ],
-    "copyright": false,
-    "media_type": "Sound",
-    "formats": {
-      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/21160/22160-readme.txt",
-      "text/html": "https://www.gutenberg.org/files/21160/21160-index.html",
-      "audio/ogg": "https://www.gutenberg.org/files/21160/ogg/21160-01.ogg",
-      "audio/mp4": "https://www.gutenberg.org/files/21160/m4b/21160-01.m4b",
-      "audio/mpeg": "https://www.gutenberg.org/files/21160/mp3/21160-01.mp3",
-      "application/rdf+xml": "https://www.gutenberg.org/ebooks/21160.rdf",
-      "image/jpeg": "https://www.gutenberg.org/cache/epub/21160/pg21160.cover.medium.jpg",
-      "application/octet-stream": "https://www.gutenberg.org/files/21160/21160-m4b.zip"
-    },
-    "download_count": 7901,
-    "cover": "21160.jpg"
-  },
-  {
     "id": 47873,
     "title": "Malay Magic: Being an introduction to the folklore and popular religion of the Malay Peninsula",
     "authors": [
@@ -19594,7 +17971,7 @@
       "text/plain; charset=utf-8": "https://www.gutenberg.org/ebooks/48320.txt.utf-8",
       "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/48320/48320-0.txt"
     },
-    "download_count": 7841,
+    "download_count": 9916,
     "cover": "48320.jpg"
   },
   {
@@ -20274,50 +18651,6 @@
     "cover": "389.jpg"
   },
   {
-    "id": 20687,
-    "title": "Pride and Prejudice",
-    "authors": [
-      {
-        "name": "Austen, Jane",
-        "birth_year": 1775,
-        "death_year": 1817
-      }
-    ],
-    "summaries": [],
-    "editors": [],
-    "translators": [],
-    "subjects": [
-      "Courtship -- Fiction",
-      "Domestic fiction",
-      "England -- Fiction",
-      "Love stories",
-      "Sisters -- Fiction",
-      "Social classes -- Fiction",
-      "Young women -- Fiction"
-    ],
-    "bookshelves": [
-      "Best Books Ever Listings",
-      "Harvard Classics"
-    ],
-    "languages": [
-      "en"
-    ],
-    "copyright": false,
-    "media_type": "Sound",
-    "formats": {
-      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/20687/20687-readme.txt",
-      "text/html": "https://www.gutenberg.org/files/20687/20687-index.html",
-      "audio/ogg": "https://www.gutenberg.org/files/20687/ogg/20687-01.ogg",
-      "audio/mp4": "https://www.gutenberg.org/files/20687/m4b/20687-01.m4b",
-      "audio/mpeg": "https://www.gutenberg.org/files/20687/mp3/20687-01.mp3",
-      "application/rdf+xml": "https://www.gutenberg.org/ebooks/20687.rdf",
-      "image/jpeg": "https://www.gutenberg.org/cache/epub/20687/pg20687.cover.medium.jpg",
-      "application/octet-stream": "https://www.gutenberg.org/files/20687/20687-m4b.zip"
-    },
-    "download_count": 7667,
-    "cover": "20687.jpg"
-  },
-  {
     "id": 31472,
     "title": "Cynthia's Chauffeur",
     "authors": [
@@ -20452,85 +18785,6 @@
     },
     "download_count": 7649,
     "cover": "12758.jpg"
-  },
-  {
-    "id": 26274,
-    "title": "The Swiss Family Robinson",
-    "authors": [
-      {
-        "name": "Wyss, Johann David",
-        "birth_year": 1743,
-        "death_year": 1818
-      }
-    ],
-    "summaries": [],
-    "editors": [],
-    "translators": [],
-    "subjects": [
-      "Family life -- Fiction",
-      "Islands -- Fiction",
-      "Survival -- Fiction"
-    ],
-    "bookshelves": [],
-    "languages": [
-      "en"
-    ],
-    "copyright": false,
-    "media_type": "Sound",
-    "formats": {
-      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/26274/26274-readme.txt",
-      "text/html": "https://www.gutenberg.org/files/26274/26274-index.html",
-      "audio/ogg": "https://www.gutenberg.org/files/26274/ogg/26274-01.ogg",
-      "audio/mp4": "https://www.gutenberg.org/files/26274/m4b/26274-01.m4b",
-      "audio/mpeg": "https://www.gutenberg.org/files/26274/mp3/26274-01.mp3",
-      "application/rdf+xml": "https://www.gutenberg.org/ebooks/26274.rdf",
-      "image/jpeg": "https://www.gutenberg.org/cache/epub/26274/pg26274.cover.medium.jpg"
-    },
-    "download_count": 7645,
-    "cover": "26274.jpg"
-  },
-  {
-    "id": 23082,
-    "title": "The Consolation of Philosophy",
-    "authors": [
-      {
-        "name": "Boethius",
-        "birth_year": 480,
-        "death_year": 524
-      }
-    ],
-    "summaries": [],
-    "editors": [],
-    "translators": [
-      {
-        "name": "James, H. R. (Henry Rosher)",
-        "birth_year": 1862,
-        "death_year": 1931
-      }
-    ],
-    "subjects": [
-      "Happiness",
-      "Philosophy and religion"
-    ],
-    "bookshelves": [
-      "Classical Antiquity"
-    ],
-    "languages": [
-      "en"
-    ],
-    "copyright": false,
-    "media_type": "Sound",
-    "formats": {
-      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/23082/23082-readme.txt",
-      "text/html": "https://www.gutenberg.org/files/23082/23082-index.html",
-      "audio/ogg": "https://www.gutenberg.org/files/23082/ogg/23082-01.ogg",
-      "audio/mp4": "https://www.gutenberg.org/files/23082/m4b/23082-01.m4b",
-      "audio/mpeg": "https://www.gutenberg.org/files/23082/mp3/23082-01.mp3",
-      "application/rdf+xml": "https://www.gutenberg.org/ebooks/23082.rdf",
-      "image/jpeg": "https://www.gutenberg.org/cache/epub/23082/pg23082.cover.medium.jpg"
-    },
-    "download_count": 7643,
-    "cover": "23082.jpg"
   },
   {
     "id": 22091,
@@ -20755,42 +19009,6 @@
     "cover": "28718.jpg"
   },
   {
-    "id": 23979,
-    "title": "Leaves of Grass",
-    "authors": [
-      {
-        "name": "Whitman, Walt",
-        "birth_year": 1819,
-        "death_year": 1892
-      }
-    ],
-    "summaries": [],
-    "editors": [],
-    "translators": [],
-    "subjects": [
-      "Poetry"
-    ],
-    "bookshelves": [
-      "Poetry"
-    ],
-    "languages": [
-      "en"
-    ],
-    "copyright": false,
-    "media_type": "Sound",
-    "formats": {
-      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/23979/23979-readme.txt",
-      "text/html": "https://www.gutenberg.org/files/23979/23979-index.html",
-      "audio/ogg": "https://www.gutenberg.org/files/23979/ogg/23979-01.ogg",
-      "audio/mp4": "https://www.gutenberg.org/files/23979/m4b/23979-01.m4b",
-      "audio/mpeg": "https://www.gutenberg.org/files/23979/mp3/23979-01.mp3",
-      "application/rdf+xml": "https://www.gutenberg.org/ebooks/23979.rdf",
-      "image/jpeg": "https://www.gutenberg.org/cache/epub/23979/pg23979.cover.medium.jpg"
-    },
-    "download_count": 7594,
-    "cover": "23979.jpg"
-  },
-  {
     "id": 308,
     "title": "Three men in a boat (to say nothing of the dog)",
     "authors": [
@@ -20926,45 +19144,6 @@
     },
     "download_count": 7568,
     "cover": "972.jpg"
-  },
-  {
-    "id": 19636,
-    "title": "Bildergeschichten",
-    "authors": [
-      {
-        "name": "Busch, Wilhelm",
-        "birth_year": 1832,
-        "death_year": 1908
-      }
-    ],
-    "summaries": [],
-    "editors": [],
-    "translators": [],
-    "subjects": [
-      "Children's poetry, German",
-      "German poetry -- 19th century"
-    ],
-    "bookshelves": [
-      "DE Kinderbuch",
-      "DE Lyrik"
-    ],
-    "languages": [
-      "de"
-    ],
-    "copyright": false,
-    "media_type": "Sound",
-    "formats": {
-      "text/html": "https://www.gutenberg.org/files/19636/19636-index.html",
-      "audio/ogg": "https://www.gutenberg.org/files/19636/ogg/19636-01.ogg",
-      "audio/mp4": "https://www.gutenberg.org/files/19636/m4b/19636-01.m4a",
-      "audio/mpeg": "https://www.gutenberg.org/files/19636/mp3/19636-01.mp3",
-      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/19636/19636.txt",
-      "application/rdf+xml": "https://www.gutenberg.org/ebooks/19636.rdf",
-      "image/jpeg": "https://www.gutenberg.org/cache/epub/19636/pg19636.cover.medium.jpg",
-      "application/octet-stream": "https://www.gutenberg.org/files/19636/19636-m4b.zip"
-    },
-    "download_count": 7567,
-    "cover": "19636.jpg"
   },
   {
     "id": 22298,
@@ -21740,43 +19919,6 @@
     },
     "download_count": 7407,
     "cover": "33524.jpg"
-  },
-  {
-    "id": 28945,
-    "title": "Scaramouche: A Romance of the French Revolution",
-    "authors": [
-      {
-        "name": "Sabatini, Rafael",
-        "birth_year": 1875,
-        "death_year": 1950
-      }
-    ],
-    "summaries": [],
-    "editors": [],
-    "translators": [],
-    "subjects": [
-      "Adventure stories",
-      "France -- History -- Revolution, 1789-1799 -- Fiction",
-      "Love stories",
-      "War stories"
-    ],
-    "bookshelves": [],
-    "languages": [
-      "en"
-    ],
-    "copyright": false,
-    "media_type": "Sound",
-    "formats": {
-      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/28945/28945_readme.txt",
-      "text/html": "https://www.gutenberg.org/files/28945/28945_index.html",
-      "audio/ogg": "https://www.gutenberg.org/files/28945/ogg/28945-01.ogg",
-      "audio/mp4": "https://www.gutenberg.org/files/28945/m4b/28945-01.m4b",
-      "audio/mpeg": "https://www.gutenberg.org/files/28945/mp3/28945-01.mp3",
-      "application/rdf+xml": "https://www.gutenberg.org/ebooks/28945.rdf",
-      "image/jpeg": "https://www.gutenberg.org/cache/epub/28945/pg28945.cover.medium.jpg"
-    },
-    "download_count": 7401,
-    "cover": "28945.jpg"
   },
   {
     "id": 24855,
@@ -22716,48 +20858,6 @@
     "cover": "16464.jpg"
   },
   {
-    "id": 21605,
-    "title": "Uncle Remus, his songs and his sayings",
-    "authors": [
-      {
-        "name": "Harris, Joel Chandler",
-        "birth_year": 1848,
-        "death_year": 1908
-      }
-    ],
-    "summaries": [],
-    "editors": [],
-    "translators": [],
-    "subjects": [
-      "African American men -- Literary collections",
-      "African Americans -- Folklore -- Literary collections",
-      "African Americans -- Songs and music",
-      "Animals -- Folklore -- Literary collections",
-      "Georgia -- Literary collections",
-      "Plantation life -- Literary collections",
-      "Remus, Uncle (Fictitious character) -- Literary collections"
-    ],
-    "bookshelves": [
-      "Children's Literature"
-    ],
-    "languages": [
-      "en"
-    ],
-    "copyright": false,
-    "media_type": "Sound",
-    "formats": {
-      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/21605/21605-readme.txt",
-      "text/html": "https://www.gutenberg.org/files/21605/21605-index.html",
-      "audio/ogg": "https://www.gutenberg.org/files/21605/ogg/21605-01.ogg",
-      "audio/mp4": "https://www.gutenberg.org/files/21605/m4b/21605-01.m4b",
-      "audio/mpeg": "https://www.gutenberg.org/files/21605/mp3/21605-01.mp3",
-      "application/rdf+xml": "https://www.gutenberg.org/ebooks/21605.rdf",
-      "image/jpeg": "https://www.gutenberg.org/cache/epub/21605/pg21605.cover.medium.jpg"
-    },
-    "download_count": 7264,
-    "cover": "21605.jpg"
-  },
-  {
     "id": 11982,
     "title": "Eighty Years and More; Reminiscences 1815-1897",
     "authors": [
@@ -22802,44 +20902,6 @@
     },
     "download_count": 7257,
     "cover": "11982.jpg"
-  },
-  {
-    "id": 20973,
-    "title": "Le tour du monde en quatre-vingts jours",
-    "authors": [
-      {
-        "name": "Verne, Jules",
-        "birth_year": 1828,
-        "death_year": 1905
-      }
-    ],
-    "summaries": [],
-    "editors": [],
-    "translators": [],
-    "subjects": [
-      "Adventure stories",
-      "Voyages around the world -- Fiction"
-    ],
-    "bookshelves": [
-      "FR Littérature"
-    ],
-    "languages": [
-      "fr"
-    ],
-    "copyright": false,
-    "media_type": "Sound",
-    "formats": {
-      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/20973/20973-readme.txt",
-      "text/html": "https://www.gutenberg.org/files/20973/20973-index.html",
-      "audio/ogg": "https://www.gutenberg.org/files/20973/ogg/20973-01.ogg",
-      "audio/mp4": "https://www.gutenberg.org/files/20973/m4b/20973-01.m4b",
-      "audio/mpeg": "https://www.gutenberg.org/files/20973/mp3/20973-01.mp3",
-      "application/rdf+xml": "https://www.gutenberg.org/ebooks/20973.rdf",
-      "image/jpeg": "https://www.gutenberg.org/cache/epub/20973/pg20973.cover.medium.jpg",
-      "application/octet-stream": "https://www.gutenberg.org/files/20973/20973-m4b.zip"
-    },
-    "download_count": 7257,
-    "cover": "20973.jpg"
   },
   {
     "id": 40686,
@@ -23330,5 +21392,967 @@
     },
     "download_count": 7186,
     "cover": "17989.jpg"
+  },
+  {
+    "id": 50559,
+    "title": "The Works of William Shakespeare [Cambridge Edition] [Vol. 3 of 9]",
+    "authors": [
+      {
+        "name": "Shakespeare, William",
+        "birth_year": 1564,
+        "death_year": 1616
+      }
+    ],
+    "summaries": [
+      "\"The Works of William Shakespeare [Cambridge Edition] [Vol. 3 of 9]\" by Shakespeare is a collection of plays written in the early 17th century. This volume includes prominent works such as \"The Taming of the Shrew,\" \"All's Well That Ends Well,\" \"Twelfth Night; or, What You Will,\" and \"The Winter's Tale,\" showcasing Shakespeare's mastery in comedy and drama. The likely topics revolve around themes of love, power dynamics in relationships, and societal expectations, along with richly drawn characters who navigate the complexities of courtship and familial duty.  At the start of the volume, the opening scenes of \"The Taming of the Shrew\" introduce Christopher Sly, a drunken tinker who is the subject of a playful ruse by a lord and his servants, who seek to convince him that he is, in fact, a nobleman. This leads into the main narrative that focuses on the tempestuous relationship between Petruchio and Katharina, highlighting their initial conflicts and fiery exchanges. Meanwhile, Lucentio arrives in Padua, infatuated with Katharina's sister Bianca, setting the stage for a web of courtship entanglements influenced by the shrewish elder sister and her suitors. The juxtaposition of Sly’s comedic predicament and the serious romantic pursuits establishes a fascinating interplay between class, gender roles, and the dynamics of love. (This is an automatically generated summary.)"
+    ],
+    "editors": [
+      {
+        "name": "Wright, William Aldis",
+        "birth_year": 1831,
+        "death_year": 1914
+      },
+      {
+        "name": "Clark, William George",
+        "birth_year": 1821,
+        "death_year": 1878
+      }
+    ],
+    "translators": [],
+    "subjects": [
+      "English drama"
+    ],
+    "bookshelves": [
+      "Category: British Literature",
+      "Category: Classics of Literature",
+      "Category: Plays/Films/Dramas"
+    ],
+    "languages": [
+      "en"
+    ],
+    "copyright": false,
+    "media_type": "Text",
+    "formats": {
+      "text/html": "https://www.gutenberg.org/ebooks/50559.html.images",
+      "application/epub+zip": "https://www.gutenberg.org/ebooks/50559.epub3.images",
+      "application/x-mobipocket-ebook": "https://www.gutenberg.org/ebooks/50559.kf8.images",
+      "application/rdf+xml": "https://www.gutenberg.org/ebooks/50559.rdf",
+      "image/jpeg": "https://www.gutenberg.org/cache/epub/50559/pg50559.cover.medium.jpg",
+      "application/octet-stream": "https://www.gutenberg.org/cache/epub/50559/pg50559-h.zip",
+      "text/plain; charset=utf-8": "https://www.gutenberg.org/ebooks/50559.txt.utf-8",
+      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/50559/50559-0.txt"
+    },
+    "download_count": 26539,
+    "cover": "50559.jpg"
+  },
+  {
+    "id": 49008,
+    "title": "The Works of William Shakespeare [Cambridge Edition] [Vol. 8 of 9]",
+    "authors": [
+      {
+        "name": "Shakespeare, William",
+        "birth_year": 1564,
+        "death_year": 1616
+      }
+    ],
+    "summaries": [
+      "\"The Works of William Shakespeare [Cambridge Edition] [Vol. 8 of 9]\" by Shakespeare is a historical and literary collection of theatrical works written in the early 17th century. This volume specifically includes iconic plays such as \"Hamlet,\" \"King Lear,\" and \"Othello,\" among others. The works explore themes of ambition, power struggles, love, and betrayal, with complex characters that resonate across time, such as the troubled Hamlet and the tragic King Lear.  At the start of the volume, the section from \"Hamlet\" unfolds with a dark, atmospheric setting in Elsinore, where guards, including Francisco and Bernardo, encounter a ghost resembling the deceased King Hamlet. The tension builds as they summon Horatio to witness the spectral figure. The scene sets a tone of unease and raises questions about fate and the supernatural, laying the groundwork for the epic tragedy that follows as Hamlet grapples with the implications of his father's death and the unrest within Denmark. The opening introduces a political and emotional conflict that will drive the narrative forward, immersing readers in a world steeped in mystery and existential inquiry. (This is an automatically generated summary.)"
+    ],
+    "editors": [
+      {
+        "name": "Wright, William Aldis",
+        "birth_year": 1831,
+        "death_year": 1914
+      },
+      {
+        "name": "Clark, William George",
+        "birth_year": 1821,
+        "death_year": 1878
+      }
+    ],
+    "translators": [],
+    "subjects": [
+      "English drama"
+    ],
+    "bookshelves": [
+      "Category: British Literature",
+      "Category: Classics of Literature",
+      "Category: Plays/Films/Dramas"
+    ],
+    "languages": [
+      "en"
+    ],
+    "copyright": false,
+    "media_type": "Text",
+    "formats": {
+      "text/html": "https://www.gutenberg.org/ebooks/49008.html.images",
+      "application/epub+zip": "https://www.gutenberg.org/ebooks/49008.epub3.images",
+      "application/x-mobipocket-ebook": "https://www.gutenberg.org/ebooks/49008.kf8.images",
+      "application/rdf+xml": "https://www.gutenberg.org/ebooks/49008.rdf",
+      "image/jpeg": "https://www.gutenberg.org/cache/epub/49008/pg49008.cover.medium.jpg",
+      "application/octet-stream": "https://www.gutenberg.org/cache/epub/49008/pg49008-h.zip",
+      "text/plain; charset=utf-8": "https://www.gutenberg.org/ebooks/49008.txt.utf-8",
+      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/49008/49008-0.txt"
+    },
+    "download_count": 23387,
+    "cover": "49008.jpg"
+  },
+  {
+    "id": 50095,
+    "title": "The Works of William Shakespeare [Cambridge Edition] [Vol. 4 of 9]",
+    "authors": [
+      {
+        "name": "Shakespeare, William",
+        "birth_year": 1564,
+        "death_year": 1616
+      }
+    ],
+    "summaries": [
+      "\"The Works of William Shakespeare [Cambridge Edition] [Vol. 4 of 9]\" by Shakespeare is a collection of dramatic works that includes plays written in the early 17th century. This volume is notable for featuring several of his historical and political plays such as \"King John,\" \"King Richard II,\" and \"Henry IV.\" The content likely delves into themes of power, legitimacy, and conflict, showcasing the complex nature of human relationships against the backdrop of monarchy and warfare.  The beginning of this volume introduces \"King John,\" starting with a scene where King John receives an envoy from France, signaling tensions over territorial claims linked to his nephew, Arthur. The dialogue reveals a struggle between King John and the French king’s representatives, who assert Arthur’s rightful claim to the English crown. The characters express their positions regarding legitimacy and power, setting in motion the conflicts of loyalty and warfare that will unfold throughout the play. The discussions present an early taste of the political intrigue and personal dynamics that characterize the narrative. (This is an automatically generated summary.)"
+    ],
+    "editors": [
+      {
+        "name": "Wright, William Aldis",
+        "birth_year": 1831,
+        "death_year": 1914
+      },
+      {
+        "name": "Clark, William George",
+        "birth_year": 1821,
+        "death_year": 1878
+      }
+    ],
+    "translators": [],
+    "subjects": [
+      "English drama"
+    ],
+    "bookshelves": [
+      "Category: British Literature",
+      "Category: Classics of Literature",
+      "Category: Plays/Films/Dramas"
+    ],
+    "languages": [
+      "en"
+    ],
+    "copyright": false,
+    "media_type": "Text",
+    "formats": {
+      "text/html": "https://www.gutenberg.org/ebooks/50095.html.images",
+      "application/epub+zip": "https://www.gutenberg.org/ebooks/50095.epub3.images",
+      "application/x-mobipocket-ebook": "https://www.gutenberg.org/ebooks/50095.kf8.images",
+      "application/rdf+xml": "https://www.gutenberg.org/ebooks/50095.rdf",
+      "image/jpeg": "https://www.gutenberg.org/cache/epub/50095/pg50095.cover.medium.jpg",
+      "application/octet-stream": "https://www.gutenberg.org/cache/epub/50095/pg50095-h.zip",
+      "text/plain; charset=utf-8": "https://www.gutenberg.org/ebooks/50095.txt.utf-8",
+      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/50095/50095-0.txt"
+    },
+    "download_count": 18829,
+    "cover": "50095.jpg"
+  },
+  {
+    "id": 49007,
+    "title": "The Works of William Shakespeare [Cambridge Edition] [Vol. 6 of 9]",
+    "authors": [
+      {
+        "name": "Shakespeare, William",
+        "birth_year": 1564,
+        "death_year": 1616
+      }
+    ],
+    "summaries": [
+      "\"The Works of William Shakespeare [Cambridge Edition] [Vol. 6 of 9]\" by Shakespeare is a collection of plays and writings from one of the most famous playwrights in the early modern period. This volume includes classic works such as \"King Henry VIII,\" \"Troilus and Cressida,\" \"Coriolanus,\" and \"Titus Andronicus,\" reflective of the late 16th to early 17th centuries. The book entails profound themes of power, love, betrayal, and morality, showcasing an array of characters from noble kings to tragic heroes.  At the start of \"King Henry VIII,\" we are introduced to characters such as the Duke of Norfolk and the Duke of Buckingham, discussing the recent glorious encounter between English and French nobility. The opening scenes set the political tone of intrigue and rivalry, especially concerning the ambitions of Cardinal Wolsey, who is portrayed as a manipulative figure in the English court. The play begins with an exploration of power dynamics, personal grievances, and the stark realities of loyalty and betrayal amidst the backdrop of Henry VIII's reign, ultimately highlighting the costs of ambition and the interplay of personal relationships with political maneuvers. (This is an automatically generated summary.)"
+    ],
+    "editors": [
+      {
+        "name": "Wright, William Aldis",
+        "birth_year": 1831,
+        "death_year": 1914
+      },
+      {
+        "name": "Clark, William George",
+        "birth_year": 1821,
+        "death_year": 1878
+      }
+    ],
+    "translators": [],
+    "subjects": [
+      "English drama"
+    ],
+    "bookshelves": [
+      "Category: British Literature",
+      "Category: Classics of Literature",
+      "Category: Plays/Films/Dramas"
+    ],
+    "languages": [
+      "en"
+    ],
+    "copyright": false,
+    "media_type": "Text",
+    "formats": {
+      "text/html": "https://www.gutenberg.org/ebooks/49007.html.images",
+      "application/epub+zip": "https://www.gutenberg.org/ebooks/49007.epub3.images",
+      "application/x-mobipocket-ebook": "https://www.gutenberg.org/ebooks/49007.kf8.images",
+      "application/rdf+xml": "https://www.gutenberg.org/ebooks/49007.rdf",
+      "image/jpeg": "https://www.gutenberg.org/cache/epub/49007/pg49007.cover.medium.jpg",
+      "application/octet-stream": "https://www.gutenberg.org/cache/epub/49007/pg49007-h.zip",
+      "text/plain; charset=utf-8": "https://www.gutenberg.org/ebooks/49007.txt.utf-8",
+      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/49007/49007-0.txt"
+    },
+    "download_count": 15849,
+    "cover": "49007.jpg"
+  },
+  {
+    "id": 50285,
+    "title": "Dr. Mabuse, der Spieler : $b Roman",
+    "authors": [
+      {
+        "name": "Jacques, Norbert",
+        "birth_year": 1880,
+        "death_year": 1954
+      }
+    ],
+    "summaries": [
+      "\"Dr. Mabuse, der Spieler\" by Norbert Jacques is a novel written in the early 20th century. This work delves into the world of gambling and deception, centering around the enigmatic character of Dr. Mabuse, a master manipulator and skilled card player. Set against the backdrop of a society gripped by the allure of chance and fortune, it explores themes of obsession, control, and the darker aspects of human nature.  At the start of the narrative, we are introduced to a high-stakes game in an exclusive club where young Hull encounters a mysterious and elegantly dressed old man, referred to as Balling. As the tension at the gaming table escalates, Hull finds himself entrapped in a whirlwind of bad luck, leading to a heavy gambling loss that he struggles to comprehend. The evening spirals into confusion, and Hull becomes increasingly unsettled by his interactions with the old man, who seems to hold a haunting sway over him. By the end of this opening portion, Hull's life is irrevocably altered, setting the stage for a broader conflict involving deception and psychological manipulation, raising questions about identity and reality. (This is an automatically generated summary.)"
+    ],
+    "editors": [],
+    "translators": [],
+    "subjects": [
+      "Criminals -- Fiction",
+      "Gamblers -- Fiction",
+      "Germany -- Fiction",
+      "Hypnotism and crime -- Fiction",
+      "Murderers -- Fiction"
+    ],
+    "bookshelves": [
+      "Category: Crime, Thrillers and Mystery",
+      "Category: German Literature",
+      "Category: Novels"
+    ],
+    "languages": [
+      "de"
+    ],
+    "copyright": false,
+    "media_type": "Text",
+    "formats": {
+      "text/html": "https://www.gutenberg.org/ebooks/50285.html.images",
+      "application/epub+zip": "https://www.gutenberg.org/ebooks/50285.epub3.images",
+      "application/x-mobipocket-ebook": "https://www.gutenberg.org/ebooks/50285.kf8.images",
+      "application/octet-stream": "https://www.gutenberg.org/files/50285/50285-page-images/p0001.png",
+      "application/rdf+xml": "https://www.gutenberg.org/ebooks/50285.rdf",
+      "image/jpeg": "https://www.gutenberg.org/cache/epub/50285/pg50285.cover.medium.jpg",
+      "text/plain; charset=utf-8": "https://www.gutenberg.org/ebooks/50285.txt.utf-8",
+      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/50285/50285-0.txt"
+    },
+    "download_count": 13563,
+    "cover": "50285.jpg"
+  },
+  {
+    "id": 49135,
+    "title": "Luther, vol. 4 of 6",
+    "authors": [
+      {
+        "name": "Grisar, Hartmann",
+        "birth_year": 1845,
+        "death_year": 1932
+      }
+    ],
+    "summaries": [
+      "\"Luther, vol. 4 of 6\" by Hartmann Grisar is a historical account written in the early 20th century. This volume continues the detailed exploration of Martin Luther's life, focusing on his theological perspectives and their implications during the Reformation, particularly his interactions with prominent figures like Henry VIII and the Landgrave Philip of Hesse. The narrative delves into contentious issues such as the acceptance of bigamy and the moral dilemmas faced by Luther and his contemporaries.  The opening of this volume introduces a significant chapter discussing \"Princely Marriages,\" specifically Luther's advice to King Henry VIII regarding bigamy in the context of his troubled marriage to Catherine of Aragon. It highlights Luther's hesitance to endorse outright divorce despite his suggestion that Henry could consider polygamy as a solution. Following this, the narrative shifts to the moral quandary of Landgrave Philip of Hesse seeking to take a second wife, revealing the pressures and justifications surrounding Luther's theological positions. This sets the stage for a broader discussion about the practical and moral implications of Luther's teachings amid the shifting landscape of Protestant reform. (This is an automatically generated summary.)"
+    ],
+    "editors": [
+      {
+        "name": "Dessoulavy, C. L. (Charles Louis)",
+        "birth_year": null,
+        "death_year": null
+      }
+    ],
+    "translators": [
+      {
+        "name": "Lamond, E. M.",
+        "birth_year": null,
+        "death_year": null
+      }
+    ],
+    "subjects": [
+      "Luther, Martin, 1483-1546"
+    ],
+    "bookshelves": [
+      "Category: Biographies",
+      "Category: History - European",
+      "Category: History - Religious"
+    ],
+    "languages": [
+      "en"
+    ],
+    "copyright": false,
+    "media_type": "Text",
+    "formats": {
+      "text/html": "https://www.gutenberg.org/ebooks/49135.html.images",
+      "application/epub+zip": "https://www.gutenberg.org/ebooks/49135.epub3.images",
+      "application/x-mobipocket-ebook": "https://www.gutenberg.org/ebooks/49135.kf8.images",
+      "application/rdf+xml": "https://www.gutenberg.org/ebooks/49135.rdf",
+      "image/jpeg": "https://www.gutenberg.org/cache/epub/49135/pg49135.cover.medium.jpg",
+      "application/octet-stream": "https://www.gutenberg.org/cache/epub/49135/pg49135-h.zip",
+      "text/plain; charset=utf-8": "https://www.gutenberg.org/ebooks/49135.txt.utf-8",
+      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/49135/49135-0.txt"
+    },
+    "download_count": 11342,
+    "cover": "49135.jpg"
+  },
+  {
+    "id": 50657,
+    "title": "The Satires of Juvenal, Persius, Sulpicia, and Lucilius: Literally translated into English prose, with notes, chronological tables, arguments, &c.",
+    "authors": [
+      {
+        "name": "Persius",
+        "birth_year": null,
+        "death_year": null
+      },
+      {
+        "name": "Juvenal",
+        "birth_year": null,
+        "death_year": null
+      },
+      {
+        "name": "Lucilius, Gaius",
+        "birth_year": null,
+        "death_year": null
+      },
+      {
+        "name": "Sulpicia",
+        "birth_year": null,
+        "death_year": null
+      }
+    ],
+    "summaries": [
+      "\"The Satires of Juvenal, Persius, Sulpicia, and Lucilius\" by Juvenal et al. is a classic collection of Roman satirical poetry written in the late 1st century AD to early 2nd century AD. This work features the sharp and critical voices of notable Roman satirists, with Juvenal being one of the most prominent, addressing the societal issues of his time, including corruption, moral decay, and the vices of the elite. The collection serves as both a historical reflection and a literary exploration of human folly and societal shortcomings.  The opening of this compilation introduces various contexts, including the life and works of Juvenal, revealing his journey as a poet during the oppressive reign of Emperor Domitian. It highlights how his experiences, particularly his exile, influenced his biting style and themes centered on tyranny and hypocrisy. The preface emphasizes the lack of faithful prose translations prior to this one and sets the stage for the accompanying metrical versions of Juvenal and Persius. The translator expresses a deep admiration for the original poets and a desire to convey their literary spirit, offering insights and critiques that will guide readers through the often complex and layered verses that follow. (This is an automatically generated summary.)"
+    ],
+    "editors": [],
+    "translators": [
+      {
+        "name": "Evans, Lewis",
+        "birth_year": 1814,
+        "death_year": 1869
+      },
+      {
+        "name": "Gifford, William",
+        "birth_year": 1756,
+        "death_year": 1826
+      }
+    ],
+    "subjects": [
+      "Juvenal -- Translations into English",
+      "Verse satire, Latin -- Translations into English"
+    ],
+    "bookshelves": [
+      "Category: Classics of Literature",
+      "Category: Poetry"
+    ],
+    "languages": [
+      "en"
+    ],
+    "copyright": false,
+    "media_type": "Text",
+    "formats": {
+      "text/html": "https://www.gutenberg.org/ebooks/50657.html.images",
+      "application/epub+zip": "https://www.gutenberg.org/ebooks/50657.epub3.images",
+      "application/x-mobipocket-ebook": "https://www.gutenberg.org/ebooks/50657.kf8.images",
+      "application/rdf+xml": "https://www.gutenberg.org/ebooks/50657.rdf",
+      "image/jpeg": "https://www.gutenberg.org/cache/epub/50657/pg50657.cover.medium.jpg",
+      "application/octet-stream": "https://www.gutenberg.org/cache/epub/50657/pg50657-h.zip",
+      "text/plain; charset=utf-8": "https://www.gutenberg.org/ebooks/50657.txt.utf-8",
+      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/50657/50657-0.txt"
+    },
+    "download_count": 10886,
+    "cover": "50657.jpg"
+  },
+  {
+    "id": 49402,
+    "title": "The Black Hawk War Including a Review of Black Hawk's Life",
+    "authors": [
+      {
+        "name": "Stevens, Frank Everett",
+        "birth_year": 1856,
+        "death_year": 1939
+      }
+    ],
+    "summaries": [
+      "\"The Black Hawk War Including a Review of Black Hawk's Life\" by Frank Everett Stevens is a historical account written in the early 20th century. The work delves into the life of Black Hawk, a prominent Native American leader, and the conflict known as the Black Hawk War, providing detailed insights into the tensions between Native Americans and American settlers during this tumultuous period.   The opening of the book introduces the author’s dedication to his mother, emphasizing the work as a labor of love. Stevens begins the narrative by outlining his extensive research on Black Hawk, revealing the challenges he faced in gathering materials, including interviews with eyewitnesses and original documents. He sets the stage for an in-depth examination of Black Hawk's early life, personality traits, and the escalations that led to conflict, particularly detailing events surrounding treaties that shaped relations between Black Hawk's tribe and the United States. This foundational chapter establishes the complexity of Black Hawk's character and the context for understanding the subsequent chapters that delve into the detailed accounts of the war and its implications on Native American culture and society. (This is an automatically generated summary.)"
+    ],
+    "editors": [],
+    "translators": [],
+    "subjects": [
+      "Black Hawk War, 1832",
+      "Black Hawk, Sauk chief, 1767-1838"
+    ],
+    "bookshelves": [
+      "Category: Biographies",
+      "Category: History - American"
+    ],
+    "languages": [
+      "en"
+    ],
+    "copyright": false,
+    "media_type": "Text",
+    "formats": {
+      "text/html": "https://www.gutenberg.org/ebooks/49402.html.images",
+      "application/epub+zip": "https://www.gutenberg.org/ebooks/49402.epub3.images",
+      "application/x-mobipocket-ebook": "https://www.gutenberg.org/ebooks/49402.kf8.images",
+      "application/rdf+xml": "https://www.gutenberg.org/ebooks/49402.rdf",
+      "image/jpeg": "https://www.gutenberg.org/cache/epub/49402/pg49402.cover.medium.jpg",
+      "application/octet-stream": "https://www.gutenberg.org/cache/epub/49402/pg49402-h.zip",
+      "text/plain; charset=utf-8": "https://www.gutenberg.org/ebooks/49402.txt.utf-8",
+      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/49402/49402-0.txt"
+    },
+    "download_count": 10156,
+    "cover": "49402.jpg"
+  },
+  {
+    "id": 49038,
+    "title": "The Underground Railroad from Slavery to Freedom: A comprehensive history",
+    "authors": [
+      {
+        "name": "Siebert, Wilbur Henry",
+        "birth_year": 1866,
+        "death_year": 1961
+      }
+    ],
+    "summaries": [
+      "\"The Underground Railroad from Slavery to Freedom: A Comprehensive History\" by Wilbur H. Siebert is a historical account written in the late 19th century. The book details the operations, individuals involved, and overall significance of the Underground Railroad, which helped enslaved individuals escape to freedom in the Northern states and Canada. The central theme revolves around the moral and logistical complexities of aiding fugitives in a society structured around slavery.  The opening of this comprehensive history introduces the challenges historians face in documenting the Underground Railroad. It highlights the secretive nature of the movement and the limited existing records, relying heavily on the testimonies of individuals who participated in underground operations. The introduction emphasizes the moral stakes involved, noting how many Northern abolitionists defied the laws of slavery to assist fleeing enslaved individuals. Furthermore, it sets the groundwork for a detailed exploration of the origins, growth, and impact of this network, positioning it as a vital force leading up to the Civil War. (This is an automatically generated summary.)"
+    ],
+    "editors": [],
+    "translators": [],
+    "subjects": [
+      "Fugitive slaves -- United States",
+      "Underground Railroad"
+    ],
+    "bookshelves": [
+      "Category: History - American",
+      "Category: History - Modern (1750+)",
+      "Category: History - Religious"
+    ],
+    "languages": [
+      "en"
+    ],
+    "copyright": false,
+    "media_type": "Text",
+    "formats": {
+      "text/html": "https://www.gutenberg.org/ebooks/49038.html.images",
+      "application/epub+zip": "https://www.gutenberg.org/ebooks/49038.epub3.images",
+      "application/x-mobipocket-ebook": "https://www.gutenberg.org/ebooks/49038.kf8.images",
+      "application/rdf+xml": "https://www.gutenberg.org/ebooks/49038.rdf",
+      "image/jpeg": "https://www.gutenberg.org/cache/epub/49038/pg49038.cover.medium.jpg",
+      "application/octet-stream": "https://www.gutenberg.org/cache/epub/49038/pg49038-h.zip",
+      "text/plain; charset=utf-8": "https://www.gutenberg.org/ebooks/49038.txt.utf-8",
+      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/49038/49038-0.txt"
+    },
+    "download_count": 9773,
+    "cover": "49038.jpg"
+  },
+  {
+    "id": 49106,
+    "title": "Luther, vol. 3 of 6",
+    "authors": [
+      {
+        "name": "Grisar, Hartmann",
+        "birth_year": 1845,
+        "death_year": 1932
+      }
+    ],
+    "summaries": [
+      "\"Luther, vol. 3 of 6\" by Hartmann Grisar is a comprehensive historical account written in the early 20th century. This volume focuses on Martin Luther’s theological evolution during the Reformation, specifically emphasizing the organizational and public aspects of the new church he helped establish. Grisar's work aims to provide a thorough and scholarly examination of Luther’s impact, presenting him not just as a reformer but also as a complex figure navigating the turbulent religious and political landscape of his time.  The opening of this volume sets the stage for a detailed exploration of Luther's changing religious position as he transitioned from advocating complete freedom in faith to establishing a structured church with binding formularies. It discusses Luther's recognition of the chaotic consequences of his earlier radicalism and his subsequent efforts to anchor Lutheranism within a more organized ecclesiastical framework. His relationships with secular authorities, the challenges posed by emerging radical factions, and the resulting shifts toward a state church model are highlighted, illustrating both his disillusionments and pragmatic adaptations in an ever-evolving spiritual context. (This is an automatically generated summary.)"
+    ],
+    "editors": [
+      {
+        "name": "Dessoulavy, C. L. (Charles Louis)",
+        "birth_year": null,
+        "death_year": null
+      }
+    ],
+    "translators": [
+      {
+        "name": "Lamond, E. M.",
+        "birth_year": null,
+        "death_year": null
+      }
+    ],
+    "subjects": [
+      "Luther, Martin, 1483-1546"
+    ],
+    "bookshelves": [
+      "Category: History - European",
+      "Category: History - Modern (1750+)",
+      "Category: History - Religious"
+    ],
+    "languages": [
+      "en"
+    ],
+    "copyright": false,
+    "media_type": "Text",
+    "formats": {
+      "text/html": "https://www.gutenberg.org/ebooks/49106.html.images",
+      "application/epub+zip": "https://www.gutenberg.org/ebooks/49106.epub3.images",
+      "application/x-mobipocket-ebook": "https://www.gutenberg.org/ebooks/49106.kf8.images",
+      "application/rdf+xml": "https://www.gutenberg.org/ebooks/49106.rdf",
+      "image/jpeg": "https://www.gutenberg.org/cache/epub/49106/pg49106.cover.medium.jpg",
+      "application/octet-stream": "https://www.gutenberg.org/cache/epub/49106/pg49106-h.zip",
+      "text/plain; charset=utf-8": "https://www.gutenberg.org/ebooks/49106.txt.utf-8",
+      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/49106/49106-0.txt"
+    },
+    "download_count": 9135,
+    "cover": "49106.jpg"
+  },
+  {
+    "id": 48296,
+    "title": "Linnet: A Romance",
+    "authors": [
+      {
+        "name": "Allen, Grant",
+        "birth_year": 1848,
+        "death_year": 1899
+      }
+    ],
+    "summaries": [
+      "\"Linnet: A Romance\" by Grant Allen is a novel written in the late 19th century. The story follows the character of Florian Wood and his companion Will Deverill as they travel through the picturesque Tyrol region, encountering local culture and characters, including a talented singer named Linnet.   The opening of the book introduces us to Florian Wood, a man with a romanticized view of the Tyrolese landscape and its people. He and Will arrive in Zell, eager to explore, but quickly find that their expectations of an idyllic Alpine paradise are met with a more commercialized reality. As they trek towards a nearby village, they engage in witty conversation about the nature of life in the Tyrol. Upon meeting local children and discovering the reality of their surroundings, Florian is disheartened to find that the idyllic image he had in mind does not align with the local experience. Their journey leads them to meet Linnet, who symbolizes the captivating culture they seek amidst the beauty and challenges of rural life. The ensuing narrative promises to explore themes of love, culture, and the contrast between idealism and reality. (This is an automatically generated summary.)"
+    ],
+    "editors": [],
+    "translators": [],
+    "subjects": [
+      "Alps -- Fiction",
+      "London (England) -- Fiction",
+      "Tyrol (Austria) -- Fiction"
+    ],
+    "bookshelves": [
+      "Category: British Literature",
+      "Category: Novels",
+      "Category: Romance"
+    ],
+    "languages": [
+      "en"
+    ],
+    "copyright": false,
+    "media_type": "Text",
+    "formats": {
+      "text/html": "https://www.gutenberg.org/ebooks/48296.html.images",
+      "application/epub+zip": "https://www.gutenberg.org/ebooks/48296.epub3.images",
+      "application/x-mobipocket-ebook": "https://www.gutenberg.org/ebooks/48296.kf8.images",
+      "application/rdf+xml": "https://www.gutenberg.org/ebooks/48296.rdf",
+      "image/jpeg": "https://www.gutenberg.org/cache/epub/48296/pg48296.cover.medium.jpg",
+      "application/octet-stream": "https://www.gutenberg.org/cache/epub/48296/pg48296-h.zip",
+      "text/plain; charset=utf-8": "https://www.gutenberg.org/ebooks/48296.txt.utf-8",
+      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/48296/48296-0.txt"
+    },
+    "download_count": 8843,
+    "cover": "48296.jpg"
+  },
+  {
+    "id": 49266,
+    "title": "The Wars of Religion in France 1559-1576: The Huguenots, Catherine de Medici and Philip II",
+    "authors": [
+      {
+        "name": "Thompson, James Westfall",
+        "birth_year": 1869,
+        "death_year": 1941
+      }
+    ],
+    "summaries": [
+      "\"The Wars of Religion in France 1559-1576\" by James Westfall Thompson is a historical account written in the early 20th century. This work delves into the tumultuous period of religious conflict in France, focusing on the Huguenots and significant figures such as Catherine de Medici and Philip II. It examines the intricacies of political, social, and economic factors that fueled these wars, offering insights into how these events shaped the course of French history.  The opening of the book sets the stage for the Huguenot revolt initiated following the death of Henry II of France in 1559. It details the royal festivities that quickly turned somber due to the king's fatal accident during a tournament, paving the way for political maneuvers by the Guises. As Francis II ascended the throne, the Guises seized control of government affairs amidst rising tensions between the Huguenots and Catholic factions. The narrative introduces key characters, political tensions, and societal dynamics that would lead to a series of violent confrontations, ultimately establishing the foundational context for the subsequent chapters on the unfolding conflicts. (This is an automatically generated summary.)"
+    ],
+    "editors": [],
+    "translators": [],
+    "subjects": [
+      "France -- History -- Wars of the Huguenots, 1562-1598",
+      "Sainte Ligue (1576-1593)"
+    ],
+    "bookshelves": [
+      "Category: History - Early Modern (c. 1450-1750)",
+      "Category: History - European",
+      "Category: History - Religious"
+    ],
+    "languages": [
+      "en"
+    ],
+    "copyright": false,
+    "media_type": "Text",
+    "formats": {
+      "text/html": "https://www.gutenberg.org/ebooks/49266.html.images",
+      "application/epub+zip": "https://www.gutenberg.org/ebooks/49266.epub3.images",
+      "application/x-mobipocket-ebook": "https://www.gutenberg.org/ebooks/49266.kf8.images",
+      "application/rdf+xml": "https://www.gutenberg.org/ebooks/49266.rdf",
+      "image/jpeg": "https://www.gutenberg.org/cache/epub/49266/pg49266.cover.medium.jpg",
+      "application/octet-stream": "https://www.gutenberg.org/cache/epub/49266/pg49266-h.zip",
+      "text/plain; charset=utf-8": "https://www.gutenberg.org/ebooks/49266.txt.utf-8",
+      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/49266/49266-0.txt"
+    },
+    "download_count": 8675,
+    "cover": "49266.jpg"
+  },
+  {
+    "id": 50603,
+    "title": "Minute Mysteries [Detectograms]",
+    "authors": [
+      {
+        "name": "Ripley, H. A. (Harold Austin)",
+        "birth_year": 1896,
+        "death_year": null
+      }
+    ],
+    "summaries": [
+      "\"Minute Mysteries [Detectograms]\" by H. A. Ripley is a collection of short detective stories written in the early 20th century. This engaging work revolves around Professor Fordney, a criminologist sharing intriguing cases that illustrate the often simplistic nature of criminal detection. Each story presents a unique scenario where readers can test their own deductive skills, with conclusions grounded in logical reasoning rather than more fantastical elements typical of genre fiction.  At the start of this collection, readers are introduced to the premise of the stories through a foreword and preface that emphasize the accessibility of solving these cryptic crimes. The opening portion features Professor Fordney discussing the nature of crime with Chief Inspector Kelley and his nephew, Jim Barry. Key points are made about the often straightforward resolution of crimes, largely due to the misguided efforts of criminals. A sample mystery is presented, showcasing the dynamic between Fordney and various characters he encounters, setting the tone for the subsequent narratives that invite readers to match wits with the protagonists while unraveling the nuances of each case. (This is an automatically generated summary.)"
+    ],
+    "editors": [],
+    "translators": [],
+    "subjects": [
+      "Detective and mystery stories",
+      "Puzzles"
+    ],
+    "bookshelves": [
+      "Category: Crime, Thrillers and Mystery",
+      "Category: Short Stories"
+    ],
+    "languages": [
+      "en"
+    ],
+    "copyright": false,
+    "media_type": "Text",
+    "formats": {
+      "text/html": "https://www.gutenberg.org/ebooks/50603.html.images",
+      "application/epub+zip": "https://www.gutenberg.org/ebooks/50603.epub3.images",
+      "application/x-mobipocket-ebook": "https://www.gutenberg.org/ebooks/50603.kf8.images",
+      "application/rdf+xml": "https://www.gutenberg.org/ebooks/50603.rdf",
+      "image/jpeg": "https://www.gutenberg.org/cache/epub/50603/pg50603.cover.medium.jpg",
+      "application/octet-stream": "https://www.gutenberg.org/cache/epub/50603/pg50603-h.zip",
+      "text/plain; charset=utf-8": "https://www.gutenberg.org/ebooks/50603.txt.utf-8",
+      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/50603/50603-0.txt"
+    },
+    "download_count": 8665,
+    "cover": "50603.jpg"
+  },
+  {
+    "id": 49987,
+    "title": "Forest Days: A Romance of Old Times",
+    "authors": [
+      {
+        "name": "James, G. P. R. (George Payne Rainsford)",
+        "birth_year": null,
+        "death_year": 1860
+      }
+    ],
+    "summaries": [
+      "\"Forest Days: A Romance of Old Times\" by G. P. R. James is a historical novel written in the mid-19th century. The story is set in medieval England and revolves around the life of the peasantry, particularly focusing on the character of Hardy the Hunchback, who is depicted as a resilient and clever figure. The novel explores themes of class struggle, love, and conflict during the reign of Henry III, bringing to life the vibrant culture and challenges of that era.  At the start of the story, readers are introduced to a quaint village and the comfortable inn that serves as a central gathering place for locals and travelers alike. The narrative begins with a nostalgic tone as it recounts the idyllic charm of rural England juxtaposed against the brewing political tensions of the period. The opening chapters showcase various characters, including Hardy, who is a peasant with a notable deformity, and hints at the arrival of influential nobles that disrupt the village's peace. The interactions between Hardy, young lovers like Ralph Harland, and the nobility set the stage for unfolding conflicts, love triangles, and issues related to social hierarchy that will be explored throughout the tale. (This is an automatically generated summary.)"
+    ],
+    "editors": [],
+    "translators": [],
+    "subjects": [
+      "Adventure stories",
+      "Great Britain -- History -- Richard I, 1189-1199 -- Fiction",
+      "Historical fiction",
+      "Outlaws -- Fiction",
+      "Robin Hood (Legendary character) -- Fiction",
+      "Sherwood Forest (England) -- Fiction"
+    ],
+    "bookshelves": [
+      "Category: British Literature",
+      "Category: Historical Novels",
+      "Category: Romance"
+    ],
+    "languages": [
+      "en"
+    ],
+    "copyright": false,
+    "media_type": "Text",
+    "formats": {
+      "text/html": "https://www.gutenberg.org/ebooks/49987.html.images",
+      "application/epub+zip": "https://www.gutenberg.org/ebooks/49987.epub3.images",
+      "application/x-mobipocket-ebook": "https://www.gutenberg.org/ebooks/49987.kf8.images",
+      "application/rdf+xml": "https://www.gutenberg.org/ebooks/49987.rdf",
+      "image/jpeg": "https://www.gutenberg.org/cache/epub/49987/pg49987.cover.medium.jpg",
+      "application/octet-stream": "https://www.gutenberg.org/cache/epub/49987/pg49987-h.zip",
+      "text/plain; charset=utf-8": "https://www.gutenberg.org/ebooks/49987.txt.utf-8",
+      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/49987/49987-0.txt"
+    },
+    "download_count": 8357,
+    "cover": "49987.jpg"
+  },
+  {
+    "id": 49027,
+    "title": "Medical Jurisprudence, Forensic medicine and Toxicology. Vol. 1",
+    "authors": [
+      {
+        "name": "Witthaus, R. A. (Rudolph August)",
+        "birth_year": 1846,
+        "death_year": 1915
+      },
+      {
+        "name": "Becker, Tracy C. (Tracy Chatfield)",
+        "birth_year": 1855,
+        "death_year": 1935
+      }
+    ],
+    "summaries": [
+      "\"Medical Jurisprudence, Forensic Medicine and Toxicology. Vol. 1\" by R. A. Witthaus et al. is a scientific publication written in the late 19th century. This comprehensive work serves as a fundamental reference for the intersection of medicine and law, particularly focusing on how medical knowledge applies in legal contexts. The book explores various aspects of medical jurisprudence, forensic medicine, and toxicology, aimed at practitioners in both legal and medical fields, as well as scholars interested in legal medicine’s historical and practical significance.  The opening of the volume sets the stage by delineating the key topics—medical jurisprudence, forensic medicine, and toxicology. It discusses the historical development of these fields, illustrating the evolution of the legal relationships between medical practitioners and the law. The introduction emphasizes the necessity for legal definitions regarding medical practice, the rights and duties of physicians, and the importance of providing expert testimony in legal cases. This section serves not only as an academic foundation but also as a practical guide for understanding the statutory landscape governing medical practice and its implications for both physicians and patients. (This is an automatically generated summary.)"
+    ],
+    "editors": [],
+    "translators": [],
+    "subjects": [
+      "Medical jurisprudence",
+      "Poisons",
+      "Toxicology"
+    ],
+    "bookshelves": [
+      "Category: Drugs/Alcohol/Pharmacology",
+      "Category: Health & Medicine",
+      "Category: Law & Criminology"
+    ],
+    "languages": [
+      "en"
+    ],
+    "copyright": false,
+    "media_type": "Text",
+    "formats": {
+      "text/html": "https://www.gutenberg.org/ebooks/49027.html.images",
+      "application/epub+zip": "https://www.gutenberg.org/ebooks/49027.epub3.images",
+      "application/x-mobipocket-ebook": "https://www.gutenberg.org/ebooks/49027.kf8.images",
+      "application/rdf+xml": "https://www.gutenberg.org/ebooks/49027.rdf",
+      "image/jpeg": "https://www.gutenberg.org/cache/epub/49027/pg49027.cover.medium.jpg",
+      "application/octet-stream": "https://www.gutenberg.org/cache/epub/49027/pg49027-h.zip",
+      "text/plain; charset=utf-8": "https://www.gutenberg.org/ebooks/49027.txt.utf-8",
+      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/49027/49027-0.txt"
+    },
+    "download_count": 8300,
+    "cover": "49027.jpg"
+  },
+  {
+    "id": 50133,
+    "title": "The Dunwich horror",
+    "authors": [
+      {
+        "name": "Lovecraft, H. P. (Howard Phillips)",
+        "birth_year": 1890,
+        "death_year": 1937
+      }
+    ],
+    "summaries": [
+      "\"The Dunwich Horror\" by H. P. Lovecraft is a cosmic horror novella written in 1928. In the decaying Massachusetts village of Dunwich, Wilbur Whateley grows at an unnatural rate, aided by his sorcerer grandfather in dark rituals connected to the entity Yog-Sothoth. When a monstrous invisible presence escapes their farmhouse and terrorizes the countryside, three professors from Miskatonic University must confront an otherworldly horror that defies human comprehension. This tale of forbidden knowledge and cosmic terror is considered a core story of the Cthulhu Mythos. (This is an automatically generated summary.)"
+    ],
+    "editors": [],
+    "translators": [],
+    "subjects": [
+      "American fiction -- 20th century",
+      "Fantasy fiction",
+      "Horror tales"
+    ],
+    "bookshelves": [
+      "Category: American Literature",
+      "Category: Crime, Thrillers and Mystery",
+      "Category: Science-Fiction & Fantasy",
+      "Category: Short Stories",
+      "Science Fiction"
+    ],
+    "languages": [
+      "en"
+    ],
+    "copyright": false,
+    "media_type": "Text",
+    "formats": {
+      "text/html": "https://www.gutenberg.org/ebooks/50133.html.images",
+      "application/epub+zip": "https://www.gutenberg.org/ebooks/50133.epub3.images",
+      "application/x-mobipocket-ebook": "https://www.gutenberg.org/ebooks/50133.kf8.images",
+      "application/rdf+xml": "https://www.gutenberg.org/ebooks/50133.rdf",
+      "image/jpeg": "https://www.gutenberg.org/cache/epub/50133/pg50133.cover.medium.jpg",
+      "application/octet-stream": "https://www.gutenberg.org/cache/epub/50133/pg50133-h.zip",
+      "text/plain; charset=utf-8": "https://www.gutenberg.org/ebooks/50133.txt.utf-8",
+      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/50133/50133-0.txt"
+    },
+    "download_count": 8125,
+    "cover": "50133.jpg"
+  },
+  {
+    "id": 48770,
+    "title": "The travels of Pedro de Cieza de Léon, A.D. 1532-50,: contained in the first part of his Chronicle of Peru",
+    "authors": [
+      {
+        "name": "Cieza de León, Pedro de",
+        "birth_year": 1518,
+        "death_year": 1554
+      }
+    ],
+    "summaries": [
+      "\"The Travels of Pedro de Cieza de Léon, A.D. 1532-50\" by Pedro de Cieza de León is a historical account written in the mid-19th century. This work serves as a detailed chronicle of the author's observations and experiences during his travels in Peru during the Spanish Conquest, covering various geographical features, cultures, and the impact of European colonization. The narrative provides crucial insights into indigenous customs, the political landscape, and the challenges faced by both the Spanish and the native populations.  The opening of this extensive chronicle provides a context for the author's experiences and his motivations for documenting the lands he traversed. Introducing readers to the early chapters, Cieza de León recounts his arrival in the New World and the founding of cities such as Panama, as well as his observations on the indigenous peoples in the regions he explored. He highlights the remarkable diversity of the land, the richness of its resources, and the complexities of its inhabitants. The author's keen observational skills are evident as he shares vivid descriptions of local customs, natural environments, and the ongoing tumult of colonial dynamics, setting the stage for a deeper understanding of Peru's historical narrative. (This is an automatically generated summary.)"
+    ],
+    "editors": [],
+    "translators": [
+      {
+        "name": "Markham, Clements R. (Clements Robert), Sir",
+        "birth_year": 1830,
+        "death_year": 1916
+      }
+    ],
+    "subjects": [
+      "America -- Early accounts to 1600",
+      "Colombia -- Description and travel -- Early works to 1800",
+      "Indians of South America",
+      "Peru -- Description and travel -- Early works to 1800",
+      "Peru -- History -- To 1548"
+    ],
+    "bookshelves": [
+      "Category: Archaeology & Anthropology",
+      "Category: History - Other",
+      "Category: Travel Writing"
+    ],
+    "languages": [
+      "en"
+    ],
+    "copyright": false,
+    "media_type": "Text",
+    "formats": {
+      "text/html": "https://www.gutenberg.org/ebooks/48770.html.images",
+      "application/epub+zip": "https://www.gutenberg.org/ebooks/48770.epub3.images",
+      "application/x-mobipocket-ebook": "https://www.gutenberg.org/ebooks/48770.kf8.images",
+      "application/rdf+xml": "https://www.gutenberg.org/ebooks/48770.rdf",
+      "image/jpeg": "https://www.gutenberg.org/cache/epub/48770/pg48770.cover.medium.jpg",
+      "application/octet-stream": "https://www.gutenberg.org/cache/epub/48770/pg48770-h.zip",
+      "text/plain; charset=utf-8": "https://www.gutenberg.org/ebooks/48770.txt.utf-8",
+      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/48770/48770-0.txt"
+    },
+    "download_count": 8003,
+    "cover": "48770.jpg"
+  },
+  {
+    "id": 50439,
+    "title": "English Eccentrics and Eccentricities",
+    "authors": [
+      {
+        "name": "Timbs, John",
+        "birth_year": 1801,
+        "death_year": 1875
+      }
+    ],
+    "summaries": [
+      "\"English Eccentrics and Eccentricities\" by John Timbs is a biographical collection published in 1866. This two-volume work catalogues the lives of unusual people from the late 18th and early 19th centuries, ranging from celebrities to recluses, religious figures to astrologers, and authors to tragedians. Timbs explores how oddity of character can coexist with goodness of heart, presenting a gallery of \"motley-minded and grotesque\" individuals whose rare accidents offer lessons in both thrift and humor. (This is an automatically generated summary.)"
+    ],
+    "editors": [],
+    "translators": [],
+    "subjects": [
+      "Eccentrics and eccentricities -- England"
+    ],
+    "bookshelves": [
+      "Category: Biographies",
+      "Category: British Literature"
+    ],
+    "languages": [
+      "en"
+    ],
+    "copyright": false,
+    "media_type": "Text",
+    "formats": {
+      "text/html": "https://www.gutenberg.org/ebooks/50439.html.images",
+      "application/epub+zip": "https://www.gutenberg.org/ebooks/50439.epub3.images",
+      "application/x-mobipocket-ebook": "https://www.gutenberg.org/ebooks/50439.kf8.images",
+      "application/rdf+xml": "https://www.gutenberg.org/ebooks/50439.rdf",
+      "image/jpeg": "https://www.gutenberg.org/cache/epub/50439/pg50439.cover.medium.jpg",
+      "application/octet-stream": "https://www.gutenberg.org/cache/epub/50439/pg50439-h.zip",
+      "text/plain; charset=utf-8": "https://www.gutenberg.org/ebooks/50439.txt.utf-8",
+      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/50439/50439-0.txt"
+    },
+    "download_count": 7697,
+    "cover": "50439.jpg"
+  },
+  {
+    "id": 50290,
+    "title": "Space Station 1",
+    "authors": [
+      {
+        "name": "Long, Frank Belknap",
+        "birth_year": 1903,
+        "death_year": 1994
+      }
+    ],
+    "summaries": [
+      "\"Space Station 1\" by Frank Belknap Long is a science fiction novel written in the late 1950s. The story follows Lieutenant David Corriston, who, upon visiting an enormous space station, becomes embroiled in a dangerous conspiracy involving kidnappings, murder, and a hidden enemy. As he grapples with these threats, his determination to uncover the truth could determine not just his fate, but that of Earth itself.  At the start of the narrative, the atmosphere onboard the space station is infused with wonder but quickly turns to terror. Corriston finds himself in a life-threatening struggle with a mysterious assailant just after expressing his awe for the station's grandeur. As he wrestles for survival in the dark, his mind races with thoughts of Helen Ramsey, the daughter of a powerful figure, who has vanished amid the chaos. The opening segment sets up an intense plot filled with suspense as Corriston fights against time and unseen threats to find her, hinting at deeper intrigues that might endanger them both. (This is an automatically generated summary.)"
+    ],
+    "editors": [],
+    "translators": [],
+    "subjects": [
+      "Impostors and imposture -- Fiction",
+      "Love stories",
+      "Science fiction",
+      "Space stations -- Fiction"
+    ],
+    "bookshelves": [
+      "Category: Crime, Thrillers and Mystery",
+      "Category: Novels",
+      "Category: Science-Fiction & Fantasy",
+      "Science Fiction"
+    ],
+    "languages": [
+      "en"
+    ],
+    "copyright": false,
+    "media_type": "Text",
+    "formats": {
+      "text/html": "https://www.gutenberg.org/ebooks/50290.html.images",
+      "application/epub+zip": "https://www.gutenberg.org/ebooks/50290.epub3.images",
+      "application/x-mobipocket-ebook": "https://www.gutenberg.org/ebooks/50290.kf8.images",
+      "application/rdf+xml": "https://www.gutenberg.org/ebooks/50290.rdf",
+      "image/jpeg": "https://www.gutenberg.org/cache/epub/50290/pg50290.cover.medium.jpg",
+      "application/octet-stream": "https://www.gutenberg.org/cache/epub/50290/pg50290-h.zip",
+      "text/plain; charset=utf-8": "https://www.gutenberg.org/ebooks/50290.txt.utf-8",
+      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/50290/50290-0.txt"
+    },
+    "download_count": 7528,
+    "cover": "50290.jpg"
+  },
+  {
+    "id": 49171,
+    "title": "Luther, vol. 5 of 6",
+    "authors": [
+      {
+        "name": "Grisar, Hartmann",
+        "birth_year": 1845,
+        "death_year": 1932
+      }
+    ],
+    "summaries": [
+      "\"Luther, vol. 5 of 6\" by Hartmann Grisar is a scholarly examination of Martin Luther's life and teachings, written in the early 20th century. This volume, part of a comprehensive six-part biography, focuses on the ethical results of Luther's theological views and explores his moral teachings, their contradictions, and their implications during his life. The book delves into Luther’s interaction with various theological movements and prominent figures of his time, reflecting on the deep impact his ideas had on Christianity.  The opening of the volume introduces the overall themes and presents Luther's ethical framework, significantly shaped by his doctrine of justification by faith. Grisar reveals the complexity of Luther's moral teachings, noting that while he asserted the importance of good works, he simultaneously emphasized that true morality stemmed from a believer's certainty of salvation. Despite grappling with the reality of sin and the devil's influence, Luther’s views promoted an active struggle against one’s own sinful nature, indifference, and temptation. The text sets the stage for an examination of Luther’s responses to emerging theological challenges, highlighting his eagerness to clarify and defend his beliefs against misinterpretation and radical applications of his doctrine. (This is an automatically generated summary.)"
+    ],
+    "editors": [
+      {
+        "name": "Dessoulavy, C. L. (Charles Louis)",
+        "birth_year": null,
+        "death_year": null
+      }
+    ],
+    "translators": [
+      {
+        "name": "Lamond, E. M.",
+        "birth_year": null,
+        "death_year": null
+      }
+    ],
+    "subjects": [
+      "Luther, Martin, 1483-1546"
+    ],
+    "bookshelves": [
+      "Category: Biographies",
+      "Category: History - Religious"
+    ],
+    "languages": [
+      "en"
+    ],
+    "copyright": false,
+    "media_type": "Text",
+    "formats": {
+      "text/html": "https://www.gutenberg.org/ebooks/49171.html.images",
+      "application/epub+zip": "https://www.gutenberg.org/ebooks/49171.epub3.images",
+      "application/x-mobipocket-ebook": "https://www.gutenberg.org/ebooks/49171.kf8.images",
+      "application/rdf+xml": "https://www.gutenberg.org/ebooks/49171.rdf",
+      "image/jpeg": "https://www.gutenberg.org/cache/epub/49171/pg49171.cover.medium.jpg",
+      "application/octet-stream": "https://www.gutenberg.org/cache/epub/49171/pg49171-h.zip",
+      "text/plain; charset=utf-8": "https://www.gutenberg.org/ebooks/49171.txt.utf-8",
+      "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/49171/49171-0.txt"
+    },
+    "download_count": 7365,
+    "cover": "49171.jpg"
   }
 ]

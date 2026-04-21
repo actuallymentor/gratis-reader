@@ -113,12 +113,12 @@ async function generate_cover_variants( source_path, book_id ) {
 
 }
 
-function derive_epub_alternatives( primary_url ) {
+function derive_epub_urls( primary_url ) {
 
     // Gutenberg epub URLs follow: /ebooks/{id}.epub3.images
-    // Derive noimages and older-format variants, ordered smallest-first
+    // Prefer noimages variants — embedded images bloat epubs and break parsing
     const match = primary_url.match( /^(.+\/ebooks\/\d+)\..+$/ )
-    if( !match ) return []
+    if( !match ) return [ primary_url ]
 
     const base = match[1]
     return [
@@ -126,13 +126,13 @@ function derive_epub_alternatives( primary_url ) {
         `${ base }.epub.noimages`,
         `${ base }.epub.images`,
         `${ base }.epub3.images`,
-    ].filter( url => url !== primary_url )
+    ]
 
 }
 
-async function try_epub_under_limit( primary_url, epub_path ) {
+async function download_best_epub( primary_url, epub_path ) {
 
-    for( const url of derive_epub_alternatives( primary_url ) ) {
+    for( const url of derive_epub_urls( primary_url ) ) {
 
         const ok = await download_file( url, epub_path )
         if( !ok ) continue
@@ -152,38 +152,32 @@ async function download_book_assets( book ) {
 
     // --- Epub (with size limit enforcement) ---
     const epub_url = book.formats?.[ EPUB_MIME ]
-    if( epub_url ) {
+    if( !epub_url ) {
+        result.epub_failed = true
+        return result
+    }
 
-        const epub_path = resolve( EPUB_DIR, `${ book.id }.epub` )
+    const epub_path = resolve( EPUB_DIR, `${ book.id }.epub` )
 
-        if( existsSync( epub_path ) ) {
+    if( existsSync( epub_path ) ) {
 
-            if( statSync( epub_path ).size <= MAX_EPUB_BYTES ) {
-                result.epub_skipped = true
-            } else {
-                unlinkSync( epub_path )
-                const found = await try_epub_under_limit( epub_url, epub_path )
-                if( !found ) {
-                    result.epub_too_large = true
-                    return result
-                }
-            }
-
+        if( statSync( epub_path ).size <= MAX_EPUB_BYTES ) {
+            result.epub_skipped = true
         } else {
-
-            const ok = await download_file( epub_url, epub_path )
-
-            if( !ok ) {
-                result.epub_failed = true
-            } else if( statSync( epub_path ).size > MAX_EPUB_BYTES ) {
-                unlinkSync( epub_path )
-                const found = await try_epub_under_limit( epub_url, epub_path )
-                if( !found ) {
-                    result.epub_too_large = true
-                    return result
-                }
+            unlinkSync( epub_path )
+            const found = await download_best_epub( epub_url, epub_path )
+            if( !found ) {
+                result.epub_too_large = true
+                return result
             }
+        }
 
+    } else {
+
+        const found = await download_best_epub( epub_url, epub_path )
+        if( !found ) {
+            result.epub_failed = true
+            return result
         }
 
     }
@@ -222,10 +216,11 @@ async function download_all_assets( books ) {
 
     console.log( `\nDownloading epubs and covers to ${ EPUB_DIR }...` )
 
-    const too_large_ids = new Set()
+    const excluded_ids = new Set()
     let epub_downloaded = 0
     let epub_skipped = 0
     let epub_too_large = 0
+    let epub_failed = 0
     let cover_downloaded = 0
     let cover_skipped = 0
     let variants_generated = 0
@@ -245,9 +240,12 @@ async function download_all_assets( books ) {
 
             if( v.epub_too_large ) {
                 epub_too_large++
-                too_large_ids.add( v.id )
+                excluded_ids.add( v.id )
+            } else if( v.epub_failed ) {
+                epub_failed++
+                excluded_ids.add( v.id )
             } else if( v.epub_skipped ) epub_skipped++
-            else if( !v.epub_failed ) epub_downloaded++
+            else epub_downloaded++
 
             if( v.cover_skipped ) cover_skipped++
             else if( v.cover_filename ) cover_downloaded++
@@ -260,13 +258,13 @@ async function download_all_assets( books ) {
         }
 
         const progress = Math.min( i + DOWNLOAD_CONCURRENCY, books.length )
-        process.stdout.write( `  Progress: ${ progress }/${ books.length } | epubs: ${ epub_downloaded } new, ${ epub_skipped } cached, ${ epub_too_large } too large | covers: ${ cover_downloaded } new, ${ cover_skipped } cached\r` )
+        process.stdout.write( `  Progress: ${ progress }/${ books.length } | epubs: ${ epub_downloaded } new, ${ epub_skipped } cached, ${ epub_too_large } too large, ${ epub_failed } failed | covers: ${ cover_downloaded } new, ${ cover_skipped } cached\r` )
 
     }
 
-    console.log( `\n  Done. Epubs: ${ epub_downloaded } new, ${ epub_skipped } cached, ${ epub_too_large } skipped (>${ MAX_EPUB_BYTES / 1024 / 1024 } MiB). Covers: ${ cover_downloaded } new, ${ cover_skipped } cached. Variants: ${ variants_generated } generated.` )
+    console.log( `\n  Done. Epubs: ${ epub_downloaded } new, ${ epub_skipped } cached, ${ epub_too_large } skipped (>${ MAX_EPUB_BYTES / 1024 / 1024 } MiB), ${ epub_failed } failed. Covers: ${ cover_downloaded } new, ${ cover_skipped } cached. Variants: ${ variants_generated } generated.` )
 
-    return too_large_ids
+    return excluded_ids
 
 }
 
@@ -363,28 +361,33 @@ async function main() {
     console.log( `Fetched ${ fetched_books.length } books across ${ page } pages.` )
 
     // Download assets and attach cover filenames to book objects
-    const too_large_ids = await download_all_assets( fetched_books )
+    const excluded_ids = await download_all_assets( fetched_books )
 
     // Clean up all files for books that exceed the size limit
-    if( too_large_ids.size > 0 && existsSync( EPUB_DIR ) ) {
+    if( excluded_ids.size > 0 && existsSync( EPUB_DIR ) ) {
         const files = readdirSync( EPUB_DIR )
-        for( const id of too_large_ids ) {
+        for( const id of excluded_ids ) {
             const pattern = new RegExp( `^${ id }[.\\-]` )
             for( const file of files ) {
                 if( pattern.test( file ) ) unlinkSync( resolve( EPUB_DIR, file ) )
             }
         }
-        console.log( `Removed files for ${ too_large_ids.size } oversized books.` )
+        console.log( `Removed files for ${ excluded_ids.size } oversized books.` )
     }
 
     // Merge: new books update existing entries, existing-only books are preserved
     // Books that exceeded the size limit are excluded entirely
     for( const book of fetched_books ) {
-        if( too_large_ids.has( book.id ) ) {
+        if( excluded_ids.has( book.id ) ) {
             existing.delete( book.id )
         } else {
             existing.set( book.id, book )
         }
+    }
+
+    // Final pass: drop any catalog entry whose epub is missing on disk
+    for( const [ id ] of existing ) {
+        if( !existsSync( resolve( EPUB_DIR, `${ id }.epub` ) ) ) existing.delete( id )
     }
 
     const merged = [ ...existing.values() ]

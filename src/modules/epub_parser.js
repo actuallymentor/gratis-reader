@@ -12,8 +12,8 @@ export const parse_epub = async ( array_buffer ) => {
     const book = ePub( array_buffer )
     await book.ready
 
-    // Load metadata
-    const metadata = await book.loaded.metadata
+    // Load metadata — guard against epubjs failing to parse (e.g. image-heavy epubs)
+    const metadata = await book.loaded?.metadata || {}
     log.info( `Parsed EPUB:`, metadata.title, `by`, metadata.creator )
 
     // Load cover URL
@@ -25,7 +25,7 @@ export const parse_epub = async ( array_buffer ) => {
     }
 
     // Load table of contents and flatten nested subitems into a single list
-    const navigation = await book.loaded.navigation
+    const navigation = await book.loaded?.navigation || {}
     const raw_toc = navigation.toc || []
 
     const flatten_toc = ( items ) => items.flatMap( item =>
