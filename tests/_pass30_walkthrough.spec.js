@@ -278,9 +278,9 @@ test.describe( `Pass 30 — Walkthrough`, () => {
         expect( url ).toMatch( /(library|\/)$/ )
     } )
 
-    // ── 10. Level picker shows all 4 levels ──
+    // ── 10. Level picker shows all proficiency levels ──
 
-    test( `BW90 level picker displays all CEFR levels`, async ( { page } ) => {
+    test( `BW90 level picker displays all proficiency levels`, async ( { page } ) => {
 
         // Clear progress to force language modal
         await page.evaluate( () => {
@@ -302,14 +302,16 @@ test.describe( `Pass 30 — Walkthrough`, () => {
         await page.waitForURL( /\/read\// )
         await page.waitForTimeout( 2000 )
 
-        // Check all four levels are shown
+        // Check all levels are shown
         const body = await page.locator( `body` ).textContent()
+        expect( body ).toContain( `A0` )
         expect( body ).toContain( `A1` )
         expect( body ).toContain( `A2` )
         expect( body ).toMatch( /B1|B2/ )
         expect( body ).toMatch( /C1|C2/ )
 
         // Check friendly labels
+        expect( body ).toMatch( /Caveman/i )
         expect( body ).toMatch( /Toddler/i )
     } )
 

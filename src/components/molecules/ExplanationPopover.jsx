@@ -2,9 +2,8 @@ import { useState, useEffect, useMemo } from 'react'
 import styled from 'styled-components'
 import { marked } from 'marked'
 import { chat_completion } from '../../modules/open_router.js'
-import { build_explanation_prompt } from '../../modules/prompts.js'
+import { build_explanation_prompt, DEFAULT_LEVEL, LEVELS } from '../../modules/prompts.js'
 import { use_settings_store } from '../../stores/settings_store.js'
-import { LEVELS } from '../../modules/prompts.js'
 import { SkeletonParagraph } from '../atoms/Skeleton.jsx'
 import { log } from 'mentie'
 
@@ -150,7 +149,7 @@ export default function ExplanationPopover( { original, translated, source_langu
     const model = use_settings_store( state => state.model )
     const last_level = use_settings_store( state => state.last_level )
 
-    const level_info = LEVELS.find( l => l.code === last_level ) || LEVELS[0]
+    const level_info = LEVELS.find( l => l.code === last_level ) || DEFAULT_LEVEL
 
     const rendered_html = useMemo( () => {
         if( !explanation ) return ``

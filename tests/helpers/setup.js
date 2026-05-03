@@ -26,8 +26,8 @@ export const upload_demo_book = async ( page ) => {
     await page.goto( `/library` )
 
     // Check if book already exists
-    const existing = await page.$$( `h3` )
-    if( existing.length > 0 ) return
+    const existing = page.getByRole( `heading`, { name: `Smart work beats hard work` } )
+    if( await existing.isVisible().catch( () => false ) ) return
 
     // Upload via the hidden file input
     const file_input = page.locator( `input[type="file"]` )

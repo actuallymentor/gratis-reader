@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { log } from 'mentie'
 import { chat_completion } from '../modules/open_router.js'
-import { build_translation_system_prompt, build_translation_user_prompt, LEVELS } from '../modules/prompts.js'
+import { build_translation_system_prompt, build_translation_user_prompt, DEFAULT_LEVEL, LEVELS } from '../modules/prompts.js'
 import { save_translation, get_translation, add_token_usage, get_token_usage } from '../modules/cache.js'
 import { use_settings_store } from '../stores/settings_store.js'
 
@@ -59,7 +59,7 @@ export const use_translation = ( { all_sentences = [], target_language, level, s
     const model = use_settings_store( state => state.model )
 
     // Get level info
-    const level_info = LEVELS.find( l => l.code === level ) || LEVELS[0]
+    const level_info = LEVELS.find( l => l.code === level ) || DEFAULT_LEVEL
 
     // Translate a batch of sentences
     const translate_batch = useCallback( async ( sentences_to_translate, signal ) => {

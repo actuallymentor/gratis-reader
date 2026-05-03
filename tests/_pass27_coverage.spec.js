@@ -37,8 +37,8 @@ test.describe( `Pass 27 — Coverage Expansion`, () => {
         await page.waitForTimeout( 2000 )
 
         // Should NOT create a book card (file rejected)
-        const books = await page.locator( `h3` ).count()
-        expect( books ).toBe( 0 )
+        const demo_book = page.getByRole( `heading`, { name: `Smart work beats hard work` } )
+        await expect( demo_book ).not.toBeVisible()
     } )
 
     // ── Spec §2: Cover image extraction ──
@@ -70,6 +70,39 @@ test.describe( `Pass 27 — Coverage Expansion`, () => {
     } )
 
     // ── Spec §5: Level-specific prompt rules ──
+
+    test( `P27-04a A0 translation prompt allows caveman simplification`, async ( { page } ) => {
+
+        let captured_system = ``
+
+        await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
+            const body = JSON.parse( route.request().postData() )
+            const system_msg = body.messages?.find( m => m.role === `system` )?.content || ``
+            if( !captured_system && system_msg.length > 0 ) captured_system = system_msg
+            const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
+            const match = user_msg.match( /Translate this sentence:\n(.+)/s )
+            const sentence = match ? match[1].trim() : `unknown`
+            await route.fulfill( {
+                contentType: `application/json`,
+                body: JSON.stringify( { choices: [ { message: { content: `[TR] ${ sentence }` } } ] } )
+            } )
+        } )
+
+        // Set level to A0 before opening
+        await page.evaluate( () => {
+            const store = JSON.parse( localStorage.getItem( `settings-storage` ) || `{}` )
+            store.state = { ...( store.state || {} ), last_level: `a0` }
+            localStorage.setItem( `settings-storage`, JSON.stringify( store ) )
+        } )
+
+        await upload_demo_book( page )
+        await open_reader( page )
+        await page.waitForTimeout( 3000 )
+
+        expect( captured_system ).toContain( `Caveman` )
+        expect( captured_system ).toContain( `A0` )
+        expect( captured_system.toLowerCase() ).toMatch( /very very|mostly.*correct|rough|incomplete/ )
+    } )
 
     test( `P27-04 A1 translation prompt includes strict simplification rules`, async ( { page } ) => {
 

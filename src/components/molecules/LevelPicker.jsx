@@ -34,7 +34,7 @@ const LevelLabel = styled.div`
 `
 
 /**
- * Proficiency level picker — four cards for A1/A2/B1-B2/C1-C2
+ * Proficiency level picker — cards for A0/A1/A2/B1-B2/C1-C2
  * @param {Object} props
  * @param {string} props.value - Current level code
  * @param {Function} props.on_change

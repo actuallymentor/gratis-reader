@@ -208,9 +208,9 @@ test.describe( `Pass 33 — Walkthrough`, () => {
         expect( accept ).toBe( `.epub` )
     } )
 
-    // ── 12. Level picker shows all CEFR levels with labels ──
+    // ── 12. Level picker shows all proficiency levels with labels ──
 
-    test( `BW127 level picker shows A1 Toddler through C1-C2 Adult`, async ( { page } ) => {
+    test( `BW127 level picker shows A0 Caveman through C1-C2 Adult`, async ( { page } ) => {
         await upload_demo_book( page )
         await open_reader( page )
 
@@ -218,8 +218,10 @@ test.describe( `Pass 33 — Walkthrough`, () => {
         await expect( page.getByText( `FONT SIZE` ) ).toBeVisible( { timeout: 3000 } )
 
         const body = await page.locator( `body` ).textContent()
+        expect( body ).toContain( `A0` )
         expect( body ).toContain( `A1` )
         expect( body ).toContain( `A2` )
+        expect( body ).toContain( `Caveman` )
         expect( body ).toContain( `Toddler` )
     } )
 

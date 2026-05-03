@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.8.0] - 2026-05-03
+
+### Added
+- Add A0 Caveman language level for extremely simple translations (uncommitted)
+
 ## [1.7.5] - 2026-04-20
 
 ### Fixed

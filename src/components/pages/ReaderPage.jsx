@@ -5,7 +5,7 @@ import { use_book } from '../../hooks/use_book.js'
 import { use_translation } from '../../hooks/use_translation.js'
 import { use_settings_store } from '../../stores/settings_store.js'
 import { save_progress, get_progress } from '../../modules/cache.js'
-import { LEVELS } from '../../modules/prompts.js'
+import { DEFAULT_LEVEL, LEVELS } from '../../modules/prompts.js'
 import Sentence from '../molecules/Sentence.jsx'
 import ExplanationPopover from '../molecules/ExplanationPopover.jsx'
 import SettingsDrawer from '../molecules/SettingsDrawer.jsx'
@@ -487,7 +487,7 @@ export default function ReaderPage() {
     }, [ last_language, last_level ] )
 
     // Get level info for badge
-    const level_info = LEVELS.find( l => l.code === last_level ) || LEVELS[0]
+    const level_info = LEVELS.find( l => l.code === last_level ) || DEFAULT_LEVEL
 
     // --- Render helpers ---
 

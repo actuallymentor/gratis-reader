@@ -3,6 +3,14 @@ import { multiline_trim } from 'mentie'
 // --- Level definitions ---
 
 export const LEVELS = [
+    { code: `a0`, label: `Caveman`, cefr: `A0`, description: `Very very simplified language that is mostly, but not always, correct`,
+        lvl_guidelines: `Use tiny vocabulary, repeated concrete words, and very short sentence fragments. Prefer clarity over correctness. Grammar may be rough or incomplete when that makes the meaning easier.`,
+        lvl_example: multiline_trim( `
+            1. Original: "The building's architecture is reminiscent of the Gothic beauty of a European cathedral"
+            2. Rewritten: "Big old building. Very pretty. Like big church."
+            3. Then translate the rewritten sentence into the target language, keeping it extremely simple even if the result is not fully correct.
+        ` )
+    },
     { code: `a1`, label: `Toddler`, cefr: `A1`, description: `Very simple words, short sentences`,
         lvl_guidelines: `Use only the most basic vocabulary and very simple sentence structures. Avoid any complex grammar or idiomatic expressions.`,
         lvl_example: multiline_trim( `
@@ -36,6 +44,8 @@ export const LEVELS = [
         ` )
     },
 ]
+
+export const DEFAULT_LEVEL = LEVELS.find( level => level.code === `a1` )
 
 // Common languages promoted at top of picker
 export const COMMON_LANGUAGES = [
@@ -201,4 +211,3 @@ export const build_word_lookup_prompt = ( word, source_language, target_language
     user: `Sentence: "${ sentence_context }"\n\nWord: ${ word }`
 
 } )
-
