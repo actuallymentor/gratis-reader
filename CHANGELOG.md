@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.9.0] - 2026-05-06
+
+### Added
+- Add `openrouter_api_key` onboarding bypass with validation/loading (uncommitted)
+
 ## [1.8.0] - 2026-05-03
 
 ### Added

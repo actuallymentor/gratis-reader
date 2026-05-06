@@ -47,7 +47,8 @@ const setup_key = async ( page ) => {
 
 const upload_book = async ( page ) => {
     await page.goto( `/library` )
-    if( await page.locator( `h3` ).count() > 0 ) return
+    const existing = page.getByRole( `heading`, { name: `Smart work beats hard work` } )
+    if( await existing.isVisible().catch( () => false ) ) return
     await page.locator( `input[type="file"]` ).setInputFiles( DEMO_BOOK )
     await expect( page.getByRole( `heading`, { name: `Smart work beats hard work` } ) ).toBeVisible( { timeout: 10_000 } )
 }

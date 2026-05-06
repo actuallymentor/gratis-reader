@@ -31,6 +31,25 @@ test.describe( `Onboarding`, () => {
 
     } )
 
+    test( `shows loading while validating an entered API key`, async ( { page } ) => {
+
+        await page.route( `**/openrouter.ai/api/v1/auth/key`, async route => {
+            await new Promise( resolve => setTimeout( resolve, 500 ) )
+            await route.fulfill( {
+                contentType: `application/json`,
+                body: JSON.stringify( { data: { label: `test-key` } } )
+            } )
+        } )
+
+        await page.goto( `/` )
+        await page.locator( `input` ).fill( `sk-or-valid-test-key` )
+        await page.getByRole( `button`, { name: `Connect` } ).click()
+
+        await expect( page.getByText( `Checking OpenRouter API key...` ) ).toBeVisible()
+        await page.waitForURL( `**/library`, { timeout: 10_000 } )
+
+    } )
+
     test( `accepts a valid API key and redirects to library`, async ( { page } ) => {
 
         await mock_auth( page )
@@ -40,6 +59,60 @@ test.describe( `Onboarding`, () => {
 
         await page.waitForURL( `**/library`, { timeout: 10_000 } )
         expect( page.url() ).toContain( `/library` )
+
+    } )
+
+    test( `validates API key from query param and stores it`, async ( { page } ) => {
+
+        let authorization_header
+
+        await page.route( `**/openrouter.ai/api/v1/auth/key`, async route => {
+            authorization_header = route.request().headers().authorization
+            await new Promise( resolve => setTimeout( resolve, 500 ) )
+            await route.fulfill( {
+                contentType: `application/json`,
+                body: JSON.stringify( { data: { label: `test-key` } } )
+            } )
+        } )
+
+        await page.goto( `/?openrouter_api_key=sk-or-query-param-key-1234` )
+
+        await expect( page.getByText( `Checking OpenRouter API key...` ) ).toBeVisible()
+        await expect( page.locator( `input[type="password"]` ) ).toBeHidden()
+        await page.waitForURL( `**/library`, { timeout: 10_000 } )
+
+        expect( page.url() ).not.toContain( `openrouter_api_key` )
+        expect( authorization_header ).toBe( `Bearer sk-or-query-param-key-1234` )
+
+        const stored_key = await page.evaluate( () => {
+            const store = JSON.parse( localStorage.getItem( `settings-storage` ) || `{}` )
+            return store.state?.api_key
+        } )
+
+        expect( stored_key ).toBe( `sk-or-query-param-key-1234` )
+
+    } )
+
+    test( `rejects invalid API key from query param`, async ( { page } ) => {
+
+        await page.route( `**/openrouter.ai/api/v1/auth/key`, async route => {
+            await new Promise( resolve => setTimeout( resolve, 500 ) )
+            await route.fulfill( { status: 401, body: `Unauthorized` } )
+        } )
+
+        await page.goto( `/library?openrouter_api_key=sk-or-bad-query-key` )
+
+        await expect( page.getByText( `Checking OpenRouter API key...` ) ).toBeVisible()
+        await expect( page.locator( `input[type="password"]` ) ).toBeVisible( { timeout: 10_000 } )
+
+        expect( page.url() ).not.toContain( `openrouter_api_key` )
+
+        const stored_key = await page.evaluate( () => {
+            const store = JSON.parse( localStorage.getItem( `settings-storage` ) || `{}` )
+            return store.state?.api_key || null
+        } )
+
+        expect( stored_key ).toBeNull()
 
     } )
 

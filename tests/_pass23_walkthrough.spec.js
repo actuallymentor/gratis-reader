@@ -47,7 +47,8 @@ const setup_key = async ( page ) => {
 
 const upload_book = async ( page ) => {
     await page.goto( `/library` )
-    if( await page.locator( `h3` ).count() > 0 ) return
+    const existing = page.getByRole( `heading`, { name: `Smart work beats hard work` } )
+    if( await existing.isVisible().catch( () => false ) ) return
     await page.locator( `input[type="file"]` ).setInputFiles( DEMO_BOOK )
     await expect( page.getByRole( `heading`, { name: `Smart work beats hard work` } ) ).toBeVisible( { timeout: 10_000 } )
 }
@@ -118,7 +119,7 @@ test.describe( `Pass 23 — Edge Cases & Error States`, () => {
 
         // Should show an error, not add a book
         await page.waitForTimeout( 2000 )
-        const books = await page.locator( `h3` ).count()
+        const books = await page.getByRole( `heading`, { name: `Smart work beats hard work` } ).count()
         expect( books ).toBe( 0 )
     } )
 
@@ -182,7 +183,7 @@ test.describe( `Pass 23 — Edge Cases & Error States`, () => {
         await page.waitForTimeout( 3000 )
 
         // Should still have exactly 1 book
-        const book_count = await page.locator( `h3` ).count()
+        const book_count = await page.getByRole( `heading`, { name: `Smart work beats hard work` } ).count()
         expect( book_count ).toBe( 1 )
     } )
 
@@ -400,8 +401,8 @@ test.describe( `Pass 23 — Edge Cases & Error States`, () => {
         await page.goto( `/library` )
 
         await page.getByRole( `button`, { name: `Settings` } ).click()
-        await expect( page.getByText( `Theme` ) ).toBeVisible()
-        await expect( page.getByText( `Font Size` ) ).toBeVisible()
+        await expect( page.getByText( `Theme`, { exact: true } ) ).toBeVisible()
+        await expect( page.getByText( `Font Size`, { exact: true } ) ).toBeVisible()
     } )
 
     // ── SWIPE NAVIGATION ────────────────────────────────────────

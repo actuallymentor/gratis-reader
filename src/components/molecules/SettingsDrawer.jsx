@@ -181,7 +181,18 @@ const SmallBtn = styled.button`
     min-height: 44px;
     white-space: nowrap;
 
-    &:hover { background: var(--bg-hover); }
+    &:hover:not(:disabled) { background: var(--bg-hover); }
+
+    &:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+`
+
+const ValidationStatus = styled.p`
+    color: var(--text-muted);
+    font-size: 0.8em;
+    margin-top: var(--space-xs);
 `
 
 const FONT_OPTIONS = [
@@ -238,6 +249,38 @@ export default function SettingsDrawer( { is_open, on_close, show_language = tru
         if( window.confirm( `Remove your API key? You'll need to enter it again.` ) ) {
             clear_api_key()
         }
+    }
+
+    const cancel_key_edit = () => {
+        set_editing_key( false )
+        set_key_draft( `` )
+    }
+
+    const save_key = async () => {
+
+        const trimmed = key_draft.trim()
+        if( !trimmed ) {
+            toast.error( `Please enter an API key` )
+            return
+        }
+
+        // Validate the key before saving it into persisted settings.
+        set_validating_key( true )
+        try {
+            const valid = await validate_api_key( trimmed )
+            if( valid ) {
+                set_api_key( trimmed )
+                toast.success( `API key updated` )
+                cancel_key_edit()
+            } else {
+                toast.error( `Invalid API key — please check and try again` )
+            }
+        } catch {
+            toast.error( `Could not connect — check your internet connection` )
+        } finally {
+            set_validating_key( false )
+        }
+
     }
 
     return <>
@@ -332,42 +375,18 @@ export default function SettingsDrawer( { is_open, on_close, show_language = tru
                             value={ key_draft }
                             onChange={ ( e ) => set_key_draft( e.target.value ) }
                             placeholder="sk-or-..."
+                            disabled={ validating_key }
                             autoFocus
                         />
                         <SmallBtn
                             disabled={ validating_key }
-                            onClick={ async () => {
-                                const trimmed = key_draft.trim()
-                                if( !trimmed ) {
-                                    toast.error( `Please enter an API key` )
-                                    return
-                                }
-
-                                // Validate the key before saving
-                                set_validating_key( true )
-                                try {
-                                    const valid = await validate_api_key( trimmed )
-                                    if( valid ) {
-                                        set_api_key( trimmed )
-                                        toast.success( `API key updated` )
-                                        set_editing_key( false )
-                                        set_key_draft( `` )
-                                    } else {
-                                        toast.error( `Invalid API key — please check and try again` )
-                                    }
-                                } catch {
-                                    toast.error( `Could not connect — check your internet connection` )
-                                } finally {
-                                    set_validating_key( false )
-                                }
-                            } }
+                            onClick={ save_key }
                         >
                             { validating_key ? `Validating...` : `Save` }
                         </SmallBtn>
-                        <SmallBtn onClick={ () => {
-                            set_editing_key( false )
-                            set_key_draft( `` )
-                        } }
+                        <SmallBtn
+                            onClick={ cancel_key_edit }
+                            disabled={ validating_key }
                         >
                             Cancel
                         </SmallBtn>
@@ -385,6 +404,10 @@ export default function SettingsDrawer( { is_open, on_close, show_language = tru
                             Update
                         </SmallBtn>
                     </KeyRow> }
+
+                { validating_key && <ValidationStatus role="status" aria-live="polite">
+                    Checking OpenRouter API key...
+                </ValidationStatus> }
 
                 <DangerBtn onClick={ handle_logout }>
                     Remove API Key

@@ -78,6 +78,12 @@ const Button = styled.button`
     }
 `
 
+const StatusText = styled.p`
+    color: var(--text-muted);
+    font-size: 0.85em;
+    margin-top: var(--space-m);
+`
+
 const HelpText = styled.p`
     font-size: 0.8em;
     color: var(--text-muted);
@@ -152,6 +158,10 @@ export default function OnboardingPage() {
             <Button onClick={ connect } disabled={ loading || !key.trim() }>
                 { loading ? `Connecting...` : `Connect` }
             </Button>
+
+            { loading && <StatusText role="status" aria-live="polite">
+                Checking OpenRouter API key...
+            </StatusText> }
 
             <HelpText>
                 Enter your <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer">OpenRouter API key</a> to get started.
