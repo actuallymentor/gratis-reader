@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.9.1] - 2026-05-06
+
+### Changed
+- Use URL fragments for `openrouter_api_key` handoff instead of query params.
+
 ## [1.9.0] - 2026-05-06
 
 ### Added
