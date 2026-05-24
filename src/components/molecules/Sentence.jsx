@@ -1,11 +1,11 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import styled from 'styled-components'
-import Tooltip from '../atoms/Tooltip.jsx'
-import { chat_completion } from '../../modules/open_router.js'
-import { build_word_lookup_prompt } from '../../modules/prompts.js'
-import { use_settings_store } from '../../stores/settings_store.js'
-import { use_cache } from '../../hooks/use_cache.js'
 import Skeleton from '../atoms/Skeleton.jsx'
+import WordTooltipText from './WordTooltipText.jsx'
+
+const SHORT_HOLD_MS = 300
+const EXPLANATION_HOLD_MS = 2000
+const PRESS_MOVE_CANCEL_PX = 12
 
 const SentenceSpan = styled.span`
     cursor: pointer;
@@ -26,17 +26,15 @@ const SentenceSpan = styled.span`
     }
 `
 
-const HoverableWord = styled.span`
-    position: relative;
-    display: inline;
+const event_point = ( e ) => {
+    const touch = e.touches?.[0] || e.changedTouches?.[0]
+    if( touch ) return { x: touch.clientX, y: touch.clientY }
 
-    &:hover {
-        color: var(--accent-dark);
-    }
-`
+    return { x: e.clientX, y: e.clientY }
+}
 
 /**
- * Interactive sentence — tap to toggle, hover words for tooltip, long-press for explanation
+ * Interactive sentence — tap words for tooltip, short-hold for original, 2s hold for explanation.
  * @param {Object} props
  * @param {string} props.sentence_id
  * @param {string} props.original
@@ -48,46 +46,76 @@ const HoverableWord = styled.span`
 export default function Sentence( { sentence_id, original, translated, source_language, target_language, on_long_press } ) {
 
     const [ showing_original, set_showing_original ] = useState( false )
-    const [ word_translations, set_word_translations ] = useState( {} )
-    const [ loading_words, set_loading_words ] = useState( {} )
-    const long_press_ref = useRef( null )
-    const suppressed_ref = useRef( false )
-    const word_abort_ref = useRef( null )
-    const api_key = use_settings_store( state => state.api_key )
-    const model = use_settings_store( state => state.model )
-    const { get_word_translation, cache_word_translation } = use_cache()
+    const explanation_timer_ref = useRef( null )
+    const press_started_at_ref = useRef( null )
+    const press_start_point_ref = useRef( null )
+    const press_cancelled_ref = useRef( false )
+    const explanation_opened_ref = useRef( false )
 
-    const display_text = showing_original ? original :  translated || original 
+    const display_text = showing_original ? original : translated || original
     const is_translated = !!translated && !showing_original
 
-    // Tap to toggle
-    const handle_click = useCallback( () => {
-        if( suppressed_ref.current ) {
-            suppressed_ref.current = false
-            return
-        }
-        if( translated ) set_showing_original( prev => !prev )
-    }, [ translated ] )
-
-    // Long-press handling
-    const handle_press_start = useCallback( ( e ) => {
-        suppressed_ref.current = false
-        long_press_ref.current = setTimeout( () => {
-            suppressed_ref.current = true
-            if( on_long_press ) {
-                on_long_press( { sentence_id, original, translated } )
-            }
-        }, 500 )
-    }, [ sentence_id, original, translated, on_long_press ] )
-
-    const handle_press_end = useCallback( () => {
-        if( long_press_ref.current ) {
-            clearTimeout( long_press_ref.current )
-            long_press_ref.current = null
+    const clear_explanation_timer = useCallback( () => {
+        if( explanation_timer_ref.current ) {
+            clearTimeout( explanation_timer_ref.current )
+            explanation_timer_ref.current = null
         }
     }, [] )
 
-    // Right-click opens explanation
+    const reset_press = useCallback( () => {
+        clear_explanation_timer()
+        press_started_at_ref.current = null
+        press_start_point_ref.current = null
+        press_cancelled_ref.current = false
+        explanation_opened_ref.current = false
+    }, [ clear_explanation_timer ] )
+
+    const handle_press_start = useCallback( ( e ) => {
+        if( e.type === `mousedown` && e.button !== 0 ) return
+
+        reset_press()
+
+        press_started_at_ref.current = Date.now()
+        press_start_point_ref.current = event_point( e )
+
+        if( translated && on_long_press ) {
+            explanation_timer_ref.current = setTimeout( () => {
+                explanation_opened_ref.current = true
+                on_long_press( { sentence_id, original, translated } )
+            }, EXPLANATION_HOLD_MS )
+        }
+    }, [ sentence_id, original, translated, on_long_press, reset_press ] )
+
+    const handle_press_move = useCallback( ( e ) => {
+        if( !press_start_point_ref.current ) return
+
+        const point = event_point( e )
+        const dx = Math.abs( point.x - press_start_point_ref.current.x )
+        const dy = Math.abs( point.y - press_start_point_ref.current.y )
+
+        if( dx > PRESS_MOVE_CANCEL_PX || dy > PRESS_MOVE_CANCEL_PX ) {
+            press_cancelled_ref.current = true
+            clear_explanation_timer()
+        }
+    }, [ clear_explanation_timer ] )
+
+    const handle_press_end = useCallback( () => {
+        const started_at = press_started_at_ref.current
+        if( !started_at ) return
+
+        const duration_ms = Date.now() - started_at
+        const was_cancelled = press_cancelled_ref.current
+        const explanation_opened = explanation_opened_ref.current
+
+        reset_press()
+
+        if( was_cancelled || explanation_opened ) return
+
+        if( translated && duration_ms >= SHORT_HOLD_MS && duration_ms < EXPLANATION_HOLD_MS ) {
+            set_showing_original( prev => !prev )
+        }
+    }, [ translated, reset_press ] )
+
     const handle_context_menu = useCallback( ( e ) => {
         if( on_long_press && translated ) {
             e.preventDefault()
@@ -95,123 +123,38 @@ export default function Sentence( { sentence_id, original, translated, source_la
         }
     }, [ sentence_id, original, translated, on_long_press ] )
 
-    // Word hover translation lookup
-    const lookup_word = useCallback( async ( word ) => {
-
-        if( !word.trim() || !api_key ) return
-
-        const clean_word = word.replace( /[.,!?;:'"()[\]{}]/g, `` ).trim()
-        if( !clean_word ) return
-
-        const cache_key = `${ clean_word.toLowerCase() }:${ source_language }:${ target_language }`
-
-        // Check if already loaded or loading
-        if( word_translations[cache_key] || loading_words[cache_key] ) return
-
-        // Check IndexedDB cache
-        const cached = await get_word_translation( clean_word, source_language, target_language )
-        if( cached ) {
-            set_word_translations( prev => ( { ...prev, [cache_key]: cached } ) )
-            return
-        }
-
-        // Fetch from API — cancel any previous in-flight word lookup
-        if( word_abort_ref.current ) word_abort_ref.current.abort()
-        const controller = new AbortController()
-        word_abort_ref.current = controller
-
-        set_loading_words( prev => ( { ...prev, [cache_key]: true } ) )
-
-        try {
-            const { system, user } = build_word_lookup_prompt( clean_word, source_language, target_language, display_text )
-            const { content } = await chat_completion( {
-                api_key, model, system_prompt: system, user_message: user, temperature: 0.1, signal: controller.signal
-            } )
-            set_word_translations( prev => ( { ...prev, [cache_key]: content } ) )
-            await cache_word_translation( clean_word, source_language, target_language, content )
-        } catch {
-            // Silently fail for word lookups
-        } finally {
-            set_loading_words( prev => ( { ...prev, [cache_key]: false } ) )
-        }
-
-    }, [ api_key, model, source_language, target_language, display_text, word_translations, loading_words, get_word_translation, cache_word_translation ] )
-
-    // Word touch-and-hold for mobile (triggers word lookup on brief hold)
-    const word_touch_ref = useRef( null )
-    const [ touched_word, set_touched_word ] = useState( null )
-
-    const handle_word_touch_start = useCallback( ( word ) => {
-        word_touch_ref.current = setTimeout( () => {
-            const clean = word.replace( /[.,!?;:'"()[\]{}]/g, `` ).toLowerCase()
-            set_touched_word( `${ clean }:${ source_language }:${ target_language }` )
-            lookup_word( word )
-        }, 300 )
-    }, [ lookup_word, source_language, target_language ] )
-
-    const dismiss_timer_ref = useRef( null )
-
-    const handle_word_touch_end = useCallback( () => {
-        if( word_touch_ref.current ) {
-            clearTimeout( word_touch_ref.current )
-            word_touch_ref.current = null
-        }
-        // Dismiss after short delay so user can read the tooltip
-        if( dismiss_timer_ref.current ) clearTimeout( dismiss_timer_ref.current )
-        dismiss_timer_ref.current = setTimeout( () => set_touched_word( null ), 2000 )
-    }, [] )
-
-    // Clean up timers and in-flight requests on unmount
+    // Clean up timers on unmount
     useEffect( () => {
-        return () => {
-            if( long_press_ref.current ) clearTimeout( long_press_ref.current )
-            if( word_touch_ref.current ) clearTimeout( word_touch_ref.current )
-            if( dismiss_timer_ref.current ) clearTimeout( dismiss_timer_ref.current )
-            if( word_abort_ref.current ) word_abort_ref.current.abort()
-        }
-    }, [] )
+        return reset_press
+    }, [ reset_press ] )
 
     // If no text at all, show skeleton
     if( !original ) return <Skeleton width="80%" height="1.2em" />
 
-    // Render words with hover/touch tooltips (translated text only)
+    // Render target-language words with tap tooltips.
     const render_words = () => {
         if( !is_translated ) return display_text
 
-        return display_text.split( /(\s+)/ ).map( ( segment, i ) => {
-            if( !segment.trim() ) return segment
-
-            const clean = segment.replace( /[.,!?;:'"()[\]{}]/g, `` ).toLowerCase()
-            const cache_key = `${ clean }:${ source_language }:${ target_language }`
-            const word_translation = word_translations[cache_key]
-            const is_loading = loading_words[cache_key]
-
-            return <Tooltip
-                key={ i }
-                content={ word_translation }
-                loading={ is_loading }
-                force_visible={ touched_word === cache_key }
-            >
-                <HoverableWord
-                    onMouseEnter={ () => lookup_word( segment ) }
-                    onTouchStart={ () => handle_word_touch_start( segment ) }
-                    onTouchEnd={ handle_word_touch_end }
-                >
-                    { segment }
-                </HoverableWord>
-            </Tooltip>
-        } )
+        return <WordTooltipText
+            text={ display_text }
+            source_language={ source_language }
+            target_language={ target_language }
+            sentence_context={ display_text }
+            tap_max_ms={ SHORT_HOLD_MS }
+        />
     }
 
     return <SentenceSpan
         data-sentence-id={ sentence_id }
         $highlighted={ showing_original }
-        onClick={ handle_click }
         onMouseDown={ handle_press_start }
         onMouseUp={ handle_press_end }
-        onMouseLeave={ handle_press_end }
+        onMouseMove={ handle_press_move }
+        onMouseLeave={ reset_press }
         onTouchStart={ handle_press_start }
         onTouchEnd={ handle_press_end }
+        onTouchMove={ handle_press_move }
+        onTouchCancel={ reset_press }
         onContextMenu={ handle_context_menu }
     >
         { render_words() }

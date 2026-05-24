@@ -3,7 +3,7 @@
  * Fresh eyes: cover every user flow end-to-end
  */
 import { test, expect } from '@playwright/test'
-import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth, clear_storage } from './helpers/setup.js'
+import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth, clear_storage, short_hold } from './helpers/setup.js'
 
 test.describe( `Pass 38 — Onboarding`, () => {
 
@@ -119,7 +119,7 @@ test.describe( `Pass 38 — Reader core flows`, () => {
         expect( text.length ).toBeGreaterThan( 0 )
     } )
 
-    test( `BW175 tap sentence toggles to original with highlight`, async ( { page } ) => {
+    test( `BW175 short hold toggles sentence to original with highlight`, async ( { page } ) => {
         await upload_demo_book( page )
         await open_reader( page )
         await page.waitForTimeout( 2000 )
@@ -127,8 +127,8 @@ test.describe( `Pass 38 — Reader core flows`, () => {
         const sentence = page.locator( `span[data-sentence-id]` ).first()
         const text_before = await sentence.textContent()
 
-        // Tap to toggle
-        await sentence.click()
+        // Short-hold to toggle
+        await short_hold( page, sentence )
         await page.waitForTimeout( 500 )
 
         // Should have highlight (accent-light background)

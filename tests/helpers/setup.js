@@ -61,6 +61,21 @@ export const open_reader = async ( page ) => {
 }
 
 /**
+ * Holds the center of an element long enough for sentence hold gestures.
+ */
+export const short_hold = async ( page, locator, duration_ms = 600 ) => {
+
+    const box = await locator.boundingBox()
+    if( !box ) throw new Error( `Cannot hold an element without a bounding box` )
+
+    await page.mouse.move( box.x + box.width / 2, box.y + box.height / 2 )
+    await page.mouse.down()
+    await page.waitForTimeout( duration_ms )
+    await page.mouse.up()
+
+}
+
+/**
  * Mock the OpenRouter API to return deterministic translations.
  */
 export const mock_openrouter = async ( page ) => {

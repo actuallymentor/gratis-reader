@@ -45,33 +45,38 @@ const Wrapper = styled.span`
 `
 
 /**
- * Word hover tooltip — shows content above the child element on hover
+ * Word tooltip — shows content above the child element when hovered or forced by a parent.
  * @param {Object} props
  * @param {React.ReactNode} props.children
  * @param {string} props.content - Text to show in tooltip
  * @param {boolean} [props.loading] - Show loading indicator
- * @param {boolean} [props.force_visible] - Force tooltip open (for mobile touch)
+ * @param {boolean} [props.force_visible] - Force tooltip open
+ * @param {boolean} [props.hover_enabled] - Opens tooltip on hover
  */
-export default function Tooltip( { children, content, loading, force_visible } ) {
+export default function Tooltip( { children, content, loading, force_visible, hover_enabled = true } ) {
 
     const [ visible, set_visible ] = useState( false )
     const timeout_ref = useRef( null )
 
     const show = () => {
+        if( !hover_enabled ) return
         clearTimeout( timeout_ref.current )
         set_visible( true )
     }
 
     const hide = () => {
+        if( !hover_enabled ) return
         timeout_ref.current = setTimeout( () => set_visible( false ), 100 )
     }
 
-    // Show tooltip when forced by parent (mobile touch-and-hold)
+    // Tap-driven tooltips force visibility and then explicitly hide when dismissed.
     useEffect( () => {
         if( force_visible ) {
             set_visible( true )
+        } else if( !hover_enabled ) {
+            set_visible( false )
         }
-    }, [ force_visible ] )
+    }, [ force_visible, hover_enabled ] )
 
     useEffect( () => {
         return () => clearTimeout( timeout_ref.current )

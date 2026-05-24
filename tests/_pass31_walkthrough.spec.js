@@ -191,10 +191,8 @@ test.describe( `Pass 31 — Walkthrough`, () => {
         expect( system_prompt ).toMatch( /language teacher/i )
         expect( system_prompt ).toMatch( /rewrite/i )
         expect( system_prompt ).toMatch( /output only/i )
-        expect( system_prompt ).toContain( `A1` )
         expect( system_prompt ).toContain( `A2` )
-        expect( system_prompt ).toContain( `B1` )
-        expect( system_prompt ).toContain( `C1` )
+        expect( system_prompt ).toContain( `Primary Schooler` )
     } )
 
     // ── 7. Cover image cleanup on unmount ──

@@ -3,7 +3,7 @@
  * Tests multi-step interaction flows that could expose state bugs
  */
 import { test, expect } from '@playwright/test'
-import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth, clear_storage } from './helpers/setup.js'
+import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth, clear_storage, short_hold } from './helpers/setup.js'
 
 test.describe( `Pass 39 — Multi-step state transitions`, () => {
 
@@ -74,9 +74,9 @@ test.describe( `Pass 39 — Multi-step state transitions`, () => {
         await open_reader( page )
         await page.waitForTimeout( 2000 )
 
-        // Tap sentence to toggle
+        // Short-hold sentence to toggle
         const sentence = page.locator( `span[data-sentence-id]` ).first()
-        await sentence.click()
+        await short_hold( page, sentence )
         await page.waitForTimeout( 500 )
 
         // Navigate to next chapter

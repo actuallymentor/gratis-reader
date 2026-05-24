@@ -86,7 +86,7 @@ test.describe( `Pass 37 — Settings key update resilience`, () => {
         await page.getByRole( `button`, { name: `Save` } ).click()
 
         // Should show error toast
-        await expect( page.getByText( /enter.*api.*key/i ) ).toBeVisible( { timeout: 3000 } )
+        await expect( page.getByText( `Please enter an API key` ) ).toBeVisible( { timeout: 3000 } )
     } )
 
     test( `BW159 settings key update shows network error on failure`, async ( { page } ) => {
@@ -142,7 +142,7 @@ test.describe( `Pass 37 — Settings key update resilience`, () => {
         await page.getByRole( `button`, { name: `Save` } ).click()
 
         // Should show success toast
-        await expect( page.getByText( /updated/i ) ).toBeVisible( { timeout: 5000 } )
+        await expect( page.getByText( `API key updated` ) ).toBeVisible( { timeout: 5000 } )
     } )
 
 } )

@@ -17,6 +17,16 @@ const clear_all = async ( page ) => {
     } )
 }
 
+const short_hold = async ( page, locator, duration_ms = 600 ) => {
+    const box = await locator.boundingBox()
+    if( !box ) throw new Error( `Cannot hold an element without a bounding box` )
+
+    await page.mouse.move( box.x + box.width / 2, box.y + box.height / 2 )
+    await page.mouse.down()
+    await page.waitForTimeout( duration_ms )
+    await page.mouse.up()
+}
+
 const mock_api = async ( page ) => {
     await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
         const body = JSON.parse( route.request().postData() )
@@ -215,14 +225,14 @@ test.describe( `Browser Walkthrough`, () => {
 
     // ── INTERACTIONS ────────────────────────────────────────────
 
-    test( `BW18 tap sentence toggles`, async ( { page } ) => {
+    test( `BW18 short hold sentence toggles`, async ( { page } ) => {
         await setup_key( page )
         await upload_book( page )
         await enter_reader( page )
         await expect( page.getByText( /\[TRANSLATED\]/ ).first() ).toBeVisible( { timeout: 15_000 } )
         const s = page.locator( `span[data-sentence-id]` ).first()
         const before = await s.textContent()
-        await s.click()
+        await short_hold( page, s )
         await page.waitForTimeout( 500 )
         expect( await s.textContent() ).not.toBe( before )
     } )
@@ -236,7 +246,7 @@ test.describe( `Browser Walkthrough`, () => {
         const box = await s.boundingBox()
         await page.mouse.move( box.x + box.width / 2, box.y + box.height / 2 )
         await page.mouse.down()
-        await page.waitForTimeout( 700 )
+        await page.waitForTimeout( 2100 )
         await page.mouse.up()
         await page.waitForTimeout( 2000 )
         expect( await page.locator( `text=/explanation/i` ).count() ).toBeGreaterThan( 0 )
@@ -257,9 +267,11 @@ test.describe( `Browser Walkthrough`, () => {
         await setup_key( page )
         await page.goto( `/library` )
         await page.getByRole( `button`, { name: `Settings` } ).click()
-        await expect( page.getByText( `FONT SIZE` ) ).toBeVisible()
-        await expect( page.getByText( `THEME` ) ).toBeVisible()
-        await expect( page.getByText( `LLM MODEL` ) ).toBeVisible()
+        const drawer = page.locator( `aside` )
+
+        await expect( drawer.getByText( `Font Size`, { exact: true } ) ).toBeVisible()
+        await expect( drawer.getByText( `Theme`, { exact: true } ) ).toBeVisible()
+        await expect( drawer.getByText( `LLM Model`, { exact: true } ) ).toBeVisible()
     } )
 
     test( `BW22 theme switching`, async ( { page } ) => {
@@ -692,7 +704,7 @@ test.describe( `Browser Walkthrough`, () => {
         expect( after_count ).toBe( 0 )
     } )
 
-    test( `BW53 word lookup abort — fast hover doesn't crash`, async ( { page } ) => {
+    test( `BW53 word lookup abort — fast taps don't crash`, async ( { page } ) => {
         await setup_key( page )
         await upload_book( page )
         await enter_reader( page )
@@ -700,11 +712,11 @@ test.describe( `Browser Walkthrough`, () => {
         // Wait for translations
         await expect( page.locator( `span[data-sentence-id]` ).first() ).toContainText( /\[TRANSLATED\]/, { timeout: 15_000 } )
 
-        // Rapidly hover multiple translated words — should not crash
-        const words = page.locator( `span[data-sentence-id] span` )
+        // Rapidly tap multiple translated words — should not crash
+        const words = page.locator( `span[data-sentence-id] [data-word-tooltip-word]` )
         const count = await words.count()
         for( let i = 0; i < Math.min( count, 8 ); i++ ) {
-            await words.nth( i ).hover( { force: true } )
+            await words.nth( i ).click( { force: true } )
             await page.waitForTimeout( 50 )
         }
 
@@ -896,7 +908,7 @@ test.describe( `Browser Walkthrough`, () => {
         expect( accept ).toBe( `.epub` )
     } )
 
-    test( `BW65 word tooltip force-visible prop exists`, async ( { page } ) => {
+    test( `BW65 word tooltip appears on tap`, async ( { page } ) => {
         await setup_key( page )
         await upload_book( page )
         await enter_reader( page )
@@ -904,12 +916,12 @@ test.describe( `Browser Walkthrough`, () => {
         // Wait for translated content with word-level spans
         await expect( page.locator( `span[data-sentence-id]` ).first() ).toContainText( /\[TRANSLATED\]/, { timeout: 15_000 } )
 
-        // Hovering over a word should trigger a lookup and show tooltip
+        // Tapping a word should trigger a lookup and show tooltip
         const sentence = page.locator( `span[data-sentence-id]` ).first()
-        const words = sentence.locator( `span` )
+        const words = sentence.locator( `[data-word-tooltip-word]` )
         if( await words.count() > 0 ) {
-            // Hover over a word to trigger desktop tooltip
-            await words.first().hover()
+            // Tap a word to trigger desktop tooltip
+            await words.first().click()
             await page.waitForTimeout( 1000 )
             // Word lookup should be triggered (even if tooltip content is loading)
         }

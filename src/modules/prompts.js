@@ -137,7 +137,7 @@ export const build_translation_system_prompt = ( source_language, target_languag
 export const build_translation_user_prompt = ( sentence, context ) => {
 
     return multiline_trim( `
-    Sencence context (for reference only — do NOT translate this):
+    Context (for reference only — do NOT translate this):
     """
     ${ context }
     """

@@ -84,10 +84,10 @@ test.describe( `Pass 30 — Walkthrough`, () => {
         await open_reader( page )
         await page.waitForTimeout( 2000 )
 
-        // Hover a word to trigger tooltip
-        const word = page.locator( `span[data-sentence-id] span` ).first()
+        // Tap a word to trigger tooltip
+        const word = page.locator( `span[data-sentence-id] [data-word-tooltip-word]` ).first()
         if( await word.isVisible() ) {
-            await word.hover()
+            await word.click()
             await page.waitForTimeout( 1000 )
         }
 

@@ -12,10 +12,11 @@ test.describe( `Settings`, () => {
 
         await page.goto( `/library` )
         await page.getByRole( `button`, { name: `Settings` } ).click()
+        const drawer = page.locator( `aside` )
 
-        await expect( page.getByText( `FONT SIZE` ) ).toBeVisible()
-        await expect( page.getByText( `THEME` ) ).toBeVisible()
-        await expect( page.getByText( `LLM MODEL` ) ).toBeVisible()
+        await expect( drawer.getByText( `Font Size`, { exact: true } ) ).toBeVisible()
+        await expect( drawer.getByText( `Theme`, { exact: true } ) ).toBeVisible()
+        await expect( drawer.getByText( `LLM Model`, { exact: true } ) ).toBeVisible()
 
     } )
 

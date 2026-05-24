@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.10.0] - 2026-05-24
+
+### Changed
+- Use tap word tooltips, short-hold original, and 2s explanations (uncommitted)
+
+### Fixed
+- Fix translation prompt context heading typo (uncommitted)
+
 ## [1.9.1] - 2026-05-06
 
 ### Changed

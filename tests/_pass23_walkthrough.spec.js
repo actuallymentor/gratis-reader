@@ -17,6 +17,16 @@ const clear_all = async ( page ) => {
     } )
 }
 
+const short_hold = async ( page, locator, duration_ms = 600 ) => {
+    const box = await locator.boundingBox()
+    if( !box ) throw new Error( `Cannot hold an element without a bounding box` )
+
+    await page.mouse.move( box.x + box.width / 2, box.y + box.height / 2 )
+    await page.mouse.down()
+    await page.waitForTimeout( duration_ms )
+    await page.mouse.up()
+}
+
 const mock_api = async ( page ) => {
     await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
         const body = JSON.parse( route.request().postData() )
@@ -294,8 +304,8 @@ test.describe( `Pass 23 — Edge Cases & Error States`, () => {
 
         const sentence = page.locator( `span[data-sentence-id]` ).first()
 
-        // Click to toggle to original
-        await sentence.click()
+        // Short-hold to toggle to original
+        await short_hold( page, sentence )
         await page.waitForTimeout( 300 )
 
         // Should have highlighted background (accent-light)
@@ -304,21 +314,21 @@ test.describe( `Pass 23 — Edge Cases & Error States`, () => {
         expect( bg ).not.toBe( `rgba(0, 0, 0, 0)` )
     } )
 
-    // ── WORD HOVER ──────────────────────────────────────────────
+    // ── WORD TAP ────────────────────────────────────────────────
 
-    test( `P23-14 hovering translated word shows tooltip or loading`, async ( { page } ) => {
+    test( `P23-14 tapping translated word shows tooltip or loading`, async ( { page } ) => {
         await setup_key( page )
         await upload_book( page )
         await enter_reader( page )
         await expect( page.getByText( /\[TRANSLATED\]/ ).first() ).toBeVisible( { timeout: 15_000 } )
 
         // Find a word span inside a translated sentence
-        const words = page.locator( `span[data-sentence-id] span` )
+        const words = page.locator( `span[data-sentence-id] [data-word-tooltip-word]` )
         const word_count = await words.count()
 
         if( word_count > 0 ) {
-            // Hover over a word
-            await words.first().hover()
+            // Tap a word
+            await words.first().click()
             await page.waitForTimeout( 1000 )
 
             // Should not crash — page still functional

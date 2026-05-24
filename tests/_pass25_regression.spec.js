@@ -25,7 +25,7 @@ const mock_api = async ( page ) => {
         const body = JSON.parse( route.request().postData() )
         const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
 
-        if( user_msg.includes( `word or phrase` ) || user_msg.includes( `Explain the word` ) ) {
+        if( user_msg.includes( `Word:` ) || user_msg.includes( `word or phrase` ) || user_msg.includes( `Explain the word` ) ) {
             await route.fulfill( {
                 contentType: `application/json`,
                 body: JSON.stringify( { choices: [ { message: { content: `**Meaning:** test\n**Grammar:** noun` } } ] } )
@@ -60,11 +60,12 @@ const setup = async ( page ) => {
 
 const upload_and_read = async ( page ) => {
     await page.goto( `/library` )
-    if( await page.locator( `h3` ).count() === 0 ) {
+    const demo_book = page.getByRole( `heading`, { name: `Smart work beats hard work` } )
+    if( !await demo_book.isVisible().catch( () => false ) ) {
         await page.locator( `input[type="file"]` ).setInputFiles( DEMO_BOOK )
-        await expect( page.locator( `h3` ).first() ).toBeVisible( { timeout: 10000 } )
+        await expect( demo_book ).toBeVisible( { timeout: 10000 } )
     }
-    await page.locator( `img[alt]` ).first().click()
+    await page.locator( `img[alt="Smart work beats hard work"]` ).first().click()
     await page.waitForURL( /\/read\// )
     const start = page.getByRole( `button`, { name: `Start Reading` } )
     try { await start.waitFor( { state: `visible`, timeout: 3000 } ); await start.click() } catch {}
@@ -170,7 +171,7 @@ test.describe( `Pass 25 — Regression & Coverage`, () => {
         await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
             const body = JSON.parse( route.request().postData() )
             const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
-            if( user_msg.includes( `word or phrase` ) || user_msg.includes( `Explain` ) ) {
+            if( user_msg.includes( `Word:` ) || user_msg.includes( `word or phrase` ) || user_msg.includes( `Explain` ) ) {
                 await route.fulfill( {
                     contentType: `application/json`,
                     body: JSON.stringify( { choices: [ { message: { content: `A very long explanation that goes on and on and should be truncated by the tooltip` } } ] } )
@@ -183,10 +184,10 @@ test.describe( `Pass 25 — Regression & Coverage`, () => {
             }
         } )
 
-        // Hover over a word span
-        const word = page.locator( `span[data-sentence-id] span` ).first()
+        // Tap a word span
+        const word = page.locator( `span[data-sentence-id] [data-word-tooltip-word]` ).first()
         if( await word.count() > 0 ) {
-            await word.hover()
+            await word.click()
             await page.waitForTimeout( 500 )
             // App should not crash — tooltip should render with overflow hidden
             expect( await page.locator( `span[data-sentence-id]` ).count() ).toBeGreaterThan( 0 )
@@ -210,8 +211,8 @@ test.describe( `Pass 25 — Regression & Coverage`, () => {
         await page.getByRole( `button`, { name: `Remove` } ).first().click()
         await page.waitForTimeout( 1000 )
 
-        // Verify book is gone
-        expect( await page.locator( `h3` ).count() ).toBe( 0 )
+        // Verify the uploaded book is gone without counting Gutenberg catalog headings.
+        await expect( page.getByRole( `heading`, { name: `Smart work beats hard work` } ) ).toHaveCount( 0 )
 
         // Verify IndexedDB progress is cleaned up
         const has_progress = await page.evaluate( () => {

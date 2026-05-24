@@ -371,11 +371,9 @@ test.describe( `Pass 24 — Coverage Gaps`, () => {
         await page.waitForTimeout( 3000 )
 
         expect( system_message ).toBeTruthy()
-        // Should contain level-specific rules
-        expect( system_message ).toContain( `A1` )
+        // Should contain the active level-specific rules
         expect( system_message ).toContain( `A2` )
-        expect( system_message ).toContain( `B1` )
-        expect( system_message ).toContain( `C1` )
+        expect( system_message ).toContain( `Primary Schooler` )
         // Should instruct to output only the translation
         expect( system_message ).toMatch( /output only/i )
     } )

@@ -3,7 +3,7 @@
  * Targets angles previous passes may have missed
  */
 import { test, expect } from '@playwright/test'
-import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth, clear_storage } from './helpers/setup.js'
+import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth, clear_storage, short_hold } from './helpers/setup.js'
 
 test.describe( `Pass 32 — Walkthrough`, () => {
 
@@ -19,8 +19,8 @@ test.describe( `Pass 32 — Walkthrough`, () => {
         await upload_demo_book( page )
         await page.goto( `/library` )
 
-        // Count books before
-        const books_before = await page.locator( `h3` ).count()
+        // Count the uploaded book only; the Gutenberg catalog also renders headings.
+        const books_before = await page.getByRole( `heading`, { name: `Smart work beats hard work` } ).count()
 
         // Upload same book again
         const file_input = page.locator( `input[type="file"]` )
@@ -28,7 +28,7 @@ test.describe( `Pass 32 — Walkthrough`, () => {
         await page.waitForTimeout( 4000 )
 
         // Count after — should be the same (upsert, not insert)
-        const books_after = await page.locator( `h3` ).count()
+        const books_after = await page.getByRole( `heading`, { name: `Smart work beats hard work` } ).count()
         expect( books_after ).toBe( books_before )
     } )
 
@@ -57,9 +57,9 @@ test.describe( `Pass 32 — Walkthrough`, () => {
         await expect( modal ).toBeVisible( { timeout: 5000 } )
     } )
 
-    // ── 3. Sentence tap cycle: translated → original → translated ──
+    // ── 3. Sentence short-hold cycle: translated → original → translated ──
 
-    test( `BW103 triple tap returns sentence to translated state`, async ( { page } ) => {
+    test( `BW103 triple short-hold returns sentence to translated state`, async ( { page } ) => {
         await upload_demo_book( page )
         await open_reader( page )
         await page.waitForTimeout( 2000 )
@@ -69,18 +69,18 @@ test.describe( `Pass 32 — Walkthrough`, () => {
         // Check highlight state toggles correctly via data-sentence-id persistence
         const id_before = await sentence.getAttribute( `data-sentence-id` )
 
-        // Tap 1 — toggle to original (highlight on)
-        await sentence.click()
+        // Hold 1 — toggle to original (highlight on)
+        await short_hold( page, sentence )
         await page.waitForTimeout( 300 )
         const highlight_1 = await sentence.evaluate( el => window.getComputedStyle( el ).backgroundColor )
 
-        // Tap 2 — toggle back to translated (highlight off)
-        await sentence.click()
+        // Hold 2 — toggle back to translated (highlight off)
+        await short_hold( page, sentence )
         await page.waitForTimeout( 300 )
         const highlight_2 = await sentence.evaluate( el => window.getComputedStyle( el ).backgroundColor )
 
-        // Tap 3 — original again (highlight on)
-        await sentence.click()
+        // Hold 3 — original again (highlight on)
+        await short_hold( page, sentence )
         await page.waitForTimeout( 300 )
         const highlight_3 = await sentence.evaluate( el => window.getComputedStyle( el ).backgroundColor )
 
@@ -221,9 +221,8 @@ test.describe( `Pass 32 — Walkthrough`, () => {
         await delete_btn.click()
         await page.waitForTimeout( 1000 )
 
-        // Book should be gone
-        const headings = await page.locator( `h3` ).count()
-        expect( headings ).toBe( 0 )
+        // Book should be gone without counting Gutenberg catalog headings.
+        await expect( page.getByRole( `heading`, { name: `Smart work beats hard work` } ) ).toHaveCount( 0 )
     } )
 
     // ── 9. Onboarding flow with invalid key shows error ──

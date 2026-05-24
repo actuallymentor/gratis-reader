@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { setup_api_key, upload_demo_book, mock_openrouter, clear_storage } from './helpers/setup.js'
+import { setup_api_key, upload_demo_book, mock_openrouter, clear_storage, short_hold } from './helpers/setup.js'
 
 test.describe( `Sentence Interactions`, () => {
 
@@ -26,42 +26,35 @@ test.describe( `Sentence Interactions`, () => {
 
     }
 
-    test( `tap toggles sentence between translated and original`, async ( { page } ) => {
+    test( `tap on translated word opens original-word tooltip`, async ( { page } ) => {
 
         await enter_reader_with_translations( page )
 
-        // Find a translated sentence by its data attribute
         const sentence = page.locator( `span[data-sentence-id]` ).first()
-        const translated_text = await sentence.textContent()
-        expect( translated_text ).toContain( `[TRANSLATED]` )
+        await expect( sentence ).toContainText( `[TRANSLATED]` )
 
-        // Click to toggle to original
-        await sentence.click()
-        await page.waitForTimeout( 500 )
+        const word = sentence.locator( `[data-word-tooltip-word]` ).first()
+        await word.click()
 
-        // The text should now be the original (no [TRANSLATED] prefix)
-        const toggled_text = await sentence.textContent()
-        expect( toggled_text ).not.toContain( `[TRANSLATED]` )
+        await expect( page.getByText( `[WORD] definition of the word` ).first() ).toBeVisible( { timeout: 5000 } )
+        await expect( sentence ).toContainText( `[TRANSLATED]` )
 
     } )
 
-    test( `second tap restores the translated version`, async ( { page } ) => {
+    test( `short hold toggles sentence between translated and original`, async ( { page } ) => {
 
         await enter_reader_with_translations( page )
 
-        const sentence = page.getByText( /\[TRANSLATED\]/ ).first()
-        const original_text = await sentence.textContent()
+        const sentence = page.locator( `span[data-sentence-id]` ).first()
+        await expect( sentence ).toContainText( `[TRANSLATED]` )
 
-        // First click — show original
-        await sentence.click()
+        await short_hold( page, sentence )
         await page.waitForTimeout( 300 )
+        await expect( sentence ).not.toContainText( `[TRANSLATED]` )
 
-        // Second click — show translated again
-        await sentence.click()
+        await short_hold( page, sentence )
         await page.waitForTimeout( 300 )
-
-        const restored_text = await sentence.textContent()
-        expect( restored_text ).toBe( original_text )
+        await expect( sentence ).toContainText( `[TRANSLATED]` )
 
     } )
 
@@ -84,7 +77,7 @@ test.describe( `Sentence Interactions`, () => {
         const box = await sentence.boundingBox()
         await page.mouse.move( box.x + box.width / 2, box.y + box.height / 2 )
         await page.mouse.down()
-        await page.waitForTimeout( 600 ) // 500ms threshold + buffer
+        await page.waitForTimeout( 2100 )
         await page.mouse.up()
 
         // Explanation popover should appear
@@ -143,52 +136,68 @@ test.describe( `Sentence Interactions`, () => {
 
     } )
 
-    test( `hovering a word in translated sentence triggers dictionary lookup`, async ( { page } ) => {
+    test( `hovering a word does not trigger dictionary lookup`, async ( { page } ) => {
 
         await enter_reader_with_translations( page )
 
         // Track word lookup API calls
         let word_lookup_calls = 0
         await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
-            word_lookup_calls++
+            const body = JSON.parse( route.request().postData() )
+            const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
+            const is_word_lookup = user_msg.includes( `Word:` )
+
+            if( is_word_lookup ) word_lookup_calls++
+
             await route.fulfill( {
                 contentType: `application/json`,
                 body: JSON.stringify( {
-                    choices: [ { message: { content: `Test definition for this word.` } } ]
+                    choices: [ { message: { content: is_word_lookup ? `Test definition for this word.` : `[TRANSLATED] continuing translation` } } ]
                 } )
             } )
         } )
 
-        // Find a word span inside a translated sentence
-        const word_spans = page.locator( `span[data-sentence-id] span` )
+        const word_spans = page.locator( `span[data-sentence-id] [data-word-tooltip-word]` )
         const word_count = await word_spans.count()
 
         if( word_count > 0 ) {
-            // Hover over the first word
             await word_spans.first().hover()
-            await page.waitForTimeout( 2000 )
+            await page.waitForTimeout( 500 )
 
-            // Hovering should trigger a word lookup API call
-            expect( word_lookup_calls ).toBeGreaterThanOrEqual( 0 )
+            expect( word_lookup_calls ).toBe( 0 )
         }
 
     } )
 
-    test( `tapping a non-translated sentence does not error`, async ( { page } ) => {
+    test( `tapping an original sentence does not error`, async ( { page } ) => {
 
         await enter_reader_with_translations( page )
 
-        // First toggle a sentence to show original
         const sentence = page.locator( `span[data-sentence-id]` ).first()
+        await short_hold( page, sentence )
+        await page.waitForTimeout( 300 )
+
         await sentence.click()
         await page.waitForTimeout( 300 )
 
-        // Tap again to toggle back — should not throw
-        await sentence.click()
-        await page.waitForTimeout( 300 )
-
-        // Page should still be functional
         await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible()
+
+    } )
+
+    test( `modal translated words open original-word tooltips`, async ( { page } ) => {
+
+        await enter_reader_with_translations( page )
+
+        const sentence = page.locator( `span[data-sentence-id]` ).first()
+        await sentence.click( { button: `right` } )
+
+        const dialog = page.getByRole( `dialog`, { name: `Translation Explanation` } )
+        await expect( dialog ).toBeVisible( { timeout: 5000 } )
+
+        const modal_word = dialog.locator( `[data-word-tooltip-word]` ).first()
+        await modal_word.click()
+
+        await expect( dialog.getByText( `[WORD] definition of the word` ).first() ).toBeVisible( { timeout: 5000 } )
 
     } )
 
