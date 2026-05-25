@@ -28,6 +28,9 @@ const FOREIGN_WORD_IGNORED_SELECTOR = [
     `input`
 ].join( `,` )
 
+const tooltip_arrow_offset = ( offset = 0 ) =>
+    `${ offset < 0 ? `-` : `+` } ${ Math.abs( offset ) }px`
+
 const Overlay = styled.div`
     position: fixed;
     inset: 0;
@@ -153,7 +156,16 @@ const ExplanationText = styled.div`
     strong { font-weight: 600; }
 
     .foreign-word {
+        appearance: none;
+        background: none;
+        border: 0;
+        color: inherit;
         cursor: pointer;
+        display: inline;
+        font: inherit;
+        margin: 0;
+        padding: 0;
+        text-align: inherit;
         border-radius: 2px;
     }
 
@@ -174,8 +186,7 @@ const FloatingTooltip = styled.div`
     font-size: 0.8em;
     white-space: nowrap;
     max-width: 250px;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    overflow: visible;
     pointer-events: none;
     z-index: 300;
 
@@ -183,41 +194,60 @@ const FloatingTooltip = styled.div`
         content: '';
         position: absolute;
         top: 100%;
-        left: 50%;
+        left: clamp( 8px, calc( 50% ${ p => tooltip_arrow_offset( p.$arrow_offset ) } ), calc( 100% - 8px ) );
         transform: translateX(-50%);
         border: 5px solid transparent;
         border-top-color: var(--text);
+    }
+
+    > span {
+        display: block;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 `
 
 const clamp = ( value, min, max ) => Math.min( Math.max( value, min ), Math.max( min, max ) )
 
-const floating_tooltip_position = ( rect ) => {
+const floating_tooltip_position = ( rect, boundary_rect ) => {
+    const boundary = boundary_rect || {
+        left: 0,
+        top: 0,
+        right: window.innerWidth,
+        bottom: window.innerHeight
+    }
+    const boundary_width = Math.max(
+        FLOATING_TOOLTIP_VIEWPORT_GAP * 2,
+        boundary.right - boundary.left
+    )
     const tooltip_half_width = Math.min(
         FLOATING_TOOLTIP_HALF_WIDTH,
-        Math.max( FLOATING_TOOLTIP_VIEWPORT_GAP, ( window.innerWidth - FLOATING_TOOLTIP_VIEWPORT_GAP * 2 ) / 2 )
+        Math.max( FLOATING_TOOLTIP_VIEWPORT_GAP, ( boundary_width - FLOATING_TOOLTIP_VIEWPORT_GAP * 2 ) / 2 )
+    )
+    const word_center_x = rect.left + rect.width / 2
+    const x = clamp(
+        word_center_x,
+        boundary.left + tooltip_half_width,
+        boundary.right - tooltip_half_width
     )
 
     return {
-        x: clamp(
-            rect.left + rect.width / 2,
-            tooltip_half_width,
-            window.innerWidth - tooltip_half_width
-        ),
+        x,
         y: clamp(
             rect.top - 8,
-            FLOATING_TOOLTIP_TOP_GAP,
-            window.innerHeight - FLOATING_TOOLTIP_VIEWPORT_GAP
-        )
+            boundary.top + FLOATING_TOOLTIP_TOP_GAP,
+            boundary.bottom - FLOATING_TOOLTIP_VIEWPORT_GAP
+        ),
+        arrow_offset: word_center_x - x
     }
 }
 
 const decorate_explanation_html = ( html, translated_words ) => {
     if( !html || translated_words.size === 0 || typeof DOMParser === `undefined` ) return html
 
-    const doc = new DOMParser().parseFromString( `<div>${ html }</div>`, `text/html` )
-    const root = doc.body.firstElementChild
-    if( !root ) return html
+    const doc = new DOMParser().parseFromString( html, `text/html` )
+    const root = doc.body
+    let decorated_count = 0
 
     const walker = doc.createTreeWalker(
         root,
@@ -244,12 +274,15 @@ const decorate_explanation_html = ( html, translated_words ) => {
 
             const clean_word = clean_lookup_word( part ).toLowerCase()
             if( clean_word && translated_words.has( clean_word ) ) {
-                const word_span = doc.createElement( `span` )
-                word_span.className = `foreign-word`
-                word_span.dataset.foreignWord = part
-                word_span.dataset.wordTooltipWord = clean_lookup_word( part )
-                word_span.textContent = part
-                fragment.appendChild( word_span )
+                const word_button = doc.createElement( `button` )
+                word_button.type = `button`
+                word_button.className = `foreign-word`
+                word_button.dataset.foreignWord = part
+                word_button.dataset.wordTooltipWord = clean_lookup_word( part )
+                word_button.setAttribute( `aria-label`, `Look up ${ clean_lookup_word( part ) }` )
+                word_button.textContent = part
+                fragment.appendChild( word_button )
+                decorated_count += 1
                 return
             }
 
@@ -259,7 +292,7 @@ const decorate_explanation_html = ( html, translated_words ) => {
         node.parentNode.replaceChild( fragment, node )
     } )
 
-    return root.innerHTML
+    return decorated_count > 0 ? root.innerHTML : html
 }
 
 /**
@@ -277,6 +310,7 @@ export default function ExplanationPopover( { original, translated, source_langu
     const [ loading, set_loading ] = useState( true )
     const [ explanation_tooltip, set_explanation_tooltip ] = useState( null )
     const explanation_ref = useRef( null )
+    const panel_ref = useRef( null )
     const tooltip_timer_ref = useRef( null )
     const api_key = use_settings_store( state => state.api_key )
     const model = use_settings_store( state => state.model )
@@ -352,6 +386,8 @@ export default function ExplanationPopover( { original, translated, source_langu
     }, [ original, translated, source_language, target_language, api_key, model, level_info ] )
 
     const show_explanation_tooltip = useCallback( ( e ) => {
+        if( e.type === `keydown` && ![ `Enter`, ` `, `Spacebar` ].includes( e.key ) ) return
+
         const word_el = e.target.closest?.( `[data-foreign-word]` )
         if( !word_el || !explanation_ref.current?.contains( word_el ) ) return
 
@@ -363,13 +399,17 @@ export default function ExplanationPopover( { original, translated, source_langu
 
         const rect = word_el.getBoundingClientRect()
         const cache_key = word_cache_key( clean_word, source_language, target_language )
-        const { x, y } = floating_tooltip_position( rect )
+        const { x, y, arrow_offset } = floating_tooltip_position(
+            rect,
+            panel_ref.current?.getBoundingClientRect()
+        )
 
         set_explanation_tooltip( {
             word: clean_word,
             cache_key,
             x,
-            y
+            y,
+            arrow_offset
         } )
         lookup_word( clean_word )
 
@@ -377,6 +417,13 @@ export default function ExplanationPopover( { original, translated, source_langu
     }, [ lookup_word, source_language, target_language ] )
 
     const explanation_tooltip_state = explanation_tooltip ? get_lookup_state( explanation_tooltip.word ) : null
+
+    const dismiss_explanation_tooltip_on_panel_press = useCallback( ( e ) => {
+        const word_el = e.target.closest?.( `[data-foreign-word]` )
+        if( word_el && explanation_ref.current?.contains( word_el ) ) return
+
+        hide_explanation_tooltip()
+    }, [ hide_explanation_tooltip ] )
 
     useEffect( () => {
         if( tooltip_timer_ref.current ) clearTimeout( tooltip_timer_ref.current )
@@ -400,7 +447,16 @@ export default function ExplanationPopover( { original, translated, source_langu
 
     useEffect( () => {
         window.addEventListener( `resize`, hide_explanation_tooltip )
-        return () => window.removeEventListener( `resize`, hide_explanation_tooltip )
+        window.addEventListener( `scroll`, hide_explanation_tooltip, true )
+        window.visualViewport?.addEventListener( `resize`, hide_explanation_tooltip )
+        window.visualViewport?.addEventListener( `scroll`, hide_explanation_tooltip )
+
+        return () => {
+            window.removeEventListener( `resize`, hide_explanation_tooltip )
+            window.removeEventListener( `scroll`, hide_explanation_tooltip, true )
+            window.visualViewport?.removeEventListener( `resize`, hide_explanation_tooltip )
+            window.visualViewport?.removeEventListener( `scroll`, hide_explanation_tooltip )
+        }
     }, [ hide_explanation_tooltip ] )
 
     // Close on Escape
@@ -412,9 +468,12 @@ export default function ExplanationPopover( { original, translated, source_langu
         return () => window.removeEventListener( `keydown`, handle_key )
     }, [ on_close ] )
 
-    const explanation_body = loading
-        ? <SkeletonParagraph lines={ 5 } />
-        : <ExplanationText ref={ explanation_ref } onClick={ show_explanation_tooltip } dangerouslySetInnerHTML={ { __html: decorated_html } } />
+    let explanation_body = <SkeletonParagraph lines={ 5 } />
+    if( !loading ) explanation_body = <ExplanationText
+        ref={ explanation_ref }
+        onClick={ show_explanation_tooltip }
+        dangerouslySetInnerHTML={ { __html: decorated_html } }
+    />
 
     return <Overlay
         role="dialog"
@@ -424,7 +483,11 @@ export default function ExplanationPopover( { original, translated, source_langu
             if( e.target === e.currentTarget ) on_close()
         } }
     >
-        <Panel onScroll={ hide_explanation_tooltip }>
+        <Panel
+            ref={ panel_ref }
+            onPointerDown={ dismiss_explanation_tooltip_on_panel_press }
+            onScroll={ hide_explanation_tooltip }
+        >
 
             <Header>
                 <Title>Translation Explanation</Title>
@@ -451,10 +514,13 @@ export default function ExplanationPopover( { original, translated, source_langu
             { explanation_tooltip && <FloatingTooltip
                 $x={ explanation_tooltip.x }
                 $y={ explanation_tooltip.y }
+                $arrow_offset={ explanation_tooltip.arrow_offset }
             >
-                { explanation_tooltip_state?.loading
-                    ? `...`
-                    : explanation_tooltip_state?.content || LOOKUP_UNAVAILABLE }
+                <span>
+                    { explanation_tooltip_state?.loading
+                        ? `...`
+                        : explanation_tooltip_state?.content || LOOKUP_UNAVAILABLE }
+                </span>
             </FloatingTooltip> }
 
         </Panel>

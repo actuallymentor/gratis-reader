@@ -34,6 +34,7 @@ export default function WordTooltipText( {
 } ) {
 
     const [ visible_word, set_visible_word ] = useState( null )
+    const container_ref = useRef( null )
     const press_started_at_ref = useRef( null )
     const dismiss_timer_ref = useRef( null )
     const { lookup_word, get_lookup_state } = use_word_lookup( {
@@ -72,18 +73,43 @@ export default function WordTooltipText( {
 
     const visible_state = visible_word ? get_lookup_state( visible_word.word ) : null
 
+    const hide_visible_word = useCallback( () => {
+        if( dismiss_timer_ref.current ) clearTimeout( dismiss_timer_ref.current )
+        set_visible_word( null )
+    }, [] )
+
     useEffect( () => {
         if( dismiss_timer_ref.current ) clearTimeout( dismiss_timer_ref.current )
         if( !visible_word || visible_state?.loading ) return
 
-        dismiss_timer_ref.current = setTimeout( () => set_visible_word( null ), TOOLTIP_DISMISS_MS )
+        dismiss_timer_ref.current = setTimeout( hide_visible_word, TOOLTIP_DISMISS_MS )
     }, [
         visible_word,
         visible_state?.loading,
         visible_state?.content,
         visible_state?.error,
-        visible_state?.can_lookup
+        visible_state?.can_lookup,
+        hide_visible_word
     ] )
+
+    useEffect( () => {
+        if( !visible_word ) return
+
+        const dismiss_on_outside_press = ( e ) => {
+            const word_el = e.target.closest?.( `[data-word-tooltip-word]` )
+
+            if( word_el && container_ref.current?.contains( word_el ) ) {
+                const clean_word = clean_lookup_word( word_el.dataset.wordTooltipWord )
+                const cache_key = word_cache_key( clean_word, source_language, target_language )
+                if( cache_key === visible_word.cache_key ) return
+            }
+
+            hide_visible_word()
+        }
+
+        document.addEventListener( `pointerdown`, dismiss_on_outside_press, true )
+        return () => document.removeEventListener( `pointerdown`, dismiss_on_outside_press, true )
+    }, [ visible_word, source_language, target_language, hide_visible_word ] )
 
     useEffect( () => {
         return () => {
@@ -93,7 +119,7 @@ export default function WordTooltipText( {
 
     if( !text ) return null
 
-    return text.split( /(\s+)/ ).map( ( segment, i ) => {
+    const segments = text.split( /(\s+)/ ).map( ( segment, i ) => {
         if( !segment.trim() ) return segment
 
         const clean_word = clean_lookup_word( segment )
@@ -120,5 +146,7 @@ export default function WordTooltipText( {
             </TappableWord>
         </Tooltip>
     } )
+
+    return <span ref={ container_ref }>{ segments }</span>
 
 }

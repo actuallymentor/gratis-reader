@@ -58,6 +58,7 @@ export default function Tooltip( { children, content, loading, force_visible, ho
 
     const [ visible, set_visible ] = useState( false )
     const timeout_ref = useRef( null )
+    const previous_force_visible_ref = useRef( force_visible )
 
     const show = () => {
         if( !hover_enabled ) return
@@ -72,11 +73,15 @@ export default function Tooltip( { children, content, loading, force_visible, ho
 
     // Controlled tooltips can force visibility without relying on hover state.
     useEffect( () => {
+        const was_forced_visible = previous_force_visible_ref.current === true
+
         if( force_visible === true ) {
             set_visible( true )
-        } else if( force_visible === false ) {
+        } else if( force_visible === false || was_forced_visible ) {
             set_visible( false )
         }
+
+        previous_force_visible_ref.current = force_visible
     }, [ force_visible ] )
 
     useEffect( () => {

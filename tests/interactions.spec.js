@@ -90,6 +90,21 @@ test.describe( `Sentence Interactions`, () => {
 
     } )
 
+    test( `word tooltip dismisses when tapping elsewhere`, async ( { page } ) => {
+
+        await enter_reader_with_translations( page )
+
+        const word = page.locator( `span[data-sentence-id] [data-word-tooltip-word]` ).nth( 1 )
+        await word.click()
+
+        await expect( page.getByText( `[WORD] definition of the word` ).first() ).toBeVisible( { timeout: 5000 } )
+
+        await page.mouse.click( 1000, 140 )
+
+        await expect( page.getByText( `[WORD] definition of the word` ).first() ).not.toBeVisible()
+
+    } )
+
     test( `parallel word lookups do not abort each other`, async ( { page } ) => {
 
         await enter_reader_with_translations( page )
@@ -359,6 +374,61 @@ test.describe( `Sentence Interactions`, () => {
         await explanation_word.click()
 
         await expect( dialog.getByText( `definition:modal:${ word_text }` ).first() ).toBeVisible( { timeout: 5000 } )
+
+        await dialog.getByRole( `heading`, { name: `Translation Explanation` } ).click()
+
+        await expect( dialog.getByText( `definition:modal:${ word_text }` ).first() ).not.toBeVisible()
+
+    } )
+
+    test( `modal explanation survives closing div text and supports keyboard lookup`, async ( { page } ) => {
+
+        await enter_reader_with_translations( page )
+
+        const sentence = page.locator( `span[data-sentence-id]` ).first()
+        const word_text = await sentence.locator( `[data-word-tooltip-word]` ).nth( 1 ).getAttribute( `data-word-tooltip-word` )
+        if( !word_text ) throw new Error( `Expected a translated word in the first sentence` )
+
+        await page.route( CHAT_URL, async route => {
+            const body = JSON.parse( route.request().postData() )
+            const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
+            const is_explanation = user_msg.includes( `Explain this translation` )
+            const is_word_lookup = user_msg.includes( `Word:` )
+
+            if( is_explanation ) {
+                await route.fulfill( {
+                    contentType: `application/json`,
+                    body: JSON.stringify( {
+                        choices: [ { message: { content: `Explanation before </div> ${ word_text } after the stray tag.` } } ]
+                    } )
+                } )
+                return
+            }
+
+            if( is_word_lookup ) {
+                await route.fulfill( {
+                    contentType: `application/json`,
+                    body: JSON.stringify( {
+                        choices: [ { message: { content: `definition:keyboard:${ word_text }` } } ]
+                    } )
+                } )
+                return
+            }
+
+            await route.fallback()
+        } )
+
+        await sentence.click( { button: `right` } )
+
+        const dialog = page.getByRole( `dialog`, { name: `Translation Explanation` } )
+        await expect( dialog ).toBeVisible( { timeout: 5000 } )
+        await expect( dialog.getByText( /Explanation before/ ).first() ).toBeVisible( { timeout: 5000 } )
+        await expect( dialog.getByText( /after the stray tag/ ).first() ).toBeVisible()
+
+        const explanation_word = dialog.getByRole( `button`, { name: `Look up ${ word_text }` } ).first()
+        await explanation_word.press( `Enter` )
+
+        await expect( dialog.getByText( `definition:keyboard:${ word_text }` ).first() ).toBeVisible( { timeout: 5000 } )
 
     } )
 

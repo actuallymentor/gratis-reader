@@ -75,10 +75,10 @@ export default function Sentence( { sentence_id, original, translated, source_la
     const handle_press_start = useCallback( ( e ) => {
         if( e.type === `mousedown` && e.button !== 0 ) return
 
+        reset_press()
+
         const point = event_point( e )
         if( !point ) return
-
-        reset_press()
 
         press_started_at_ref.current = Date.now()
         press_start_point_ref.current = point

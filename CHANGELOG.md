@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.10.2] - 2026-05-25
+
+### Fixed
+- Harden explanation word tooltip decoration and dismissal (uncommitted)
+- Track word lookup aborts across cache checks (uncommitted)
+
 ## [1.10.1] - 2026-05-25
 
 ### Fixed

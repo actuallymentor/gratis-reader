@@ -6,6 +6,7 @@ import { use_cache } from './use_cache.js'
 
 const WORD_PUNCTUATION_RE = /[.,!?;:'"()[\]{}]/g
 const WORD_WITH_LETTERS_RE = /\p{L}/u
+const WORD_LOOKUP_MEMORY_LIMIT = 250
 
 /**
  * Normalizes a visible word before dictionary lookup.
@@ -42,13 +43,35 @@ export const use_word_lookup = ( { source_language, target_language, sentence_co
     const loading_words_ref = useRef( {} )
     const lookup_errors_ref = useRef( {} )
     const word_abort_ref = useRef( {} )
-    const mounted_ref = useRef( true )
+    const lookup_keys_ref = useRef( [] )
+    const mounted_ref = useRef( false )
     const api_key = use_settings_store( state => state.api_key )
     const model = use_settings_store( state => state.model )
     const { get_word_translation, cache_word_translation } = use_cache()
 
     const refresh_lookup_state = useCallback( () => {
         if( mounted_ref.current ) set_lookup_version( version => version + 1 )
+    }, [] )
+
+    const remember_lookup_key = useCallback( ( cache_key ) => {
+        const ordered_keys = lookup_keys_ref.current.filter( key => key !== cache_key )
+        ordered_keys.push( cache_key )
+
+        const evicted_keys = ordered_keys.slice( 0, Math.max( 0, ordered_keys.length - WORD_LOOKUP_MEMORY_LIMIT ) )
+        lookup_keys_ref.current = ordered_keys.slice( -WORD_LOOKUP_MEMORY_LIMIT )
+
+        if( evicted_keys.length === 0 ) return
+
+        const prune_store = ( store ) => {
+            const next_store = { ...store }
+            evicted_keys.forEach( key => {
+                if( !loading_words_ref.current[key] ) delete next_store[key]
+            } )
+            return next_store
+        }
+
+        word_translations_ref.current = prune_store( word_translations_ref.current )
+        lookup_errors_ref.current = prune_store( lookup_errors_ref.current )
     }, [] )
 
     const lookup_word = useCallback( async ( word ) => {
@@ -64,15 +87,25 @@ export const use_word_lookup = ( { source_language, target_language, sentence_co
         lookup_errors_ref.current = { ...lookup_errors_ref.current, [cache_key]: false }
         refresh_lookup_state()
 
+        const controller = new AbortController()
+        word_abort_ref.current = { ...word_abort_ref.current, [cache_key]: controller }
+        let refresh_in_finally = true
+
+        const clear_loading_word = () => {
+            const next_loading_words = { ...loading_words_ref.current }
+            delete next_loading_words[cache_key]
+            loading_words_ref.current = next_loading_words
+        }
+
         try {
             const cached = await get_word_translation( clean_word, source_language, target_language )
+            if( controller.signal.aborted ) return
+
             if( cached ) {
                 word_translations_ref.current = { ...word_translations_ref.current, [cache_key]: cached }
+                remember_lookup_key( cache_key )
                 return
             }
-
-            const controller = new AbortController()
-            word_abort_ref.current = { ...word_abort_ref.current, [cache_key]: controller }
 
             const { system, user } = build_word_lookup_prompt( clean_word, source_language, target_language, sentence_context )
             const { content } = await chat_completion( {
@@ -85,8 +118,10 @@ export const use_word_lookup = ( { source_language, target_language, sentence_co
             } )
 
             word_translations_ref.current = { ...word_translations_ref.current, [cache_key]: content }
-            loading_words_ref.current = { ...loading_words_ref.current, [cache_key]: false }
+            remember_lookup_key( cache_key )
+            clear_loading_word()
             refresh_lookup_state()
+            refresh_in_finally = false
 
             try {
                 await cache_word_translation( clean_word, source_language, target_language, content )
@@ -95,15 +130,19 @@ export const use_word_lookup = ( { source_language, target_language, sentence_co
             }
         } catch ( error ) {
             // Word lookups are opportunistic; the reading flow should never break on lookup failure.
-            if( error?.name !== `AbortError` ) {
+            if( !controller.signal.aborted && error?.name !== `AbortError` ) {
                 lookup_errors_ref.current = { ...lookup_errors_ref.current, [cache_key]: true }
+                remember_lookup_key( cache_key )
             }
         } finally {
             const remaining_controllers = { ...word_abort_ref.current }
             delete remaining_controllers[cache_key]
             word_abort_ref.current = remaining_controllers
-            loading_words_ref.current = { ...loading_words_ref.current, [cache_key]: false }
-            refresh_lookup_state()
+
+            if( refresh_in_finally ) {
+                clear_loading_word()
+                refresh_lookup_state()
+            }
         }
 
     }, [
@@ -114,6 +153,7 @@ export const use_word_lookup = ( { source_language, target_language, sentence_co
         sentence_context,
         get_word_translation,
         cache_word_translation,
+        remember_lookup_key,
         refresh_lookup_state
     ] )
 
@@ -135,6 +175,7 @@ export const use_word_lookup = ( { source_language, target_language, sentence_co
         return () => {
             mounted_ref.current = false
             Object.values( word_abort_ref.current ).forEach( controller => controller.abort() )
+            word_abort_ref.current = {}
         }
     }, [] )
 
