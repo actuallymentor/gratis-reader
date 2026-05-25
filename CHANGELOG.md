@@ -1,9 +1,14 @@
 # Changelog
 
+## [1.10.6] - 2026-05-25
+
+### Fixed
+- Harden PWA update badge reload, accessibility, and registration behavior
+
 ## [1.10.5] - 2026-05-25
 
 ### Added
-- Show a click-to-update badge when a new PWA version is available (uncommitted)
+- Show a click-to-update badge when a new PWA version is available
 
 ## [1.10.4] - 2026-05-25
 

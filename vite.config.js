@@ -8,6 +8,7 @@ export default defineConfig( {
         react(),
         VitePWA( {
             registerType: `prompt`,
+            injectRegister: null,
             manifest: {
                 name: `Gratis Reader`,
                 short_name: `Gratis Reader`,
