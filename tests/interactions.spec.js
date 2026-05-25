@@ -389,6 +389,7 @@ test.describe( `Sentence Interactions`, () => {
         const sentence = page.locator( `span[data-sentence-id]` ).first()
         const word_text = await sentence.locator( `[data-word-tooltip-word]` ).nth( 1 ).getAttribute( `data-word-tooltip-word` )
         if( !word_text ) throw new Error( `Expected a translated word in the first sentence` )
+        let word_lookup_calls = 0
 
         await page.route( CHAT_URL, async route => {
             const body = JSON.parse( route.request().postData() )
@@ -407,6 +408,7 @@ test.describe( `Sentence Interactions`, () => {
             }
 
             if( is_word_lookup ) {
+                word_lookup_calls += 1
                 await route.fulfill( {
                     contentType: `application/json`,
                     body: JSON.stringify( {
@@ -430,6 +432,8 @@ test.describe( `Sentence Interactions`, () => {
         await explanation_word.press( `Enter` )
 
         await expect( dialog.getByText( `definition:keyboard:${ word_text }` ).first() ).toBeVisible( { timeout: 5000 } )
+        await page.waitForTimeout( 600 )
+        expect( word_lookup_calls ).toBe( 1 )
 
     } )
 

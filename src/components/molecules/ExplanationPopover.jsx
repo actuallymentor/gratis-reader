@@ -280,14 +280,16 @@ const decorate_explanation_html = ( html, translated_words ) => {
 
             const clean_word = clean_lookup_word( part ).toLowerCase()
             if( clean_word && translated_words.has( clean_word ) ) {
-                const word_button = doc.createElement( `button` )
-                word_button.type = `button`
-                word_button.className = `foreign-word`
-                word_button.dataset.foreignWord = part
-                word_button.dataset.wordTooltipWord = clean_lookup_word( part )
-                word_button.setAttribute( `aria-label`, `Look up ${ clean_lookup_word( part ) }` )
-                word_button.textContent = part
-                fragment.appendChild( word_button )
+                // Keep explanation text selectable and avoid native button keyboard click synthesis.
+                const word_el = doc.createElement( `span` )
+                word_el.className = `foreign-word`
+                word_el.dataset.foreignWord = part
+                word_el.dataset.wordTooltipWord = clean_lookup_word( part )
+                word_el.setAttribute( `role`, `button` )
+                word_el.setAttribute( `tabindex`, `0` )
+                word_el.setAttribute( `aria-label`, `Look up ${ clean_lookup_word( part ) }` )
+                word_el.textContent = part
+                fragment.appendChild( word_el )
                 decorated_count += 1
                 return
             }
@@ -345,6 +347,7 @@ export default function ExplanationPopover( { original, translated, source_langu
         () => decorate_explanation_html( rendered_html, translated_words ),
         [ rendered_html, translated_words ]
     )
+    const decorated_inner_html = useMemo( () => ( { __html: decorated_html } ), [ decorated_html ] )
 
     const hide_explanation_tooltip = useCallback( () => {
         if( tooltip_timer_ref.current ) clearTimeout( tooltip_timer_ref.current )
@@ -392,13 +395,16 @@ export default function ExplanationPopover( { original, translated, source_langu
     }, [ original, translated, source_language, target_language, api_key, model, level_info ] )
 
     const show_explanation_tooltip = useCallback( ( e ) => {
-        if( e.type === `keydown` && ![ `Enter`, ` `, `Spacebar` ].includes( e.key ) ) return
+        const is_keyboard_activation = e.type === `keydown`
+        if( is_keyboard_activation && ![ `Enter`, ` `, `Spacebar` ].includes( e.key ) ) return
 
         const word_el = e.target.closest?.( `[data-foreign-word]` )
         if( !word_el || !explanation_ref.current?.contains( word_el ) ) return
 
         e.preventDefault()
-        e.stopPropagation()
+        if( !is_keyboard_activation ) {
+            e.stopPropagation()
+        }
 
         const clean_word = clean_lookup_word( word_el.dataset.foreignWord )
         if( !clean_word ) return
@@ -423,6 +429,12 @@ export default function ExplanationPopover( { original, translated, source_langu
     }, [ lookup_word, source_language, target_language ] )
 
     const explanation_tooltip_state = explanation_tooltip ? get_lookup_state( explanation_tooltip.word ) : null
+
+    useEffect( () => {
+        window.addEventListener( `keydown`, show_explanation_tooltip, true )
+
+        return () => window.removeEventListener( `keydown`, show_explanation_tooltip, true )
+    }, [ show_explanation_tooltip ] )
 
     const dismiss_explanation_tooltip_on_panel_press = useCallback( ( e ) => {
         const word_el = e.target.closest?.( `[data-foreign-word]` )
@@ -478,8 +490,7 @@ export default function ExplanationPopover( { original, translated, source_langu
     if( !loading ) explanation_body = <ExplanationText
         ref={ explanation_ref }
         onClick={ show_explanation_tooltip }
-        onKeyDown={ show_explanation_tooltip }
-        dangerouslySetInnerHTML={ { __html: decorated_html } }
+        dangerouslySetInnerHTML={ decorated_inner_html }
     />
 
     return <Overlay

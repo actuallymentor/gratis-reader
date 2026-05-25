@@ -58,13 +58,20 @@ export const use_word_lookup = ( { source_language, target_language, sentence_co
         ordered_keys.push( cache_key )
 
         const evicted_keys = ordered_keys.slice( 0, Math.max( 0, ordered_keys.length - WORD_LOOKUP_MEMORY_LIMIT ) )
-        lookup_keys_ref.current = ordered_keys.slice( -WORD_LOOKUP_MEMORY_LIMIT )
+        const loading_evicted_keys = evicted_keys.filter( key => loading_words_ref.current[key] )
+        const pruned_keys = evicted_keys.filter( key => !loading_words_ref.current[key] )
 
-        if( evicted_keys.length === 0 ) return
+        // Keep any future in-flight keys visible until their request settles.
+        lookup_keys_ref.current = [
+            ...loading_evicted_keys,
+            ...ordered_keys.slice( -WORD_LOOKUP_MEMORY_LIMIT )
+        ]
+
+        if( pruned_keys.length === 0 ) return
 
         const prune_store = ( store ) => {
             const next_store = { ...store }
-            evicted_keys.forEach( key => delete next_store[key] )
+            pruned_keys.forEach( key => delete next_store[key] )
             return next_store
         }
 

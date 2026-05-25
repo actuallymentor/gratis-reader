@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.10.4] - 2026-05-25
+
+### Fixed
+- Avoid duplicate keyboard-triggered explanation lookups and focus churn (uncommitted)
+- Clarify forced tooltip release and lookup pruning behavior (uncommitted)
+
 ## [1.10.3] - 2026-05-25
 
 ### Fixed
