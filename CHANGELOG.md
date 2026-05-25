@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.10.5] - 2026-05-25
+
+### Added
+- Show a click-to-update badge when a new PWA version is available (uncommitted)
+
 ## [1.10.4] - 2026-05-25
 
 ### Fixed

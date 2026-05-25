@@ -7,7 +7,7 @@ export default defineConfig( {
     plugins: [
         react(),
         VitePWA( {
-            registerType: `autoUpdate`,
+            registerType: `prompt`,
             manifest: {
                 name: `Gratis Reader`,
                 short_name: `Gratis Reader`,
