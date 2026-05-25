@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.10.1] - 2026-05-25
+
+### Fixed
+- Stabilize word tooltip lookups and slow dictionary responses (uncommitted)
+- Clamp, dismiss, and reliably decorate explanation word tooltips (uncommitted)
+
 ## [1.10.0] - 2026-05-24
 
 ### Changed

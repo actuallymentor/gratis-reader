@@ -9,6 +9,25 @@ import { log } from 'mentie'
 import WordTooltipText from './WordTooltipText.jsx'
 import { clean_lookup_word, word_cache_key, use_word_lookup } from '../../hooks/use_word_lookup.js'
 
+const TOOLTIP_DISMISS_MS = 2000
+const LOOKUP_UNAVAILABLE = `Lookup unavailable`
+const FLOATING_TOOLTIP_HALF_WIDTH = 130
+const FLOATING_TOOLTIP_TOP_GAP = 56
+const FLOATING_TOOLTIP_VIEWPORT_GAP = 12
+const FOREIGN_WORD_IGNORED_SELECTOR = [
+    `a`,
+    `button`,
+    `code`,
+    `pre`,
+    `kbd`,
+    `samp`,
+    `script`,
+    `style`,
+    `textarea`,
+    `select`,
+    `input`
+].join( `,` )
+
 const Overlay = styled.div`
     position: fixed;
     inset: 0;
@@ -171,6 +190,78 @@ const FloatingTooltip = styled.div`
     }
 `
 
+const clamp = ( value, min, max ) => Math.min( Math.max( value, min ), Math.max( min, max ) )
+
+const floating_tooltip_position = ( rect ) => {
+    const tooltip_half_width = Math.min(
+        FLOATING_TOOLTIP_HALF_WIDTH,
+        Math.max( FLOATING_TOOLTIP_VIEWPORT_GAP, ( window.innerWidth - FLOATING_TOOLTIP_VIEWPORT_GAP * 2 ) / 2 )
+    )
+
+    return {
+        x: clamp(
+            rect.left + rect.width / 2,
+            tooltip_half_width,
+            window.innerWidth - tooltip_half_width
+        ),
+        y: clamp(
+            rect.top - 8,
+            FLOATING_TOOLTIP_TOP_GAP,
+            window.innerHeight - FLOATING_TOOLTIP_VIEWPORT_GAP
+        )
+    }
+}
+
+const decorate_explanation_html = ( html, translated_words ) => {
+    if( !html || translated_words.size === 0 || typeof DOMParser === `undefined` ) return html
+
+    const doc = new DOMParser().parseFromString( `<div>${ html }</div>`, `text/html` )
+    const root = doc.body.firstElementChild
+    if( !root ) return html
+
+    const walker = doc.createTreeWalker(
+        root,
+        NodeFilter.SHOW_TEXT,
+        {
+            acceptNode: ( node ) => {
+                const parent = node.parentElement
+                if( !parent || parent.closest( `[data-foreign-word]` ) ) return NodeFilter.FILTER_REJECT
+                if( parent.closest( FOREIGN_WORD_IGNORED_SELECTOR ) ) return NodeFilter.FILTER_REJECT
+
+                return node.nodeValue.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT
+            }
+        }
+    )
+
+    const text_nodes = []
+    while( walker.nextNode() ) text_nodes.push( walker.currentNode )
+
+    text_nodes.forEach( node => {
+        const fragment = doc.createDocumentFragment()
+
+        node.nodeValue.split( /(\s+)/ ).forEach( part => {
+            if( !part ) return
+
+            const clean_word = clean_lookup_word( part ).toLowerCase()
+            if( clean_word && translated_words.has( clean_word ) ) {
+                const word_span = doc.createElement( `span` )
+                word_span.className = `foreign-word`
+                word_span.dataset.foreignWord = part
+                word_span.dataset.wordTooltipWord = clean_lookup_word( part )
+                word_span.textContent = part
+                fragment.appendChild( word_span )
+                return
+            }
+
+            fragment.appendChild( doc.createTextNode( part ) )
+        } )
+
+        node.parentNode.replaceChild( fragment, node )
+    } )
+
+    return root.innerHTML
+}
+
 /**
  * Explanation popover for long-press on a sentence
  * @param {Object} props
@@ -209,6 +300,16 @@ export default function ExplanationPopover( { original, translated, source_langu
             .map( word => clean_lookup_word( word ).toLowerCase() )
             .filter( Boolean )
     ), [ translated ] )
+
+    const decorated_html = useMemo(
+        () => decorate_explanation_html( rendered_html, translated_words ),
+        [ rendered_html, translated_words ]
+    )
+
+    const hide_explanation_tooltip = useCallback( () => {
+        if( tooltip_timer_ref.current ) clearTimeout( tooltip_timer_ref.current )
+        set_explanation_tooltip( null )
+    }, [] )
 
     // Fetch explanation on mount
     useEffect( () => {
@@ -250,57 +351,11 @@ export default function ExplanationPopover( { original, translated, source_langu
 
     }, [ original, translated, source_language, target_language, api_key, model, level_info ] )
 
-    // Make repeated target-language words inside the explanation tappable too.
-    useEffect( () => {
-        const root = explanation_ref.current
-        if( !root || !rendered_html || translated_words.size === 0 ) return
-
-        const walker = document.createTreeWalker(
-            root,
-            NodeFilter.SHOW_TEXT,
-            {
-                acceptNode: ( node ) => {
-                    const parent = node.parentElement
-                    if( !parent || parent.closest( `[data-foreign-word]` ) ) return NodeFilter.FILTER_REJECT
-                    if( [ `SCRIPT`, `STYLE` ].includes( parent.tagName ) ) return NodeFilter.FILTER_REJECT
-
-                    return node.nodeValue.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT
-                }
-            }
-        )
-
-        const text_nodes = []
-        while( walker.nextNode() ) text_nodes.push( walker.currentNode )
-
-        text_nodes.forEach( node => {
-            const fragment = document.createDocumentFragment()
-
-            node.nodeValue.split( /(\s+)/ ).forEach( part => {
-                if( !part ) return
-
-                const clean_word = clean_lookup_word( part ).toLowerCase()
-                if( clean_word && translated_words.has( clean_word ) ) {
-                    const word_span = document.createElement( `span` )
-                    word_span.className = `foreign-word`
-                    word_span.dataset.foreignWord = part
-                    word_span.dataset.wordTooltipWord = clean_lookup_word( part )
-                    word_span.textContent = part
-                    fragment.appendChild( word_span )
-                    return
-                }
-
-                fragment.appendChild( document.createTextNode( part ) )
-            } )
-
-            node.parentNode.replaceChild( fragment, node )
-        } )
-
-    }, [ rendered_html, translated_words ] )
-
     const show_explanation_tooltip = useCallback( ( e ) => {
         const word_el = e.target.closest?.( `[data-foreign-word]` )
         if( !word_el || !explanation_ref.current?.contains( word_el ) ) return
 
+        e.preventDefault()
         e.stopPropagation()
 
         const clean_word = clean_lookup_word( word_el.dataset.foreignWord )
@@ -308,24 +363,45 @@ export default function ExplanationPopover( { original, translated, source_langu
 
         const rect = word_el.getBoundingClientRect()
         const cache_key = word_cache_key( clean_word, source_language, target_language )
+        const { x, y } = floating_tooltip_position( rect )
 
         set_explanation_tooltip( {
             word: clean_word,
             cache_key,
-            x: rect.left + rect.width / 2,
-            y: rect.top - 8
+            x,
+            y
         } )
         lookup_word( clean_word )
 
         if( tooltip_timer_ref.current ) clearTimeout( tooltip_timer_ref.current )
-        tooltip_timer_ref.current = setTimeout( () => set_explanation_tooltip( null ), 2000 )
     }, [ lookup_word, source_language, target_language ] )
+
+    const explanation_tooltip_state = explanation_tooltip ? get_lookup_state( explanation_tooltip.word ) : null
+
+    useEffect( () => {
+        if( tooltip_timer_ref.current ) clearTimeout( tooltip_timer_ref.current )
+        if( !explanation_tooltip || explanation_tooltip_state?.loading ) return
+
+        tooltip_timer_ref.current = setTimeout( hide_explanation_tooltip, TOOLTIP_DISMISS_MS )
+    }, [
+        explanation_tooltip,
+        explanation_tooltip_state?.loading,
+        explanation_tooltip_state?.content,
+        explanation_tooltip_state?.error,
+        explanation_tooltip_state?.can_lookup,
+        hide_explanation_tooltip
+    ] )
 
     useEffect( () => {
         return () => {
             if( tooltip_timer_ref.current ) clearTimeout( tooltip_timer_ref.current )
         }
     }, [] )
+
+    useEffect( () => {
+        window.addEventListener( `resize`, hide_explanation_tooltip )
+        return () => window.removeEventListener( `resize`, hide_explanation_tooltip )
+    }, [ hide_explanation_tooltip ] )
 
     // Close on Escape
     useEffect( () => {
@@ -338,7 +414,7 @@ export default function ExplanationPopover( { original, translated, source_langu
 
     const explanation_body = loading
         ? <SkeletonParagraph lines={ 5 } />
-        : <ExplanationText ref={ explanation_ref } onClick={ show_explanation_tooltip } dangerouslySetInnerHTML={ { __html: rendered_html } } />
+        : <ExplanationText ref={ explanation_ref } onClick={ show_explanation_tooltip } dangerouslySetInnerHTML={ { __html: decorated_html } } />
 
     return <Overlay
         role="dialog"
@@ -348,7 +424,7 @@ export default function ExplanationPopover( { original, translated, source_langu
             if( e.target === e.currentTarget ) on_close()
         } }
     >
-        <Panel>
+        <Panel onScroll={ hide_explanation_tooltip }>
 
             <Header>
                 <Title>Translation Explanation</Title>
@@ -376,9 +452,9 @@ export default function ExplanationPopover( { original, translated, source_langu
                 $x={ explanation_tooltip.x }
                 $y={ explanation_tooltip.y }
             >
-                { get_lookup_state( explanation_tooltip.word ).loading
+                { explanation_tooltip_state?.loading
                     ? `...`
-                    : get_lookup_state( explanation_tooltip.word ).content || `...` }
+                    : explanation_tooltip_state?.content || LOOKUP_UNAVAILABLE }
             </FloatingTooltip> }
 
         </Panel>

@@ -52,8 +52,9 @@ const Wrapper = styled.span`
  * @param {boolean} [props.loading] - Show loading indicator
  * @param {boolean} [props.force_visible] - Force tooltip open
  * @param {boolean} [props.hover_enabled] - Opens tooltip on hover
+ * @param {string} [props.fallback_content] - Text to show when content is unavailable
  */
-export default function Tooltip( { children, content, loading, force_visible, hover_enabled = true } ) {
+export default function Tooltip( { children, content, loading, force_visible, hover_enabled = true, fallback_content = `...` } ) {
 
     const [ visible, set_visible ] = useState( false )
     const timeout_ref = useRef( null )
@@ -69,14 +70,14 @@ export default function Tooltip( { children, content, loading, force_visible, ho
         timeout_ref.current = setTimeout( () => set_visible( false ), 100 )
     }
 
-    // Tap-driven tooltips force visibility and then explicitly hide when dismissed.
+    // Controlled tooltips can force visibility without relying on hover state.
     useEffect( () => {
-        if( force_visible ) {
+        if( force_visible === true ) {
             set_visible( true )
-        } else if( !hover_enabled ) {
+        } else if( force_visible === false ) {
             set_visible( false )
         }
-    }, [ force_visible, hover_enabled ] )
+    }, [ force_visible ] )
 
     useEffect( () => {
         return () => clearTimeout( timeout_ref.current )
@@ -88,7 +89,7 @@ export default function Tooltip( { children, content, loading, force_visible, ho
     >
         { children }
         { visible && <TooltipContainer $visible={ visible }>
-            { loading ? `...` :  content || `...`  }
+            { loading ? `...` : content || fallback_content }
         </TooltipContainer> }
     </Wrapper>
 

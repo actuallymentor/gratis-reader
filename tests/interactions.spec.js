@@ -1,6 +1,8 @@
 import { test, expect } from '@playwright/test'
 import { setup_api_key, upload_demo_book, mock_openrouter, clear_storage, short_hold } from './helpers/setup.js'
 
+const CHAT_URL = `**/openrouter.ai/api/v1/chat/completions`
+
 test.describe( `Sentence Interactions`, () => {
 
     test.beforeEach( async ( { page } ) => {
@@ -26,6 +28,38 @@ test.describe( `Sentence Interactions`, () => {
 
     }
 
+    const use_word_lookup_mock = async ( page, delay_for_word = () => 0 ) => {
+
+        const calls = {}
+
+        await page.route( CHAT_URL, async route => {
+            const body = JSON.parse( route.request().postData() )
+            const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
+            const word_match = user_msg.match( /Word:\s*(.+)$/ )
+
+            if( word_match ) {
+                const word = word_match[1].trim()
+                calls[word] = ( calls[word] || 0 ) + 1
+
+                const delay_ms = delay_for_word( word )
+                if( delay_ms ) await new Promise( resolve => setTimeout( resolve, delay_ms ) )
+
+                await route.fulfill( {
+                    contentType: `application/json`,
+                    body: JSON.stringify( {
+                        choices: [ { message: { content: `definition:${ word }` } } ]
+                    } )
+                } )
+                return
+            }
+
+            await route.fallback()
+        } )
+
+        return calls
+
+    }
+
     test( `tap on translated word opens original-word tooltip`, async ( { page } ) => {
 
         await enter_reader_with_translations( page )
@@ -38,6 +72,84 @@ test.describe( `Sentence Interactions`, () => {
 
         await expect( page.getByText( `[WORD] definition of the word` ).first() ).toBeVisible( { timeout: 5000 } )
         await expect( sentence ).toContainText( `[TRANSLATED]` )
+
+    } )
+
+    test( `slow word lookup keeps tooltip open until content arrives`, async ( { page } ) => {
+
+        await enter_reader_with_translations( page )
+
+        await use_word_lookup_mock( page, () => 2500 )
+
+        const word = page.locator( `span[data-sentence-id] [data-word-tooltip-word]` ).nth( 1 )
+        const word_text = await word.getAttribute( `data-word-tooltip-word` )
+
+        await word.click()
+
+        await expect( page.getByText( `definition:${ word_text }` ).first() ).toBeVisible( { timeout: 5000 } )
+
+    } )
+
+    test( `parallel word lookups do not abort each other`, async ( { page } ) => {
+
+        await enter_reader_with_translations( page )
+
+        const word_spans = page.locator( `span[data-sentence-id] [data-word-tooltip-word]` )
+        const first_word = word_spans.nth( 0 )
+        const first_text = await first_word.getAttribute( `data-word-tooltip-word` )
+        const second_index = await word_spans.evaluateAll( ( words, first ) =>
+            words.findIndex( word => word.dataset.wordTooltipWord && word.dataset.wordTooltipWord !== first ),
+            first_text
+        )
+        expect( second_index ).toBeGreaterThan( -1 )
+        const second_word = word_spans.nth( second_index )
+        const second_text = await second_word.getAttribute( `data-word-tooltip-word` )
+
+        const calls = await use_word_lookup_mock( page, word => word === first_text ? 900 : 100 )
+
+        await first_word.click()
+        await second_word.click()
+
+        await expect( page.getByText( `definition:${ second_text }` ).first() ).toBeVisible( { timeout: 2000 } )
+        await page.waitForTimeout( 1100 )
+
+        await first_word.click()
+
+        await expect( page.getByText( `definition:${ first_text }` ).first() ).toBeVisible( { timeout: 500 } )
+        expect( calls[first_text] ).toBe( 1 )
+        expect( calls[second_text] ).toBe( 1 )
+
+    } )
+
+    test( `numeric-only translated tokens are not tappable lookup words`, async ( { page } ) => {
+
+        await page.route( CHAT_URL, async route => {
+            const body = JSON.parse( route.request().postData() )
+            const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
+            const is_word_lookup = user_msg.includes( `Word:` )
+
+            await route.fulfill( {
+                contentType: `application/json`,
+                body: JSON.stringify( {
+                    choices: [ { message: { content: is_word_lookup ? `definition` : `[TRANSLATED] 123 alpha` } } ],
+                    usage: { prompt_tokens: 25, completion_tokens: 15, total_tokens: 40 }
+                } )
+            } )
+        } )
+
+        await page.locator( `img[alt]` ).first().click()
+        await page.waitForURL( /\/read\// )
+
+        const start_btn = page.getByRole( `button`, { name: `Start Reading` } )
+        try {
+            await start_btn.waitFor( { state: `visible`, timeout: 3000 } )
+            await start_btn.click()
+        } catch { /* modal not shown */ }
+
+        const sentence = page.locator( `span[data-sentence-id]` ).first()
+        await expect( sentence ).toContainText( `[TRANSLATED] 123 alpha`, { timeout: 15_000 } )
+        await expect( sentence.locator( `[data-word-tooltip-word="123"]` ) ).toHaveCount( 0 )
+        await expect( sentence.locator( `[data-word-tooltip-word="alpha"]` ).first() ).toBeVisible()
 
     } )
 
@@ -198,6 +310,55 @@ test.describe( `Sentence Interactions`, () => {
         await modal_word.click()
 
         await expect( dialog.getByText( `[WORD] definition of the word` ).first() ).toBeVisible( { timeout: 5000 } )
+
+    } )
+
+    test( `modal explanation foreign words open original-word tooltips`, async ( { page } ) => {
+
+        await enter_reader_with_translations( page )
+
+        const sentence = page.locator( `span[data-sentence-id]` ).first()
+        const word_text = await sentence.locator( `[data-word-tooltip-word]` ).nth( 1 ).getAttribute( `data-word-tooltip-word` )
+        if( !word_text ) throw new Error( `Expected a translated word in the first sentence` )
+
+        await page.route( CHAT_URL, async route => {
+            const body = JSON.parse( route.request().postData() )
+            const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
+            const is_explanation = user_msg.includes( `Explain this translation` )
+            const is_word_lookup = user_msg.includes( `Word:` )
+
+            if( is_explanation ) {
+                await route.fulfill( {
+                    contentType: `application/json`,
+                    body: JSON.stringify( {
+                        choices: [ { message: { content: `This explanation repeats ${ word_text } inside the modal body.` } } ]
+                    } )
+                } )
+                return
+            }
+
+            if( is_word_lookup ) {
+                await route.fulfill( {
+                    contentType: `application/json`,
+                    body: JSON.stringify( {
+                        choices: [ { message: { content: `definition:modal:${ word_text }` } } ]
+                    } )
+                } )
+                return
+            }
+
+            await route.fallback()
+        } )
+
+        await sentence.click( { button: `right` } )
+
+        const dialog = page.getByRole( `dialog`, { name: `Translation Explanation` } )
+        await expect( dialog ).toBeVisible( { timeout: 5000 } )
+
+        const explanation_word = dialog.locator( `.foreign-word` ).filter( { hasText: word_text } ).first()
+        await explanation_word.click()
+
+        await expect( dialog.getByText( `definition:modal:${ word_text }` ).first() ).toBeVisible( { timeout: 5000 } )
 
     } )
 

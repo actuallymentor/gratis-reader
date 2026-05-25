@@ -5,13 +5,17 @@ import { use_settings_store } from '../stores/settings_store.js'
 import { use_cache } from './use_cache.js'
 
 const WORD_PUNCTUATION_RE = /[.,!?;:'"()[\]{}]/g
+const WORD_WITH_LETTERS_RE = /\p{L}/u
 
 /**
  * Normalizes a visible word before dictionary lookup.
  * @param {string} word
  * @returns {string}
  */
-export const clean_lookup_word = ( word ) => word.replace( WORD_PUNCTUATION_RE, `` ).trim()
+export const clean_lookup_word = ( word ) => {
+    const clean_word = String( word || `` ).replace( WORD_PUNCTUATION_RE, `` ).trim()
+    return WORD_WITH_LETTERS_RE.test( clean_word ) ? clean_word : ``
+}
 
 /**
  * Builds the stable lookup cache key used by word tooltips.
@@ -33,37 +37,43 @@ export const word_cache_key = ( word, source_language, target_language ) =>
  */
 export const use_word_lookup = ( { source_language, target_language, sentence_context } ) => {
 
-    const [ word_translations, set_word_translations ] = useState( {} )
-    const [ loading_words, set_loading_words ] = useState( {} )
-    const word_abort_ref = useRef( null )
+    const [ , set_lookup_version ] = useState( 0 )
+    const word_translations_ref = useRef( {} )
+    const loading_words_ref = useRef( {} )
+    const lookup_errors_ref = useRef( {} )
+    const word_abort_ref = useRef( {} )
+    const mounted_ref = useRef( true )
     const api_key = use_settings_store( state => state.api_key )
     const model = use_settings_store( state => state.model )
     const { get_word_translation, cache_word_translation } = use_cache()
 
+    const refresh_lookup_state = useCallback( () => {
+        if( mounted_ref.current ) set_lookup_version( version => version + 1 )
+    }, [] )
+
     const lookup_word = useCallback( async ( word ) => {
 
-        if( !word.trim() || !api_key ) return
-
         const clean_word = clean_lookup_word( word )
-        if( !clean_word ) return
+        if( !clean_word || !api_key ) return
 
         const cache_key = word_cache_key( clean_word, source_language, target_language )
 
-        if( word_translations[cache_key] || loading_words[cache_key] ) return
+        if( word_translations_ref.current[cache_key] || loading_words_ref.current[cache_key] ) return
 
-        const cached = await get_word_translation( clean_word, source_language, target_language )
-        if( cached ) {
-            set_word_translations( prev => ( { ...prev, [cache_key]: cached } ) )
-            return
-        }
-
-        if( word_abort_ref.current ) word_abort_ref.current.abort()
-        const controller = new AbortController()
-        word_abort_ref.current = controller
-
-        set_loading_words( prev => ( { ...prev, [cache_key]: true } ) )
+        loading_words_ref.current = { ...loading_words_ref.current, [cache_key]: true }
+        lookup_errors_ref.current = { ...lookup_errors_ref.current, [cache_key]: false }
+        refresh_lookup_state()
 
         try {
+            const cached = await get_word_translation( clean_word, source_language, target_language )
+            if( cached ) {
+                word_translations_ref.current = { ...word_translations_ref.current, [cache_key]: cached }
+                return
+            }
+
+            const controller = new AbortController()
+            word_abort_ref.current = { ...word_abort_ref.current, [cache_key]: controller }
+
             const { system, user } = build_word_lookup_prompt( clean_word, source_language, target_language, sentence_context )
             const { content } = await chat_completion( {
                 api_key,
@@ -74,12 +84,26 @@ export const use_word_lookup = ( { source_language, target_language, sentence_co
                 signal: controller.signal
             } )
 
-            set_word_translations( prev => ( { ...prev, [cache_key]: content } ) )
-            await cache_word_translation( clean_word, source_language, target_language, content )
-        } catch {
+            word_translations_ref.current = { ...word_translations_ref.current, [cache_key]: content }
+            loading_words_ref.current = { ...loading_words_ref.current, [cache_key]: false }
+            refresh_lookup_state()
+
+            try {
+                await cache_word_translation( clean_word, source_language, target_language, content )
+            } catch {
+                // Cache writes should not invalidate a successful lookup.
+            }
+        } catch ( error ) {
             // Word lookups are opportunistic; the reading flow should never break on lookup failure.
+            if( error?.name !== `AbortError` ) {
+                lookup_errors_ref.current = { ...lookup_errors_ref.current, [cache_key]: true }
+            }
         } finally {
-            set_loading_words( prev => ( { ...prev, [cache_key]: false } ) )
+            const remaining_controllers = { ...word_abort_ref.current }
+            delete remaining_controllers[cache_key]
+            word_abort_ref.current = remaining_controllers
+            loading_words_ref.current = { ...loading_words_ref.current, [cache_key]: false }
+            refresh_lookup_state()
         }
 
     }, [
@@ -88,10 +112,9 @@ export const use_word_lookup = ( { source_language, target_language, sentence_co
         source_language,
         target_language,
         sentence_context,
-        word_translations,
-        loading_words,
         get_word_translation,
-        cache_word_translation
+        cache_word_translation,
+        refresh_lookup_state
     ] )
 
     const get_lookup_state = useCallback( ( word ) => {
@@ -99,14 +122,19 @@ export const use_word_lookup = ( { source_language, target_language, sentence_co
 
         return {
             cache_key,
-            content: word_translations[cache_key],
-            loading: !!loading_words[cache_key]
+            content: word_translations_ref.current[cache_key],
+            loading: !!loading_words_ref.current[cache_key],
+            error: !!lookup_errors_ref.current[cache_key],
+            can_lookup: !!api_key
         }
-    }, [ source_language, target_language, word_translations, loading_words ] )
+    }, [ source_language, target_language, api_key ] )
 
     useEffect( () => {
+        mounted_ref.current = true
+
         return () => {
-            if( word_abort_ref.current ) word_abort_ref.current.abort()
+            mounted_ref.current = false
+            Object.values( word_abort_ref.current ).forEach( controller => controller.abort() )
         }
     }, [] )
 

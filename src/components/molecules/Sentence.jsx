@@ -28,9 +28,11 @@ const SentenceSpan = styled.span`
 
 const event_point = ( e ) => {
     const touch = e.touches?.[0] || e.changedTouches?.[0]
-    if( touch ) return { x: touch.clientX, y: touch.clientY }
+    const x = touch ? touch.clientX : e.clientX
+    const y = touch ? touch.clientY : e.clientY
 
-    return { x: e.clientX, y: e.clientY }
+    if( Number.isFinite( x ) && Number.isFinite( y ) ) return { x, y }
+    return null
 }
 
 /**
@@ -73,10 +75,13 @@ export default function Sentence( { sentence_id, original, translated, source_la
     const handle_press_start = useCallback( ( e ) => {
         if( e.type === `mousedown` && e.button !== 0 ) return
 
+        const point = event_point( e )
+        if( !point ) return
+
         reset_press()
 
         press_started_at_ref.current = Date.now()
-        press_start_point_ref.current = event_point( e )
+        press_start_point_ref.current = point
 
         if( translated && on_long_press ) {
             explanation_timer_ref.current = setTimeout( () => {
@@ -90,6 +95,12 @@ export default function Sentence( { sentence_id, original, translated, source_la
         if( !press_start_point_ref.current ) return
 
         const point = event_point( e )
+        if( !point ) {
+            press_cancelled_ref.current = true
+            clear_explanation_timer()
+            return
+        }
+
         const dx = Math.abs( point.x - press_start_point_ref.current.x )
         const dy = Math.abs( point.y - press_start_point_ref.current.y )
 

@@ -5,6 +5,7 @@ import { clean_lookup_word, word_cache_key, use_word_lookup } from '../../hooks/
 
 const TAP_MAX_MS = 300
 const TOOLTIP_DISMISS_MS = 2000
+const LOOKUP_UNAVAILABLE = `Lookup unavailable`
 
 const TappableWord = styled.span`
     cursor: pointer;
@@ -51,11 +52,10 @@ export default function WordTooltipText( {
 
         const cache_key = word_cache_key( clean_word, source_language, target_language )
 
-        set_visible_word( cache_key )
+        set_visible_word( { word: clean_word, cache_key } )
         lookup_word( clean_word )
 
         if( dismiss_timer_ref.current ) clearTimeout( dismiss_timer_ref.current )
-        dismiss_timer_ref.current = setTimeout( () => set_visible_word( null ), TOOLTIP_DISMISS_MS )
     }, [ lookup_word, source_language, target_language ] )
 
     const handle_word_click = useCallback( ( e, word ) => {
@@ -69,6 +69,21 @@ export default function WordTooltipText( {
 
         reveal_word( word )
     }, [ reveal_word, tap_max_ms ] )
+
+    const visible_state = visible_word ? get_lookup_state( visible_word.word ) : null
+
+    useEffect( () => {
+        if( dismiss_timer_ref.current ) clearTimeout( dismiss_timer_ref.current )
+        if( !visible_word || visible_state?.loading ) return
+
+        dismiss_timer_ref.current = setTimeout( () => set_visible_word( null ), TOOLTIP_DISMISS_MS )
+    }, [
+        visible_word,
+        visible_state?.loading,
+        visible_state?.content,
+        visible_state?.error,
+        visible_state?.can_lookup
+    ] )
 
     useEffect( () => {
         return () => {
@@ -84,14 +99,16 @@ export default function WordTooltipText( {
         const clean_word = clean_lookup_word( segment )
         if( !clean_word ) return segment
 
-        const { cache_key, content, loading } = get_lookup_state( clean_word )
+        const { cache_key, content, loading, error, can_lookup } = get_lookup_state( clean_word )
+        const tooltip_content = !can_lookup || error ? LOOKUP_UNAVAILABLE : content
 
         return <Tooltip
-            key={ i }
-            content={ content }
+            key={ `${ i }-${ cache_key }` }
+            content={ tooltip_content }
             loading={ loading }
-            force_visible={ visible_word === cache_key }
+            force_visible={ visible_word?.cache_key === cache_key }
             hover_enabled={ false }
+            fallback_content={ LOOKUP_UNAVAILABLE }
         >
             <TappableWord
                 data-word-tooltip-word={ clean_word }
