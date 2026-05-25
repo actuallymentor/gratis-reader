@@ -66,6 +66,7 @@ test.describe( `Sentence Interactions`, () => {
 
         const sentence = page.locator( `span[data-sentence-id]` ).first()
         await expect( sentence ).toContainText( `[TRANSLATED]` )
+        await expect.poll( () => sentence.evaluate( el => el.children.length ) ).toBeGreaterThan( 1 )
 
         const word = sentence.locator( `[data-word-tooltip-word]` ).first()
         await word.click()

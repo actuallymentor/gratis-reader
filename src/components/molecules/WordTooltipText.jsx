@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useState, useRef, useCallback, useEffect, useId } from 'react'
 import styled from 'styled-components'
 import Tooltip from '../atoms/Tooltip.jsx'
 import { clean_lookup_word, word_cache_key, use_word_lookup } from '../../hooks/use_word_lookup.js'
@@ -34,7 +34,7 @@ export default function WordTooltipText( {
 } ) {
 
     const [ visible_word, set_visible_word ] = useState( null )
-    const container_ref = useRef( null )
+    const tooltip_group_id = useId()
     const press_started_at_ref = useRef( null )
     const dismiss_timer_ref = useRef( null )
     const { lookup_word, get_lookup_state } = use_word_lookup( {
@@ -97,19 +97,14 @@ export default function WordTooltipText( {
 
         const dismiss_on_outside_press = ( e ) => {
             const word_el = e.target.closest?.( `[data-word-tooltip-word]` )
-
-            if( word_el && container_ref.current?.contains( word_el ) ) {
-                const clean_word = clean_lookup_word( word_el.dataset.wordTooltipWord )
-                const cache_key = word_cache_key( clean_word, source_language, target_language )
-                if( cache_key === visible_word.cache_key ) return
-            }
+            if( word_el?.dataset.wordTooltipGroup === tooltip_group_id ) return
 
             hide_visible_word()
         }
 
         document.addEventListener( `pointerdown`, dismiss_on_outside_press, true )
         return () => document.removeEventListener( `pointerdown`, dismiss_on_outside_press, true )
-    }, [ visible_word, source_language, target_language, hide_visible_word ] )
+    }, [ visible_word, tooltip_group_id, hide_visible_word ] )
 
     useEffect( () => {
         return () => {
@@ -138,6 +133,7 @@ export default function WordTooltipText( {
         >
             <TappableWord
                 data-word-tooltip-word={ clean_word }
+                data-word-tooltip-group={ tooltip_group_id }
                 onMouseDown={ remember_press_start }
                 onTouchStart={ remember_press_start }
                 onClick={ e => handle_word_click( e, segment ) }
@@ -147,6 +143,6 @@ export default function WordTooltipText( {
         </Tooltip>
     } )
 
-    return <span ref={ container_ref }>{ segments }</span>
+    return segments
 
 }

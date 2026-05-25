@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.10.3] - 2026-05-25
+
+### Fixed
+- Smooth word tooltip switching and focus affordances (uncommitted)
+- Simplify tooltip scroll, hover, and lookup pruning edge cases (uncommitted)
+
 ## [1.10.2] - 2026-05-25
 
 ### Fixed

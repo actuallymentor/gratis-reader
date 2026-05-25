@@ -74,15 +74,16 @@ export default function Tooltip( { children, content, loading, force_visible, ho
     // Controlled tooltips can force visibility without relying on hover state.
     useEffect( () => {
         const was_forced_visible = previous_force_visible_ref.current === true
+        const should_close_uncontrolled_tooltip = force_visible === undefined && was_forced_visible && !hover_enabled
 
         if( force_visible === true ) {
             set_visible( true )
-        } else if( force_visible === false || was_forced_visible ) {
+        } else if( force_visible === false || should_close_uncontrolled_tooltip ) {
             set_visible( false )
         }
 
         previous_force_visible_ref.current = force_visible
-    }, [ force_visible ] )
+    }, [ force_visible, hover_enabled ] )
 
     useEffect( () => {
         return () => clearTimeout( timeout_ref.current )

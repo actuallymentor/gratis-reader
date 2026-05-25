@@ -44,7 +44,7 @@ export const use_word_lookup = ( { source_language, target_language, sentence_co
     const lookup_errors_ref = useRef( {} )
     const word_abort_ref = useRef( {} )
     const lookup_keys_ref = useRef( [] )
-    const mounted_ref = useRef( false )
+    const mounted_ref = useRef( true )
     const api_key = use_settings_store( state => state.api_key )
     const model = use_settings_store( state => state.model )
     const { get_word_translation, cache_word_translation } = use_cache()
@@ -64,13 +64,12 @@ export const use_word_lookup = ( { source_language, target_language, sentence_co
 
         const prune_store = ( store ) => {
             const next_store = { ...store }
-            evicted_keys.forEach( key => {
-                if( !loading_words_ref.current[key] ) delete next_store[key]
-            } )
+            evicted_keys.forEach( key => delete next_store[key] )
             return next_store
         }
 
         word_translations_ref.current = prune_store( word_translations_ref.current )
+        loading_words_ref.current = prune_store( loading_words_ref.current )
         lookup_errors_ref.current = prune_store( lookup_errors_ref.current )
     }, [] )
 

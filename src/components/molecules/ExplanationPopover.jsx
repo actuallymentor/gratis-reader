@@ -172,6 +172,12 @@ const ExplanationText = styled.div`
     .foreign-word:hover {
         color: var(--accent-dark);
     }
+
+    .foreign-word:focus-visible {
+        color: var(--accent-dark);
+        outline: 2px solid var(--accent-dark);
+        outline-offset: 2px;
+    }
 `
 
 const FloatingTooltip = styled.div`
@@ -472,6 +478,7 @@ export default function ExplanationPopover( { original, translated, source_langu
     if( !loading ) explanation_body = <ExplanationText
         ref={ explanation_ref }
         onClick={ show_explanation_tooltip }
+        onKeyDown={ show_explanation_tooltip }
         dangerouslySetInnerHTML={ { __html: decorated_html } }
     />
 
@@ -486,7 +493,6 @@ export default function ExplanationPopover( { original, translated, source_langu
         <Panel
             ref={ panel_ref }
             onPointerDown={ dismiss_explanation_tooltip_on_panel_press }
-            onScroll={ hide_explanation_tooltip }
         >
 
             <Header>
