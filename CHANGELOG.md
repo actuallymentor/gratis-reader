@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.11.0] - 2026-05-26
+
+### Changed
+- Switch reader gestures to click, double-click, and long-press (uncommitted)
+
 ## [1.10.6] - 2026-05-25
 
 ### Fixed

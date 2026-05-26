@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { setup_api_key, upload_demo_book, mock_openrouter, clear_storage, short_hold } from './helpers/setup.js'
+import { setup_api_key, upload_demo_book, mock_openrouter, clear_storage, long_press } from './helpers/setup.js'
 
 const CHAT_URL = `**/openrouter.ai/api/v1/chat/completions`
 
@@ -60,7 +60,7 @@ test.describe( `Sentence Interactions`, () => {
 
     }
 
-    test( `tap on translated word opens original-word tooltip`, async ( { page } ) => {
+    test( `click on translated word opens original-word tooltip`, async ( { page } ) => {
 
         await enter_reader_with_translations( page )
 
@@ -91,7 +91,7 @@ test.describe( `Sentence Interactions`, () => {
 
     } )
 
-    test( `word tooltip dismisses when tapping elsewhere`, async ( { page } ) => {
+    test( `word tooltip dismisses when clicking elsewhere`, async ( { page } ) => {
 
         await enter_reader_with_translations( page )
 
@@ -137,7 +137,7 @@ test.describe( `Sentence Interactions`, () => {
 
     } )
 
-    test( `numeric-only translated tokens are not tappable lookup words`, async ( { page } ) => {
+    test( `numeric-only translated tokens are not clickable lookup words`, async ( { page } ) => {
 
         await page.route( CHAT_URL, async route => {
             const body = JSON.parse( route.request().postData() )
@@ -169,18 +169,19 @@ test.describe( `Sentence Interactions`, () => {
 
     } )
 
-    test( `short hold toggles sentence between translated and original`, async ( { page } ) => {
+    test( `double click toggles sentence between translated and original`, async ( { page } ) => {
 
         await enter_reader_with_translations( page )
 
         const sentence = page.locator( `span[data-sentence-id]` ).first()
         await expect( sentence ).toContainText( `[TRANSLATED]` )
 
-        await short_hold( page, sentence )
+        const word = sentence.locator( `[data-word-tooltip-word]` ).nth( 1 )
+        await word.dblclick()
         await page.waitForTimeout( 300 )
         await expect( sentence ).not.toContainText( `[TRANSLATED]` )
 
-        await short_hold( page, sentence )
+        await sentence.dblclick()
         await page.waitForTimeout( 300 )
         await expect( sentence ).toContainText( `[TRANSLATED]` )
 
@@ -200,13 +201,8 @@ test.describe( `Sentence Interactions`, () => {
             } )
         } )
 
-        // Long press on a translated sentence
         const sentence = page.locator( `span[data-sentence-id]` ).first()
-        const box = await sentence.boundingBox()
-        await page.mouse.move( box.x + box.width / 2, box.y + box.height / 2 )
-        await page.mouse.down()
-        await page.waitForTimeout( 2100 )
-        await page.mouse.up()
+        await long_press( page, sentence )
 
         // Explanation popover should appear
         await expect( page.getByText( `Translation Explanation` ) ).toBeVisible( { timeout: 5000 } )
@@ -297,12 +293,12 @@ test.describe( `Sentence Interactions`, () => {
 
     } )
 
-    test( `tapping an original sentence does not error`, async ( { page } ) => {
+    test( `clicking an original sentence does not error`, async ( { page } ) => {
 
         await enter_reader_with_translations( page )
 
         const sentence = page.locator( `span[data-sentence-id]` ).first()
-        await short_hold( page, sentence )
+        await sentence.dblclick()
         await page.waitForTimeout( 300 )
 
         await sentence.click()

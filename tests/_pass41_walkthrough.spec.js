@@ -7,7 +7,7 @@
  *   3. Reader (language modal, sentence rendering, footer, nav)
  *   4. Token display (accumulation, persistence via IDB)
  *   5. Settings drawer (theme, font, API key masking)
- *   6. Interactions (sentence toggle, right-click explanation, Escape)
+ *   6. Interactions (sentence double-click, right-click explanation, Escape)
  *   7. Edge cases (first/last chapter boundaries, rapid navigation, console errors)
  */
 
@@ -105,17 +105,6 @@ const open_reader = async ( page ) => {
     await page.getByRole( `heading`, { name: `Smart work beats hard work` } ).click()
     await page.waitForURL( /\/read\//, { timeout: 10_000 } )
 }
-
-const short_hold = async ( page, locator, duration_ms = 600 ) => {
-    const box = await locator.boundingBox()
-    if( !box ) throw new Error( `Cannot hold an element without a bounding box` )
-
-    await page.mouse.move( box.x + box.width / 2, box.y + box.height / 2 )
-    await page.mouse.down()
-    await page.waitForTimeout( duration_ms )
-    await page.mouse.up()
-}
-
 
 // ─── Test ─────────────────────────────────────────────────────────────────────
 
@@ -569,7 +558,7 @@ test.describe( `Gratis Reader — Full Walkthrough`, () => {
 
     // ─── 6. Interactions ─────────────────────────────────────────────────
 
-    test( `6A: Short hold sentence — toggles between translated and original`, async ( { page } ) => {
+    test( `6A: Double-click sentence — toggles between translated and original`, async ( { page } ) => {
         await clear_storage( page )
         await setup_api_key( page )
         await mock_openrouter( page )
@@ -588,15 +577,15 @@ test.describe( `Gratis Reader — Full Walkthrough`, () => {
         // Wait for the translation to load (text should contain [TR])
         await expect( first_sentence ).toContainText( `[TR]`, { timeout: 30_000 } )
 
-        // Short-hold to toggle to original
-        await short_hold( page, first_sentence )
+        // Double-click to toggle to original
+        await first_sentence.dblclick()
         await page.waitForTimeout( 500 )
 
         // Should now show original (which should NOT contain [TR])
         await expect( first_sentence ).not.toContainText( `[TR]` )
 
-        // Short-hold again to toggle back to translated
-        await short_hold( page, first_sentence )
+        // Double-click again to toggle back to translated
+        await first_sentence.dblclick()
         await page.waitForTimeout( 500 )
 
         // Should show translated again (contains [TR])

@@ -3,8 +3,7 @@ import styled from 'styled-components'
 import Skeleton from '../atoms/Skeleton.jsx'
 import WordTooltipText from './WordTooltipText.jsx'
 
-const SHORT_HOLD_MS = 300
-const EXPLANATION_HOLD_MS = 2000
+const LONG_PRESS_MS = 600
 const PRESS_MOVE_CANCEL_PX = 12
 
 const SentenceSpan = styled.span`
@@ -36,7 +35,7 @@ const event_point = ( e ) => {
 }
 
 /**
- * Interactive sentence — tap words for tooltip, short-hold for original, 2s hold for explanation.
+ * Interactive sentence — click words for tooltip, double-click sentence for original, long-press for explanation.
  * @param {Object} props
  * @param {string} props.sentence_id
  * @param {string} props.original
@@ -51,8 +50,6 @@ export default function Sentence( { sentence_id, original, translated, source_la
     const explanation_timer_ref = useRef( null )
     const press_started_at_ref = useRef( null )
     const press_start_point_ref = useRef( null )
-    const press_cancelled_ref = useRef( false )
-    const explanation_opened_ref = useRef( false )
 
     const display_text = showing_original ? original : translated || original
     const is_translated = !!translated && !showing_original
@@ -68,8 +65,6 @@ export default function Sentence( { sentence_id, original, translated, source_la
         clear_explanation_timer()
         press_started_at_ref.current = null
         press_start_point_ref.current = null
-        press_cancelled_ref.current = false
-        explanation_opened_ref.current = false
     }, [ clear_explanation_timer ] )
 
     const handle_press_start = useCallback( ( e ) => {
@@ -85,9 +80,8 @@ export default function Sentence( { sentence_id, original, translated, source_la
 
         if( translated && on_long_press ) {
             explanation_timer_ref.current = setTimeout( () => {
-                explanation_opened_ref.current = true
                 on_long_press( { sentence_id, original, translated } )
-            }, EXPLANATION_HOLD_MS )
+            }, LONG_PRESS_MS )
         }
     }, [ sentence_id, original, translated, on_long_press, reset_press ] )
 
@@ -96,7 +90,6 @@ export default function Sentence( { sentence_id, original, translated, source_la
 
         const point = event_point( e )
         if( !point ) {
-            press_cancelled_ref.current = true
             clear_explanation_timer()
             return
         }
@@ -105,7 +98,6 @@ export default function Sentence( { sentence_id, original, translated, source_la
         const dy = Math.abs( point.y - press_start_point_ref.current.y )
 
         if( dx > PRESS_MOVE_CANCEL_PX || dy > PRESS_MOVE_CANCEL_PX ) {
-            press_cancelled_ref.current = true
             clear_explanation_timer()
         }
     }, [ clear_explanation_timer ] )
@@ -114,18 +106,15 @@ export default function Sentence( { sentence_id, original, translated, source_la
         const started_at = press_started_at_ref.current
         if( !started_at ) return
 
-        const duration_ms = Date.now() - started_at
-        const was_cancelled = press_cancelled_ref.current
-        const explanation_opened = explanation_opened_ref.current
-
         reset_press()
+    }, [ reset_press ] )
 
-        if( was_cancelled || explanation_opened ) return
+    const toggle_original_sentence = useCallback( ( e ) => {
+        if( !translated ) return
 
-        if( translated && duration_ms >= SHORT_HOLD_MS && duration_ms < EXPLANATION_HOLD_MS ) {
-            set_showing_original( prev => !prev )
-        }
-    }, [ translated, reset_press ] )
+        e.preventDefault()
+        set_showing_original( prev => !prev )
+    }, [ translated ] )
 
     const handle_context_menu = useCallback( ( e ) => {
         if( on_long_press && translated ) {
@@ -142,7 +131,7 @@ export default function Sentence( { sentence_id, original, translated, source_la
     // If no text at all, show skeleton
     if( !original ) return <Skeleton width="80%" height="1.2em" />
 
-    // Render target-language words with tap tooltips.
+    // Render target-language words with click tooltips.
     const render_words = () => {
         if( !is_translated ) return display_text
 
@@ -151,7 +140,7 @@ export default function Sentence( { sentence_id, original, translated, source_la
             source_language={ source_language }
             target_language={ target_language }
             sentence_context={ display_text }
-            tap_max_ms={ SHORT_HOLD_MS }
+            click_max_ms={ LONG_PRESS_MS }
         />
     }
 
@@ -166,6 +155,7 @@ export default function Sentence( { sentence_id, original, translated, source_la
         onTouchEnd={ handle_press_end }
         onTouchMove={ handle_press_move }
         onTouchCancel={ reset_press }
+        onDoubleClick={ toggle_original_sentence }
         onContextMenu={ handle_context_menu }
     >
         { render_words() }

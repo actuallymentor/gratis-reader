@@ -17,16 +17,6 @@ const clear_all = async ( page ) => {
     } )
 }
 
-const short_hold = async ( page, locator, duration_ms = 600 ) => {
-    const box = await locator.boundingBox()
-    if( !box ) throw new Error( `Cannot hold an element without a bounding box` )
-
-    await page.mouse.move( box.x + box.width / 2, box.y + box.height / 2 )
-    await page.mouse.down()
-    await page.waitForTimeout( duration_ms )
-    await page.mouse.up()
-}
-
 const mock_api = async ( page ) => {
     await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
         const body = JSON.parse( route.request().postData() )
@@ -162,13 +152,13 @@ test.describe( `Pass 23 — Edge Cases & Error States`, () => {
         expect( parseInt( match[1] ) ).toBeGreaterThanOrEqual( 1 )
     } )
 
-    test( `P23-06 rapid sentence tapping does not crash`, async ( { page } ) => {
+    test( `P23-06 rapid sentence clicking does not crash`, async ( { page } ) => {
         await setup_key( page )
         await upload_book( page )
         await enter_reader( page )
         await expect( page.getByText( /\[TRANSLATED\]/ ).first() ).toBeVisible( { timeout: 15_000 } )
 
-        // Tap first sentence rapidly 10 times
+        // Click first sentence rapidly 10 times
         const sentence = page.locator( `span[data-sentence-id]` ).first()
         for( let i = 0; i < 10; i++ ) {
             await sentence.click()
@@ -304,8 +294,8 @@ test.describe( `Pass 23 — Edge Cases & Error States`, () => {
 
         const sentence = page.locator( `span[data-sentence-id]` ).first()
 
-        // Short-hold to toggle to original
-        await short_hold( page, sentence )
+        // Double-click to toggle to original
+        await sentence.dblclick()
         await page.waitForTimeout( 300 )
 
         // Should have highlighted background (accent-light)
@@ -314,9 +304,9 @@ test.describe( `Pass 23 — Edge Cases & Error States`, () => {
         expect( bg ).not.toBe( `rgba(0, 0, 0, 0)` )
     } )
 
-    // ── WORD TAP ────────────────────────────────────────────────
+    // ── WORD CLICK ──────────────────────────────────────────────
 
-    test( `P23-14 tapping translated word shows tooltip or loading`, async ( { page } ) => {
+    test( `P23-14 clicking translated word shows tooltip or loading`, async ( { page } ) => {
         await setup_key( page )
         await upload_book( page )
         await enter_reader( page )

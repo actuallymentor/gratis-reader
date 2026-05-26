@@ -3,11 +3,11 @@ import styled from 'styled-components'
 import Tooltip from '../atoms/Tooltip.jsx'
 import { clean_lookup_word, word_cache_key, use_word_lookup } from '../../hooks/use_word_lookup.js'
 
-const TAP_MAX_MS = 300
+const CLICK_MAX_MS = 300
 const TOOLTIP_DISMISS_MS = 2000
 const LOOKUP_UNAVAILABLE = `Lookup unavailable`
 
-const TappableWord = styled.span`
+const ClickableWord = styled.span`
     cursor: pointer;
     border-radius: 2px;
 
@@ -17,20 +17,20 @@ const TappableWord = styled.span`
 `
 
 /**
- * Renders target-language text where one tap on any word shows its source-language equivalent.
+ * Renders target-language text where one click on any word shows its source-language equivalent.
  * @param {Object} props
  * @param {string} props.text
  * @param {string} props.source_language
  * @param {string} props.target_language
  * @param {string} [props.sentence_context]
- * @param {number} [props.tap_max_ms]
+ * @param {number} [props.click_max_ms]
  */
 export default function WordTooltipText( {
     text,
     source_language,
     target_language,
     sentence_context,
-    tap_max_ms = TAP_MAX_MS
+    click_max_ms = CLICK_MAX_MS
 } ) {
 
     const [ visible_word, set_visible_word ] = useState( null )
@@ -66,10 +66,10 @@ export default function WordTooltipText( {
         const elapsed_ms = started_at ? Date.now() - started_at : 0
         press_started_at_ref.current = null
 
-        if( started_at && elapsed_ms > tap_max_ms ) return
+        if( started_at && elapsed_ms > click_max_ms ) return
 
         reveal_word( word )
-    }, [ reveal_word, tap_max_ms ] )
+    }, [ reveal_word, click_max_ms ] )
 
     const visible_state = visible_word ? get_lookup_state( visible_word.word ) : null
 
@@ -131,7 +131,7 @@ export default function WordTooltipText( {
             hover_enabled={ false }
             fallback_content={ LOOKUP_UNAVAILABLE }
         >
-            <TappableWord
+            <ClickableWord
                 data-word-tooltip-word={ clean_word }
                 data-word-tooltip-group={ tooltip_group_id }
                 onMouseDown={ remember_press_start }
@@ -139,7 +139,7 @@ export default function WordTooltipText( {
                 onClick={ e => handle_word_click( e, segment ) }
             >
                 { segment }
-            </TappableWord>
+            </ClickableWord>
         </Tooltip>
     } )
 

@@ -3,7 +3,7 @@
  * Targets angles that 32 previous passes haven't deeply covered
  */
 import { test, expect } from '@playwright/test'
-import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth, clear_storage, short_hold } from './helpers/setup.js'
+import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth, clear_storage } from './helpers/setup.js'
 
 test.describe( `Pass 33 — Walkthrough`, () => {
 
@@ -30,7 +30,7 @@ test.describe( `Pass 33 — Walkthrough`, () => {
         )
 
         // Toggle first sentence
-        await short_hold( page, sentences.first() )
+        await sentences.first().dblclick()
         await page.waitForTimeout( 300 )
 
         // Second sentence should be unchanged
@@ -105,9 +105,9 @@ test.describe( `Pass 33 — Walkthrough`, () => {
         expect( errors ).toEqual( [] )
     } )
 
-    // ── 5. Word tap tooltip shows content on desktop ──
+    // ── 5. Word click tooltip shows content on desktop ──
 
-    test( `BW120 tapping a translated word shows tooltip`, async ( { page } ) => {
+    test( `BW120 clicking a translated word shows tooltip`, async ( { page } ) => {
         await upload_demo_book( page )
         await open_reader( page )
         await page.waitForTimeout( 2000 )
@@ -125,7 +125,7 @@ test.describe( `Pass 33 — Walkthrough`, () => {
             // Even if tooltip doesn't render visually in test, no error should occur
         }
 
-        // Main check: no errors from tapping
+        // Main check: no errors from clicking
         const errors = []
         page.on( `pageerror`, e => errors.push( e.message ) )
         expect( errors ).toEqual( [] )

@@ -5,7 +5,7 @@
  * offline banner, cover extraction, MOBI rejection, PWA config.
  */
 import { test, expect } from '@playwright/test'
-import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth, clear_storage, short_hold } from './helpers/setup.js'
+import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth, clear_storage } from './helpers/setup.js'
 
 // Helper to open settings from reader
 const open_settings = async ( page ) => {
@@ -454,16 +454,16 @@ test.describe( `Pass 27 — Coverage Expansion`, () => {
         // Get background before toggle
         const bg_before = await sentence.evaluate( el => getComputedStyle( el ).backgroundColor )
 
-        // Short-hold to toggle to original
-        await short_hold( page, sentence )
+        // Double-click to toggle to original
+        await sentence.dblclick()
         await page.waitForTimeout( 500 )
 
         // Background should change (highlight) — accent-light color
         const bg_after = await sentence.evaluate( el => getComputedStyle( el ).backgroundColor )
         expect( bg_after ).not.toBe( bg_before )
 
-        // Short-hold again to toggle back — highlight should revert
-        await short_hold( page, sentence )
+        // Double-click again to toggle back — highlight should revert
+        await sentence.dblclick()
         await page.waitForTimeout( 500 )
 
         // After toggling back, the sentence may keep a subtle different bg

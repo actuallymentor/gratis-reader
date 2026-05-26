@@ -6,7 +6,7 @@
  * Run: npx playwright test tests/_pass29_walkthrough.mjs
  */
 import { test, expect } from '@playwright/test'
-import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth, short_hold } from './helpers/setup.js'
+import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth } from './helpers/setup.js'
 
 // Helper to open settings from reader
 const open_settings = async ( page ) => {
@@ -61,10 +61,10 @@ test.describe( `Pass 29 — Walkthrough`, () => {
         await open_reader( page )
         await page.waitForTimeout( 2000 )
 
-        // Find a tappable word span
+        // Find a clickable word span
         const word = page.locator( `span[data-sentence-id] [data-word-tooltip-word]` ).first()
         if( await word.isVisible() ) {
-            // Trigger tap to test word lookup
+            // Trigger click to test word lookup
             await word.click()
             await page.waitForTimeout( 1000 )
         }
@@ -171,25 +171,25 @@ test.describe( `Pass 29 — Walkthrough`, () => {
         await expect( page.getByText( `FONT SIZE` ) ).not.toBeVisible( { timeout: 3000 } )
     } )
 
-    // ── 7. Short-hold-to-toggle works ──
+    // ── 7. Double-click-to-toggle works ──
 
-    test( `BW72 short hold toggles between translated and original`, async ( { page } ) => {
+    test( `BW72 double-click toggles between translated and original`, async ( { page } ) => {
         await open_reader( page )
         await page.waitForTimeout( 2000 )
 
         const sentence = page.locator( `span[data-sentence-id]` ).first()
         const highlighted_before = await sentence.evaluate( el => el.dataset.sentenceId )
 
-        // Short-hold to toggle — check the sentence interaction remains stable
-        await short_hold( page, sentence )
+        // Double-click to toggle — check the sentence interaction remains stable
+        await sentence.dblclick()
         await page.waitForTimeout( 300 )
 
         // The sentence should still be there and have the same ID
         const highlighted_after = await sentence.evaluate( el => el.dataset.sentenceId )
         expect( highlighted_after ).toBe( highlighted_before )
 
-        // Short-hold again to toggle back
-        await short_hold( page, sentence )
+        // Double-click again to toggle back
+        await sentence.dblclick()
         await page.waitForTimeout( 300 )
 
         // Sentence ID should persist through toggle

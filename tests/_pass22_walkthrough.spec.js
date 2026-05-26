@@ -17,16 +17,6 @@ const clear_all = async ( page ) => {
     } )
 }
 
-const short_hold = async ( page, locator, duration_ms = 600 ) => {
-    const box = await locator.boundingBox()
-    if( !box ) throw new Error( `Cannot hold an element without a bounding box` )
-
-    await page.mouse.move( box.x + box.width / 2, box.y + box.height / 2 )
-    await page.mouse.down()
-    await page.waitForTimeout( duration_ms )
-    await page.mouse.up()
-}
-
 const mock_api = async ( page ) => {
     await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
         const body = JSON.parse( route.request().postData() )
@@ -311,9 +301,9 @@ test.describe( `Pass 22 — Bug Fixes & Edge Cases`, () => {
         await page.waitForURL( `**/library`, { timeout: 5000 } )
     } )
 
-    // ── REGRESSION: Short-hold-to-toggle sentences ──────────────
+    // ── REGRESSION: Double-click-to-toggle sentences ──────────────
 
-    test( `P22-12 short hold toggles between translated and original`, async ( { page } ) => {
+    test( `P22-12 double-click toggles between translated and original`, async ( { page } ) => {
         await setup_key( page )
         await upload_book( page )
         await enter_reader( page )
@@ -326,14 +316,14 @@ test.describe( `Pass 22 — Bug Fixes & Edge Cases`, () => {
         const text_before = await sentence.textContent()
         expect( text_before ).toContain( `[TRANSLATED]` )
 
-        // Short-hold to toggle to original
-        await short_hold( page, sentence )
+        // Double-click to toggle to original
+        await sentence.dblclick()
         await page.waitForTimeout( 500 )
         const text_after = await sentence.innerText()
         expect( text_after ).not.toContain( `[TRANSLATED]` )
 
-        // Short-hold again to toggle back
-        await short_hold( page, sentence )
+        // Double-click again to toggle back
+        await sentence.dblclick()
         await page.waitForTimeout( 500 )
         await expect( sentence ).toContainText( `[TRANSLATED]` )
     } )

@@ -3,7 +3,7 @@
  * Targets angles previous passes may have missed
  */
 import { test, expect } from '@playwright/test'
-import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth, clear_storage, short_hold } from './helpers/setup.js'
+import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth, clear_storage } from './helpers/setup.js'
 
 test.describe( `Pass 32 — Walkthrough`, () => {
 
@@ -57,9 +57,9 @@ test.describe( `Pass 32 — Walkthrough`, () => {
         await expect( modal ).toBeVisible( { timeout: 5000 } )
     } )
 
-    // ── 3. Sentence short-hold cycle: translated → original → translated ──
+    // ── 3. Sentence double-click cycle: translated → original → translated ──
 
-    test( `BW103 triple short-hold returns sentence to translated state`, async ( { page } ) => {
+    test( `BW103 triple double-click keeps sentence toggle stable`, async ( { page } ) => {
         await upload_demo_book( page )
         await open_reader( page )
         await page.waitForTimeout( 2000 )
@@ -69,27 +69,28 @@ test.describe( `Pass 32 — Walkthrough`, () => {
         // Check highlight state toggles correctly via data-sentence-id persistence
         const id_before = await sentence.getAttribute( `data-sentence-id` )
 
-        // Hold 1 — toggle to original (highlight on)
-        await short_hold( page, sentence )
+        // Double-click 1 — toggle to original (highlight on)
+        await sentence.dblclick()
         await page.waitForTimeout( 300 )
         const highlight_1 = await sentence.evaluate( el => window.getComputedStyle( el ).backgroundColor )
 
-        // Hold 2 — toggle back to translated (highlight off)
-        await short_hold( page, sentence )
+        // Double-click 2 — toggle back to translated (highlight off)
+        await sentence.dblclick()
         await page.waitForTimeout( 300 )
         const highlight_2 = await sentence.evaluate( el => window.getComputedStyle( el ).backgroundColor )
 
-        // Hold 3 — original again (highlight on)
-        await short_hold( page, sentence )
+        // Double-click 3 — original again (highlight on)
+        await sentence.dblclick()
         await page.waitForTimeout( 300 )
         const highlight_3 = await sentence.evaluate( el => window.getComputedStyle( el ).backgroundColor )
 
-        // Sentence ID should persist through all taps
+        // Sentence ID should persist through all double-clicks
         const id_after = await sentence.getAttribute( `data-sentence-id` )
         expect( id_after ).toBe( id_before )
 
-        // Highlights should cycle: tap1 == tap3, tap1 != tap2
+        // Highlights should cycle: state1 == state3, state1 != state2
         expect( highlight_3 ).toBe( highlight_1 )
+        expect( highlight_2 ).not.toBe( highlight_1 )
     } )
 
     // ── 4. Settings drawer opens and closes cleanly ──

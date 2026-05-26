@@ -61,9 +61,9 @@ export const open_reader = async ( page ) => {
 }
 
 /**
- * Holds the center of an element long enough for sentence hold gestures.
+ * Holds the center of an element long enough for reader long-press actions.
  */
-export const short_hold = async ( page, locator, duration_ms = 600 ) => {
+export const long_press = async ( page, locator, duration_ms = 700 ) => {
 
     const box = await locator.boundingBox()
     if( !box ) throw new Error( `Cannot hold an element without a bounding box` )
