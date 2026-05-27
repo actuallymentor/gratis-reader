@@ -16,7 +16,7 @@ const ClickableWord = styled.span`
 `
 
 /**
- * Renders target-language text where hovering or clicking any word shows its source-language equivalent.
+ * Renders target-language text where clicking any word shows its source-language equivalent.
  * @param {Object} props
  * @param {string} props.text
  * @param {string} props.source_language
@@ -113,7 +113,6 @@ export default function WordTooltipText( {
                 data-word-tooltip-word={ clean_word }
                 data-word-tooltip-group={ tooltip_group_id }
                 onMouseDown={ remember_press_start }
-                onMouseEnter={ () => reveal_word( segment, tooltip_key ) }
                 onTouchStart={ remember_press_start }
                 onClick={ e => handle_word_click( e, segment, tooltip_key ) }
             >

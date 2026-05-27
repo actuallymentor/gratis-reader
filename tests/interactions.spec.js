@@ -263,7 +263,7 @@ test.describe( `Sentence Interactions`, () => {
 
     } )
 
-    test( `hovering a word opens original-word tooltip`, async ( { page } ) => {
+    test( `hovering a word does not trigger dictionary lookup`, async ( { page } ) => {
 
         await enter_reader_with_translations( page )
 
@@ -289,9 +289,10 @@ test.describe( `Sentence Interactions`, () => {
 
         if( word_count > 0 ) {
             await word_spans.first().hover()
+            await page.waitForTimeout( 500 )
 
-            await expect( page.getByText( `Test definition for this word.` ).first() ).toBeVisible( { timeout: 5000 } )
-            expect( word_lookup_calls ).toBe( 1 )
+            await expect( page.getByText( `Test definition for this word.` ).first() ).not.toBeVisible()
+            expect( word_lookup_calls ).toBe( 0 )
         }
 
     } )

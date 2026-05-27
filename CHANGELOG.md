@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.12.1] - 2026-05-27
+
+### Changed
+- Limit reader word tooltips to click and tap triggers (uncommitted)
+
 ## [1.12.0] - 2026-05-27
 
 ### Changed
