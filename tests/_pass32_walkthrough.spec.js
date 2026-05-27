@@ -3,7 +3,7 @@
  * Targets angles previous passes may have missed
  */
 import { test, expect } from '@playwright/test'
-import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth, clear_storage } from './helpers/setup.js'
+import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth, clear_storage, long_press } from './helpers/setup.js'
 
 test.describe( `Pass 32 — Walkthrough`, () => {
 
@@ -57,9 +57,9 @@ test.describe( `Pass 32 — Walkthrough`, () => {
         await expect( modal ).toBeVisible( { timeout: 5000 } )
     } )
 
-    // ── 3. Sentence double-click cycle: translated → original → translated ──
+    // ── 3. Sentence long-press cycle: translated → original → translated ──
 
-    test( `BW103 triple double-click keeps sentence toggle stable`, async ( { page } ) => {
+    test( `BW103 triple long-press keeps sentence toggle stable`, async ( { page } ) => {
         await upload_demo_book( page )
         await open_reader( page )
         await page.waitForTimeout( 2000 )
@@ -69,22 +69,16 @@ test.describe( `Pass 32 — Walkthrough`, () => {
         // Check highlight state toggles correctly via data-sentence-id persistence
         const id_before = await sentence.getAttribute( `data-sentence-id` )
 
-        // Double-click 1 — toggle to original (highlight on)
-        await sentence.dblclick()
-        await page.waitForTimeout( 300 )
+        await long_press( page, sentence )
         const highlight_1 = await sentence.evaluate( el => window.getComputedStyle( el ).backgroundColor )
 
-        // Double-click 2 — toggle back to translated (highlight off)
-        await sentence.dblclick()
-        await page.waitForTimeout( 300 )
+        await long_press( page, sentence )
         const highlight_2 = await sentence.evaluate( el => window.getComputedStyle( el ).backgroundColor )
 
-        // Double-click 3 — original again (highlight on)
-        await sentence.dblclick()
-        await page.waitForTimeout( 300 )
+        await long_press( page, sentence )
         const highlight_3 = await sentence.evaluate( el => window.getComputedStyle( el ).backgroundColor )
 
-        // Sentence ID should persist through all double-clicks
+        // Sentence ID should persist through all long-presses
         const id_after = await sentence.getAttribute( `data-sentence-id` )
         expect( id_after ).toBe( id_before )
 

@@ -3,7 +3,7 @@
  * Tests multi-step interaction flows that could expose state bugs
  */
 import { test, expect } from '@playwright/test'
-import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth, clear_storage } from './helpers/setup.js'
+import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth, clear_storage, long_press } from './helpers/setup.js'
 
 test.describe( `Pass 39 — Multi-step state transitions`, () => {
 
@@ -67,17 +67,17 @@ test.describe( `Pass 39 — Multi-step state transitions`, () => {
         expect( ch1_id ).toBeTruthy()
     } )
 
-    // ── 3. Toggle sentence then navigate — no stale state ──
+    // ── 3. Inspect sentence then navigate — no stale state ──
 
-    test( `BW192 toggled sentence resets after chapter change`, async ( { page } ) => {
+    test( `BW192 long-pressed sentence resets after chapter change`, async ( { page } ) => {
         await upload_demo_book( page )
         await open_reader( page )
         await page.waitForTimeout( 2000 )
 
-        // Double-click sentence to toggle
+        // Long-press sentence to reveal the original
         const sentence = page.locator( `span[data-sentence-id]` ).first()
-        await sentence.dblclick()
-        await page.waitForTimeout( 500 )
+        await long_press( page, sentence )
+        await expect( sentence.getByRole( `button`, { name: `Explain` } ) ).toBeVisible()
 
         // Navigate to next chapter
         await page.keyboard.press( `ArrowRight` )
@@ -253,7 +253,7 @@ test.describe( `Pass 39 — Multi-step state transitions`, () => {
         }
     } )
 
-    // ── 10. Long-press explanation popover lifecycle ──
+    // ── 10. Explanation popover lifecycle ──
 
     test( `BW199 explanation popover opens and closes cleanly`, async ( { page } ) => {
         const errors = []

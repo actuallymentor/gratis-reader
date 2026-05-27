@@ -3,7 +3,7 @@
  * Targets angles that 32 previous passes haven't deeply covered
  */
 import { test, expect } from '@playwright/test'
-import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth, clear_storage } from './helpers/setup.js'
+import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth, clear_storage, long_press } from './helpers/setup.js'
 
 test.describe( `Pass 33 — Walkthrough`, () => {
 
@@ -13,9 +13,9 @@ test.describe( `Pass 33 — Walkthrough`, () => {
         await setup_api_key( page )
     } )
 
-    // ── 1. Multiple sentences can be toggled independently ──
+    // ── 1. Multiple sentences can be inspected independently ──
 
-    test( `BW116 toggling one sentence does not affect others`, async ( { page } ) => {
+    test( `BW116 inspecting one sentence does not affect others`, async ( { page } ) => {
         await upload_demo_book( page )
         await open_reader( page )
         await page.waitForTimeout( 2000 )
@@ -29,9 +29,7 @@ test.describe( `Pass 33 — Walkthrough`, () => {
             el => window.getComputedStyle( el ).backgroundColor
         )
 
-        // Toggle first sentence
-        await sentences.first().dblclick()
-        await page.waitForTimeout( 300 )
+        await long_press( page, sentences.first() )
 
         // Second sentence should be unchanged
         const bg_after = await sentences.nth( 1 ).evaluate(

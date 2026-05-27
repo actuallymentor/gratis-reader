@@ -558,7 +558,7 @@ test.describe( `Gratis Reader — Full Walkthrough`, () => {
 
     // ─── 6. Interactions ─────────────────────────────────────────────────
 
-    test( `6A: Double-click sentence — toggles between translated and original`, async ( { page } ) => {
+    test( `6A: Double-click sentence — leaves translated text alone`, async ( { page } ) => {
         await clear_storage( page )
         await setup_api_key( page )
         await mock_openrouter( page )
@@ -577,18 +577,16 @@ test.describe( `Gratis Reader — Full Walkthrough`, () => {
         // Wait for the translation to load (text should contain [TR])
         await expect( first_sentence ).toContainText( `[TR]`, { timeout: 30_000 } )
 
-        // Double-click to toggle to original
+        // Double-click no longer toggles sentence state.
         await first_sentence.dblclick()
         await page.waitForTimeout( 500 )
 
-        // Should now show original (which should NOT contain [TR])
-        await expect( first_sentence ).not.toContainText( `[TR]` )
+        await expect( first_sentence ).toContainText( `[TR]` )
 
-        // Double-click again to toggle back to translated
+        // A second double-click should be just as inert.
         await first_sentence.dblclick()
         await page.waitForTimeout( 500 )
 
-        // Should show translated again (contains [TR])
         await expect( first_sentence ).toContainText( `[TR]` )
     } )
 

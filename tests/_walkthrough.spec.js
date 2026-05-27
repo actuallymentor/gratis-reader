@@ -215,19 +215,18 @@ test.describe( `Browser Walkthrough`, () => {
 
     // ── INTERACTIONS ────────────────────────────────────────────
 
-    test( `BW18 double-click sentence toggles`, async ( { page } ) => {
+    test( `BW18 double-click sentence does nothing`, async ( { page } ) => {
         await setup_key( page )
         await upload_book( page )
         await enter_reader( page )
         await expect( page.getByText( /\[TRANSLATED\]/ ).first() ).toBeVisible( { timeout: 15_000 } )
         const s = page.locator( `span[data-sentence-id]` ).first()
-        const before = await s.textContent()
         await s.dblclick()
         await page.waitForTimeout( 500 )
-        expect( await s.textContent() ).not.toBe( before )
+        await expect( s ).toContainText( `[TRANSLATED]` )
     } )
 
-    test( `BW19 long-press → explanation popover`, async ( { page } ) => {
+    test( `BW19 long-press → Explain tooltip`, async ( { page } ) => {
         await setup_key( page )
         await upload_book( page )
         await enter_reader( page )
@@ -238,8 +237,9 @@ test.describe( `Browser Walkthrough`, () => {
         await page.mouse.down()
         await page.waitForTimeout( 700 )
         await page.mouse.up()
-        await page.waitForTimeout( 2000 )
-        expect( await page.locator( `text=/explanation/i` ).count() ).toBeGreaterThan( 0 )
+        await expect( s.getByRole( `button`, { name: `Explain` } ) ).toBeVisible()
+        await s.getByRole( `button`, { name: `Explain` } ).click()
+        await expect( page.getByText( `Translation Explanation` ) ).toBeVisible( { timeout: 5000 } )
     } )
 
     test( `BW20 right-click → explanation popover`, async ( { page } ) => {
@@ -842,7 +842,7 @@ test.describe( `Browser Walkthrough`, () => {
         await expect( error_text ).toHaveCount( 0 )
     } )
 
-    test( `BW62 long-press opens explanation without chapter change`, async ( { page } ) => {
+    test( `BW62 long-press Explain flow does not change chapter`, async ( { page } ) => {
         await setup_key( page )
         await upload_book( page )
         await enter_reader( page )
@@ -853,12 +853,16 @@ test.describe( `Browser Walkthrough`, () => {
         // Record current progress text
         const progress_before = await page.locator( `text=/\\d+ \\/ \\d+/` ).first().textContent()
 
-        // Right-click a sentence to trigger explanation (same codepath as long-press)
         const sentence = page.locator( `span[data-sentence-id]` ).first()
-        await sentence.click( { button: `right` } )
+        const box = await sentence.boundingBox()
+        await page.mouse.move( box.x + box.width / 2, box.y + box.height / 2 )
+        await page.mouse.down()
+        await page.waitForTimeout( 700 )
+        await page.mouse.up()
 
-        // Explanation popover should appear
-        await expect( page.locator( `text=Explanation` ).or( page.locator( `[class*="Popover"]` ) ) ).toBeVisible( { timeout: 5_000 } )
+        await expect( sentence.getByRole( `button`, { name: `Explain` } ) ).toBeVisible()
+        await sentence.getByRole( `button`, { name: `Explain` } ).click()
+        await expect( page.getByText( `Translation Explanation` ) ).toBeVisible( { timeout: 5_000 } )
 
         // Progress should remain unchanged (no accidental chapter navigation)
         const progress_after = await page.locator( `text=/\\d+ \\/ \\d+/` ).first().textContent()

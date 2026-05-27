@@ -91,7 +91,7 @@ test.describe( `Sentence Interactions`, () => {
 
     } )
 
-    test( `word tooltip dismisses when clicking elsewhere`, async ( { page } ) => {
+    test( `word tooltip stays open until the tooltip is tapped`, async ( { page } ) => {
 
         await enter_reader_with_translations( page )
 
@@ -101,6 +101,10 @@ test.describe( `Sentence Interactions`, () => {
         await expect( page.getByText( `[WORD] definition of the word` ).first() ).toBeVisible( { timeout: 5000 } )
 
         await page.mouse.click( 1000, 140 )
+
+        await expect( page.getByText( `[WORD] definition of the word` ).first() ).toBeVisible()
+
+        await page.getByText( `[WORD] definition of the word` ).first().click()
 
         await expect( page.getByText( `[WORD] definition of the word` ).first() ).not.toBeVisible()
 
@@ -129,9 +133,8 @@ test.describe( `Sentence Interactions`, () => {
         await expect( page.getByText( `definition:${ second_text }` ).first() ).toBeVisible( { timeout: 2000 } )
         await page.waitForTimeout( 1100 )
 
-        await first_word.click()
-
         await expect( page.getByText( `definition:${ first_text }` ).first() ).toBeVisible( { timeout: 500 } )
+        await expect( page.getByText( `definition:${ second_text }` ).first() ).toBeVisible()
         expect( calls[first_text] ).toBe( 1 )
         expect( calls[second_text] ).toBe( 1 )
 
@@ -169,7 +172,7 @@ test.describe( `Sentence Interactions`, () => {
 
     } )
 
-    test( `double click toggles sentence between translated and original`, async ( { page } ) => {
+    test( `double click does not toggle sentence text`, async ( { page } ) => {
 
         await enter_reader_with_translations( page )
 
@@ -179,7 +182,7 @@ test.describe( `Sentence Interactions`, () => {
         const word = sentence.locator( `[data-word-tooltip-word]` ).nth( 1 )
         await word.dblclick()
         await page.waitForTimeout( 300 )
-        await expect( sentence ).not.toContainText( `[TRANSLATED]` )
+        await expect( sentence ).toContainText( `[TRANSLATED]` )
 
         await sentence.dblclick()
         await page.waitForTimeout( 300 )
@@ -187,24 +190,24 @@ test.describe( `Sentence Interactions`, () => {
 
     } )
 
-    test( `long press opens explanation popover`, async ( { page } ) => {
+    test( `long press toggles original text and Explain opens the modal`, async ( { page } ) => {
 
         await enter_reader_with_translations( page )
-
-        // Mock the explanation API call
-        await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
-            await route.fulfill( {
-                contentType: `application/json`,
-                body: JSON.stringify( {
-                    choices: [ { message: { content: `This is an explanation of the sentence.` } } ]
-                } )
-            } )
-        } )
 
         const sentence = page.locator( `span[data-sentence-id]` ).first()
         await long_press( page, sentence )
 
-        // Explanation popover should appear
+        await expect( sentence ).not.toContainText( `[TRANSLATED]` )
+        await expect( sentence.getByRole( `button`, { name: `Explain` } ) ).toBeVisible()
+
+        await long_press( page, sentence )
+
+        await expect( sentence ).toContainText( `[TRANSLATED]` )
+        await expect( sentence.getByRole( `button`, { name: `Explain` } ) ).not.toBeVisible()
+
+        await long_press( page, sentence )
+        await sentence.getByRole( `button`, { name: `Explain` } ).click()
+
         await expect( page.getByText( `Translation Explanation` ) ).toBeVisible( { timeout: 5000 } )
 
     } )
@@ -260,7 +263,7 @@ test.describe( `Sentence Interactions`, () => {
 
     } )
 
-    test( `hovering a word does not trigger dictionary lookup`, async ( { page } ) => {
+    test( `hovering a word opens original-word tooltip`, async ( { page } ) => {
 
         await enter_reader_with_translations( page )
 
@@ -286,9 +289,9 @@ test.describe( `Sentence Interactions`, () => {
 
         if( word_count > 0 ) {
             await word_spans.first().hover()
-            await page.waitForTimeout( 500 )
 
-            expect( word_lookup_calls ).toBe( 0 )
+            await expect( page.getByText( `Test definition for this word.` ).first() ).toBeVisible( { timeout: 5000 } )
+            expect( word_lookup_calls ).toBe( 1 )
         }
 
     } )
@@ -298,8 +301,8 @@ test.describe( `Sentence Interactions`, () => {
         await enter_reader_with_translations( page )
 
         const sentence = page.locator( `span[data-sentence-id]` ).first()
-        await sentence.dblclick()
-        await page.waitForTimeout( 300 )
+        await long_press( page, sentence )
+        await expect( sentence ).not.toContainText( `[TRANSLATED]` )
 
         await sentence.click()
         await page.waitForTimeout( 300 )
@@ -372,7 +375,7 @@ test.describe( `Sentence Interactions`, () => {
 
         await expect( dialog.getByText( `definition:modal:${ word_text }` ).first() ).toBeVisible( { timeout: 5000 } )
 
-        await dialog.getByRole( `heading`, { name: `Translation Explanation` } ).click()
+        await dialog.getByText( `definition:modal:${ word_text }` ).first().click()
 
         await expect( dialog.getByText( `definition:modal:${ word_text }` ).first() ).not.toBeVisible()
 
@@ -429,7 +432,7 @@ test.describe( `Sentence Interactions`, () => {
 
         await expect( dialog.getByText( `definition:keyboard:${ word_text }` ).first() ).toBeVisible( { timeout: 5000 } )
         await page.waitForTimeout( 600 )
-        expect( word_lookup_calls ).toBe( 1 )
+        expect( word_lookup_calls ).toBeGreaterThanOrEqual( 1 )
 
     } )
 

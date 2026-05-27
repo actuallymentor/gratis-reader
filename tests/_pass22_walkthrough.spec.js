@@ -301,9 +301,9 @@ test.describe( `Pass 22 — Bug Fixes & Edge Cases`, () => {
         await page.waitForURL( `**/library`, { timeout: 5000 } )
     } )
 
-    // ── REGRESSION: Double-click-to-toggle sentences ──────────────
+    // ── REGRESSION: Double-click no longer toggles sentences ─────
 
-    test( `P22-12 double-click toggles between translated and original`, async ( { page } ) => {
+    test( `P22-12 double-click leaves translated sentence visible`, async ( { page } ) => {
         await setup_key( page )
         await upload_book( page )
         await enter_reader( page )
@@ -316,13 +316,11 @@ test.describe( `Pass 22 — Bug Fixes & Edge Cases`, () => {
         const text_before = await sentence.textContent()
         expect( text_before ).toContain( `[TRANSLATED]` )
 
-        // Double-click to toggle to original
         await sentence.dblclick()
         await page.waitForTimeout( 500 )
         const text_after = await sentence.innerText()
-        expect( text_after ).not.toContain( `[TRANSLATED]` )
+        expect( text_after ).toContain( `[TRANSLATED]` )
 
-        // Double-click again to toggle back
         await sentence.dblclick()
         await page.waitForTimeout( 500 )
         await expect( sentence ).toContainText( `[TRANSLATED]` )

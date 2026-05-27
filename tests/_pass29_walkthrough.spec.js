@@ -1,6 +1,6 @@
 /**
  * Pass 29 — Standalone Playwright walkthrough
- * Tests: dismiss timer cleanup, long sentence fallback, table content extraction,
+ * Tests: persistent word tooltips, long sentence fallback, table content extraction,
  * NFC normalization, connection caching, manifest start_url, general app health.
  *
  * Run: npx playwright test tests/_pass29_walkthrough.mjs
@@ -33,9 +33,9 @@ test.describe( `Pass 29 — Walkthrough`, () => {
         expect( sentences.length ).toBeGreaterThan( 0 )
     } )
 
-    // ── 2. Word touch-and-hold dismiss timer (fix verification) ──
+    // ── 2. Word tooltip persistence ──
 
-    test( `BW67 word touch tooltip appears and auto-dismisses`, async ( { page } ) => {
+    test( `BW67 word touch tooltip appears and stays stable`, async ( { page } ) => {
 
         // Override mock to handle word lookups
         await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
@@ -171,30 +171,28 @@ test.describe( `Pass 29 — Walkthrough`, () => {
         await expect( page.getByText( `FONT SIZE` ) ).not.toBeVisible( { timeout: 3000 } )
     } )
 
-    // ── 7. Double-click-to-toggle works ──
+    // ── 7. Double-click is inert ──
 
-    test( `BW72 double-click toggles between translated and original`, async ( { page } ) => {
+    test( `BW72 double-click leaves translated sentence visible`, async ( { page } ) => {
         await open_reader( page )
         await page.waitForTimeout( 2000 )
 
         const sentence = page.locator( `span[data-sentence-id]` ).first()
-        const highlighted_before = await sentence.evaluate( el => el.dataset.sentenceId )
+        await expect( sentence ).toContainText( `[TRANSLATED]`, { timeout: 15_000 } )
+        const id_before = await sentence.evaluate( el => el.dataset.sentenceId )
 
-        // Double-click to toggle — check the sentence interaction remains stable
         await sentence.dblclick()
         await page.waitForTimeout( 300 )
 
-        // The sentence should still be there and have the same ID
-        const highlighted_after = await sentence.evaluate( el => el.dataset.sentenceId )
-        expect( highlighted_after ).toBe( highlighted_before )
+        await expect( sentence ).toContainText( `[TRANSLATED]` )
+        const id_after = await sentence.evaluate( el => el.dataset.sentenceId )
+        expect( id_after ).toBe( id_before )
 
-        // Double-click again to toggle back
         await sentence.dblclick()
         await page.waitForTimeout( 300 )
 
-        // Sentence ID should persist through toggle
         const id_restored = await sentence.evaluate( el => el.dataset.sentenceId )
-        expect( id_restored ).toBe( highlighted_before )
+        expect( id_restored ).toBe( id_before )
     } )
 
     // ── 8. Explanation popover opens on right-click ──

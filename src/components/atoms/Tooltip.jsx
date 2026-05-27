@@ -15,7 +15,8 @@ const TooltipContainer = styled.div`
     max-width: 250px;
     overflow: hidden;
     text-overflow: ellipsis;
-    pointer-events: none;
+    pointer-events: ${ p => p.$dismissible ? `auto` : `none` };
+    cursor: ${ p => p.$dismissible ? `pointer` : `default` };
     z-index: 100;
     opacity: ${ p => p.$visible ? 1 : 0 };
     transition: opacity 0.15s ease;
@@ -53,8 +54,17 @@ const Wrapper = styled.span`
  * @param {boolean} [props.force_visible] - Force tooltip open
  * @param {boolean} [props.hover_enabled] - Opens tooltip on hover
  * @param {string} [props.fallback_content] - Text to show when content is unavailable
+ * @param {Function} [props.on_dismiss] - Called when the visible tooltip is clicked
  */
-export default function Tooltip( { children, content, loading, force_visible, hover_enabled = true, fallback_content = `...` } ) {
+export default function Tooltip( {
+    children,
+    content,
+    loading,
+    force_visible,
+    hover_enabled = true,
+    fallback_content = `...`,
+    on_dismiss
+} ) {
 
     const [ visible, set_visible ] = useState( false )
     const timeout_ref = useRef( null )
@@ -72,6 +82,19 @@ export default function Tooltip( { children, content, loading, force_visible, ho
         if( !hover_enabled ) return
         hovered_ref.current = false
         timeout_ref.current = setTimeout( () => set_visible( false ), 100 )
+    }
+
+    const dismiss = ( e ) => {
+        if( !on_dismiss ) return
+
+        e.preventDefault()
+        e.stopPropagation()
+        on_dismiss( e )
+    }
+
+    const dismiss_with_keyboard = ( e ) => {
+        if( !on_dismiss || ![ `Enter`, ` `, `Spacebar` ].includes( e.key ) ) return
+        dismiss( e )
     }
 
     // Controlled tooltips can force visibility without relying on hover state.
@@ -99,7 +122,18 @@ export default function Tooltip( { children, content, loading, force_visible, ho
         onMouseLeave={ hide }
     >
         { children }
-        { visible && <TooltipContainer $visible={ visible }>
+        { visible && <TooltipContainer
+            $visible={ visible }
+            $dismissible={ !!on_dismiss }
+            role={ on_dismiss ? `button` : undefined }
+            tabIndex={ on_dismiss ? 0 : undefined }
+            aria-label={ on_dismiss ? `Dismiss word tooltip` : undefined }
+            onPointerDown={ e => {
+                if( on_dismiss ) e.stopPropagation()
+            } }
+            onClick={ dismiss }
+            onKeyDown={ dismiss_with_keyboard }
+        >
             { loading ? `...` : content || fallback_content }
         </TooltipContainer> }
     </Wrapper>

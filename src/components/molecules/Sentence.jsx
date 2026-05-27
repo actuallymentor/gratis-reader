@@ -7,6 +7,7 @@ const LONG_PRESS_MS = 600
 const PRESS_MOVE_CANCEL_PX = 12
 
 const SentenceSpan = styled.span`
+    position: relative;
     cursor: pointer;
     transition: background-color 0.2s ease;
     border-radius: 2px;
@@ -25,6 +26,37 @@ const SentenceSpan = styled.span`
     }
 `
 
+const ExplainTooltip = styled.button`
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 8px);
+    transform: translateX(-50%);
+    min-width: 72px;
+    min-height: 40px;
+    padding: var(--space-xs) var(--space-s);
+    background: var(--text);
+    color: var(--bg);
+    border: 0;
+    border-radius: var(--radius-s);
+    box-shadow: var(--shadow);
+    font: inherit;
+    font-size: 0.8em;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    z-index: 120;
+
+    &::after {
+        content: '';
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        border: 5px solid transparent;
+        border-top-color: var(--text);
+    }
+`
+
 const event_point = ( e ) => {
     const touch = e.touches?.[0] || e.changedTouches?.[0]
     const x = touch ? touch.clientX : e.clientX
@@ -35,7 +67,7 @@ const event_point = ( e ) => {
 }
 
 /**
- * Interactive sentence — click words for tooltip, double-click sentence for original, long-press for explanation.
+ * Interactive sentence — click words for tooltip, long-press for original text and explanation access.
  * @param {Object} props
  * @param {string} props.sentence_id
  * @param {string} props.original
@@ -46,11 +78,16 @@ const event_point = ( e ) => {
  */
 export default function Sentence( { sentence_id, original, translated, source_language, target_language, on_long_press } ) {
 
-    const [ showing_original, set_showing_original ] = useState( false )
+    const [ sentence_focus, set_sentence_focus ] = useState( {
+        showing_original: false,
+        explain_visible: false
+    } )
     const explanation_timer_ref = useRef( null )
     const press_started_at_ref = useRef( null )
     const press_start_point_ref = useRef( null )
+    const context_menu_blocked_until_ref = useRef( 0 )
 
+    const { showing_original, explain_visible } = sentence_focus
     const display_text = showing_original ? original : translated || original
     const is_translated = !!translated && !showing_original
 
@@ -67,6 +104,19 @@ export default function Sentence( { sentence_id, original, translated, source_la
         press_start_point_ref.current = null
     }, [ clear_explanation_timer ] )
 
+    const toggle_original_prompt = useCallback( () => {
+        if( !translated ) return
+
+        set_sentence_focus( current => {
+            const next_showing_original = !current.showing_original
+
+            return {
+                showing_original: next_showing_original,
+                explain_visible: next_showing_original
+            }
+        } )
+    }, [ translated ] )
+
     const handle_press_start = useCallback( ( e ) => {
         if( e.type === `mousedown` && e.button !== 0 ) return
 
@@ -80,10 +130,11 @@ export default function Sentence( { sentence_id, original, translated, source_la
 
         if( translated && on_long_press ) {
             explanation_timer_ref.current = setTimeout( () => {
-                on_long_press( { sentence_id, original, translated } )
+                context_menu_blocked_until_ref.current = Date.now() + 1200
+                toggle_original_prompt()
             }, LONG_PRESS_MS )
         }
-    }, [ sentence_id, original, translated, on_long_press, reset_press ] )
+    }, [ translated, on_long_press, reset_press, toggle_original_prompt ] )
 
     const handle_press_move = useCallback( ( e ) => {
         if( !press_start_point_ref.current ) return
@@ -109,14 +160,25 @@ export default function Sentence( { sentence_id, original, translated, source_la
         reset_press()
     }, [ reset_press ] )
 
-    const toggle_original_sentence = useCallback( ( e ) => {
-        if( !translated ) return
-
+    const open_explanation = useCallback( ( e ) => {
         e.preventDefault()
-        set_showing_original( prev => !prev )
-    }, [ translated ] )
+        e.stopPropagation()
+
+        if( on_long_press && translated ) {
+            on_long_press( { sentence_id, original, translated } )
+        }
+    }, [ sentence_id, original, translated, on_long_press ] )
+
+    const stop_explain_interaction = useCallback( ( e ) => {
+        e.stopPropagation()
+    }, [] )
 
     const handle_context_menu = useCallback( ( e ) => {
+        if( Date.now() < context_menu_blocked_until_ref.current ) {
+            e.preventDefault()
+            return
+        }
+
         if( on_long_press && translated ) {
             e.preventDefault()
             on_long_press( { sentence_id, original, translated } )
@@ -127,6 +189,13 @@ export default function Sentence( { sentence_id, original, translated, source_la
     useEffect( () => {
         return reset_press
     }, [ reset_press ] )
+
+    useEffect( () => {
+        set_sentence_focus( {
+            showing_original: false,
+            explain_visible: false
+        } )
+    }, [ sentence_id, translated ] )
 
     // If no text at all, show skeleton
     if( !original ) return <Skeleton width="80%" height="1.2em" />
@@ -155,10 +224,17 @@ export default function Sentence( { sentence_id, original, translated, source_la
         onTouchEnd={ handle_press_end }
         onTouchMove={ handle_press_move }
         onTouchCancel={ reset_press }
-        onDoubleClick={ toggle_original_sentence }
         onContextMenu={ handle_context_menu }
     >
         { render_words() }
+        { explain_visible && <ExplainTooltip
+            type="button"
+            onMouseDown={ stop_explain_interaction }
+            onTouchStart={ stop_explain_interaction }
+            onClick={ open_explanation }
+        >
+            Explain
+        </ExplainTooltip> }
     </SentenceSpan>
 
 }

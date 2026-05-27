@@ -5,7 +5,7 @@
  * offline banner, cover extraction, MOBI rejection, PWA config.
  */
 import { test, expect } from '@playwright/test'
-import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth, clear_storage } from './helpers/setup.js'
+import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth, clear_storage, long_press } from './helpers/setup.js'
 
 // Helper to open settings from reader
 const open_settings = async ( page ) => {
@@ -444,7 +444,7 @@ test.describe( `Pass 27 — Coverage Expansion`, () => {
 
     // ── Spec §7b: Visual cue on toggled sentence ──
 
-    test( `P27-15 toggled sentence has visible background highlight`, async ( { page } ) => {
+    test( `P27-15 long-pressed sentence has visible background highlight`, async ( { page } ) => {
         await upload_demo_book( page )
         await open_reader( page )
         await page.waitForTimeout( 3000 )
@@ -454,17 +454,13 @@ test.describe( `Pass 27 — Coverage Expansion`, () => {
         // Get background before toggle
         const bg_before = await sentence.evaluate( el => getComputedStyle( el ).backgroundColor )
 
-        // Double-click to toggle to original
-        await sentence.dblclick()
-        await page.waitForTimeout( 500 )
+        await long_press( page, sentence )
 
         // Background should change (highlight) — accent-light color
         const bg_after = await sentence.evaluate( el => getComputedStyle( el ).backgroundColor )
         expect( bg_after ).not.toBe( bg_before )
 
-        // Double-click again to toggle back — highlight should revert
-        await sentence.dblclick()
-        await page.waitForTimeout( 500 )
+        await long_press( page, sentence )
 
         // After toggling back, the sentence may keep a subtle different bg
         // but it should NOT be the highlight color anymore

@@ -4,7 +4,6 @@ import Tooltip from '../atoms/Tooltip.jsx'
 import { clean_lookup_word, word_cache_key, use_word_lookup } from '../../hooks/use_word_lookup.js'
 
 const CLICK_MAX_MS = 300
-const TOOLTIP_DISMISS_MS = 2000
 const LOOKUP_UNAVAILABLE = `Lookup unavailable`
 
 const ClickableWord = styled.span`
@@ -17,7 +16,7 @@ const ClickableWord = styled.span`
 `
 
 /**
- * Renders target-language text where one click on any word shows its source-language equivalent.
+ * Renders target-language text where hovering or clicking any word shows its source-language equivalent.
  * @param {Object} props
  * @param {string} props.text
  * @param {string} props.source_language
@@ -33,10 +32,9 @@ export default function WordTooltipText( {
     click_max_ms = CLICK_MAX_MS
 } ) {
 
-    const [ visible_word, set_visible_word ] = useState( null )
+    const [ visible_tooltips, set_visible_tooltips ] = useState( {} )
     const tooltip_group_id = useId()
     const press_started_at_ref = useRef( null )
-    const dismiss_timer_ref = useRef( null )
     const { lookup_word, get_lookup_state } = use_word_lookup( {
         source_language,
         target_language,
@@ -47,19 +45,34 @@ export default function WordTooltipText( {
         press_started_at_ref.current = Date.now()
     }, [] )
 
-    const reveal_word = useCallback( ( word ) => {
+    const reveal_word = useCallback( ( word, tooltip_key ) => {
         const clean_word = clean_lookup_word( word )
         if( !clean_word ) return
 
         const cache_key = word_cache_key( clean_word, source_language, target_language )
 
-        set_visible_word( { word: clean_word, cache_key } )
-        lookup_word( clean_word )
+        set_visible_tooltips( visible => {
+            if( visible[tooltip_key] ) return visible
 
-        if( dismiss_timer_ref.current ) clearTimeout( dismiss_timer_ref.current )
+            return {
+                ...visible,
+                [tooltip_key]: { word: clean_word, cache_key }
+            }
+        } )
+        lookup_word( clean_word )
     }, [ lookup_word, source_language, target_language ] )
 
-    const handle_word_click = useCallback( ( e, word ) => {
+    const dismiss_tooltip = useCallback( ( tooltip_key ) => {
+        set_visible_tooltips( visible => {
+            if( !visible[tooltip_key] ) return visible
+
+            const next_visible = { ...visible }
+            delete next_visible[tooltip_key]
+            return next_visible
+        } )
+    }, [] )
+
+    const handle_word_click = useCallback( ( e, word, tooltip_key ) => {
         e.stopPropagation()
 
         const started_at = press_started_at_ref.current
@@ -68,49 +81,12 @@ export default function WordTooltipText( {
 
         if( started_at && elapsed_ms > click_max_ms ) return
 
-        reveal_word( word )
+        reveal_word( word, tooltip_key )
     }, [ reveal_word, click_max_ms ] )
 
-    const visible_state = visible_word ? get_lookup_state( visible_word.word ) : null
-
-    const hide_visible_word = useCallback( () => {
-        if( dismiss_timer_ref.current ) clearTimeout( dismiss_timer_ref.current )
-        set_visible_word( null )
-    }, [] )
-
     useEffect( () => {
-        if( dismiss_timer_ref.current ) clearTimeout( dismiss_timer_ref.current )
-        if( !visible_word || visible_state?.loading ) return
-
-        dismiss_timer_ref.current = setTimeout( hide_visible_word, TOOLTIP_DISMISS_MS )
-    }, [
-        visible_word,
-        visible_state?.loading,
-        visible_state?.content,
-        visible_state?.error,
-        visible_state?.can_lookup,
-        hide_visible_word
-    ] )
-
-    useEffect( () => {
-        if( !visible_word ) return
-
-        const dismiss_on_outside_press = ( e ) => {
-            const word_el = e.target.closest?.( `[data-word-tooltip-word]` )
-            if( word_el?.dataset.wordTooltipGroup === tooltip_group_id ) return
-
-            hide_visible_word()
-        }
-
-        document.addEventListener( `pointerdown`, dismiss_on_outside_press, true )
-        return () => document.removeEventListener( `pointerdown`, dismiss_on_outside_press, true )
-    }, [ visible_word, tooltip_group_id, hide_visible_word ] )
-
-    useEffect( () => {
-        return () => {
-            if( dismiss_timer_ref.current ) clearTimeout( dismiss_timer_ref.current )
-        }
-    }, [] )
+        set_visible_tooltips( {} )
+    }, [ text, source_language, target_language ] )
 
     if( !text ) return null
 
@@ -122,21 +98,24 @@ export default function WordTooltipText( {
 
         const { cache_key, content, loading, error, can_lookup } = get_lookup_state( clean_word )
         const tooltip_content = !can_lookup || error ? LOOKUP_UNAVAILABLE : content
+        const tooltip_key = `${ i }-${ cache_key }`
 
         return <Tooltip
-            key={ `${ i }-${ cache_key }` }
+            key={ tooltip_key }
             content={ tooltip_content }
             loading={ loading }
-            force_visible={ visible_word?.cache_key === cache_key }
+            force_visible={ !!visible_tooltips[tooltip_key] }
             hover_enabled={ false }
             fallback_content={ LOOKUP_UNAVAILABLE }
+            on_dismiss={ () => dismiss_tooltip( tooltip_key ) }
         >
             <ClickableWord
                 data-word-tooltip-word={ clean_word }
                 data-word-tooltip-group={ tooltip_group_id }
                 onMouseDown={ remember_press_start }
+                onMouseEnter={ () => reveal_word( segment, tooltip_key ) }
                 onTouchStart={ remember_press_start }
-                onClick={ e => handle_word_click( e, segment ) }
+                onClick={ e => handle_word_click( e, segment, tooltip_key ) }
             >
                 { segment }
             </ClickableWord>

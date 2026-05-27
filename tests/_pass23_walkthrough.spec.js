@@ -286,7 +286,7 @@ test.describe( `Pass 23 — Edge Cases & Error States`, () => {
         expect( translated ).toBeGreaterThan( 1 )
     } )
 
-    test( `P23-13 toggling sentence shows visual highlight`, async ( { page } ) => {
+    test( `P23-13 long-pressing sentence shows visual highlight`, async ( { page } ) => {
         await setup_key( page )
         await upload_book( page )
         await enter_reader( page )
@@ -294,9 +294,11 @@ test.describe( `Pass 23 — Edge Cases & Error States`, () => {
 
         const sentence = page.locator( `span[data-sentence-id]` ).first()
 
-        // Double-click to toggle to original
-        await sentence.dblclick()
-        await page.waitForTimeout( 300 )
+        const box = await sentence.boundingBox()
+        await page.mouse.move( box.x + box.width / 2, box.y + box.height / 2 )
+        await page.mouse.down()
+        await page.waitForTimeout( 700 )
+        await page.mouse.up()
 
         // Should have highlighted background (accent-light)
         const bg = await sentence.evaluate( el => getComputedStyle( el ).backgroundColor )

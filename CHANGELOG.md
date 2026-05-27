@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.12.0] - 2026-05-27
+
+### Changed
+- Make reader word and sentence tooltips persistent and tap-dismissable (uncommitted)
+
 ## [1.11.0] - 2026-05-26
 
 ### Changed

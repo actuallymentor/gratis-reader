@@ -9,7 +9,6 @@ import { log } from 'mentie'
 import WordTooltipText from './WordTooltipText.jsx'
 import { clean_lookup_word, word_cache_key, use_word_lookup } from '../../hooks/use_word_lookup.js'
 
-const TOOLTIP_DISMISS_MS = 2000
 const LOOKUP_UNAVAILABLE = `Lookup unavailable`
 const FLOATING_TOOLTIP_HALF_WIDTH = 130
 const FLOATING_TOOLTIP_TOP_GAP = 56
@@ -193,7 +192,8 @@ const FloatingTooltip = styled.div`
     white-space: nowrap;
     max-width: 250px;
     overflow: visible;
-    pointer-events: none;
+    pointer-events: auto;
+    cursor: pointer;
     z-index: 300;
 
     &::after {
@@ -285,6 +285,7 @@ const decorate_explanation_html = ( html, translated_words ) => {
                 word_el.className = `foreign-word`
                 word_el.dataset.foreignWord = part
                 word_el.dataset.wordTooltipWord = clean_lookup_word( part )
+                word_el.dataset.wordTooltipInstance = `${ decorated_count }-${ clean_word }`
                 word_el.setAttribute( `role`, `button` )
                 word_el.setAttribute( `tabindex`, `0` )
                 word_el.setAttribute( `aria-label`, `Look up ${ clean_lookup_word( part ) }` )
@@ -316,10 +317,9 @@ export default function ExplanationPopover( { original, translated, source_langu
 
     const [ explanation, set_explanation ] = useState( null )
     const [ loading, set_loading ] = useState( true )
-    const [ explanation_tooltip, set_explanation_tooltip ] = useState( null )
+    const [ explanation_tooltips, set_explanation_tooltips ] = useState( {} )
     const explanation_ref = useRef( null )
     const panel_ref = useRef( null )
-    const tooltip_timer_ref = useRef( null )
     const api_key = use_settings_store( state => state.api_key )
     const model = use_settings_store( state => state.model )
     const last_level = use_settings_store( state => state.last_level )
@@ -349,9 +349,14 @@ export default function ExplanationPopover( { original, translated, source_langu
     )
     const decorated_inner_html = useMemo( () => ( { __html: decorated_html } ), [ decorated_html ] )
 
-    const hide_explanation_tooltip = useCallback( () => {
-        if( tooltip_timer_ref.current ) clearTimeout( tooltip_timer_ref.current )
-        set_explanation_tooltip( null )
+    const dismiss_explanation_tooltip = useCallback( ( tooltip_key ) => {
+        set_explanation_tooltips( tooltips => {
+            if( !tooltips[tooltip_key] ) return tooltips
+
+            const next_tooltips = { ...tooltips }
+            delete next_tooltips[tooltip_key]
+            return next_tooltips
+        } )
     }, [] )
 
     // Fetch explanation on mount
@@ -411,24 +416,28 @@ export default function ExplanationPopover( { original, translated, source_langu
 
         const rect = word_el.getBoundingClientRect()
         const cache_key = word_cache_key( clean_word, source_language, target_language )
+        const tooltip_key = word_el.dataset.wordTooltipInstance || cache_key
         const { x, y, arrow_offset } = floating_tooltip_position(
             rect,
             panel_ref.current?.getBoundingClientRect()
         )
 
-        set_explanation_tooltip( {
-            word: clean_word,
-            cache_key,
-            x,
-            y,
-            arrow_offset
+        set_explanation_tooltips( tooltips => {
+            if( tooltips[tooltip_key] ) return tooltips
+
+            return {
+                ...tooltips,
+                [tooltip_key]: {
+                    word: clean_word,
+                    cache_key,
+                    x,
+                    y,
+                    arrow_offset
+                }
+            }
         } )
         lookup_word( clean_word )
-
-        if( tooltip_timer_ref.current ) clearTimeout( tooltip_timer_ref.current )
     }, [ lookup_word, source_language, target_language ] )
-
-    const explanation_tooltip_state = explanation_tooltip ? get_lookup_state( explanation_tooltip.word ) : null
 
     useEffect( () => {
         window.addEventListener( `keydown`, show_explanation_tooltip, true )
@@ -436,46 +445,9 @@ export default function ExplanationPopover( { original, translated, source_langu
         return () => window.removeEventListener( `keydown`, show_explanation_tooltip, true )
     }, [ show_explanation_tooltip ] )
 
-    const dismiss_explanation_tooltip_on_panel_press = useCallback( ( e ) => {
-        const word_el = e.target.closest?.( `[data-foreign-word]` )
-        if( word_el && explanation_ref.current?.contains( word_el ) ) return
-
-        hide_explanation_tooltip()
-    }, [ hide_explanation_tooltip ] )
-
     useEffect( () => {
-        if( tooltip_timer_ref.current ) clearTimeout( tooltip_timer_ref.current )
-        if( !explanation_tooltip || explanation_tooltip_state?.loading ) return
-
-        tooltip_timer_ref.current = setTimeout( hide_explanation_tooltip, TOOLTIP_DISMISS_MS )
-    }, [
-        explanation_tooltip,
-        explanation_tooltip_state?.loading,
-        explanation_tooltip_state?.content,
-        explanation_tooltip_state?.error,
-        explanation_tooltip_state?.can_lookup,
-        hide_explanation_tooltip
-    ] )
-
-    useEffect( () => {
-        return () => {
-            if( tooltip_timer_ref.current ) clearTimeout( tooltip_timer_ref.current )
-        }
-    }, [] )
-
-    useEffect( () => {
-        window.addEventListener( `resize`, hide_explanation_tooltip )
-        window.addEventListener( `scroll`, hide_explanation_tooltip, true )
-        window.visualViewport?.addEventListener( `resize`, hide_explanation_tooltip )
-        window.visualViewport?.addEventListener( `scroll`, hide_explanation_tooltip )
-
-        return () => {
-            window.removeEventListener( `resize`, hide_explanation_tooltip )
-            window.removeEventListener( `scroll`, hide_explanation_tooltip, true )
-            window.visualViewport?.removeEventListener( `resize`, hide_explanation_tooltip )
-            window.visualViewport?.removeEventListener( `scroll`, hide_explanation_tooltip )
-        }
-    }, [ hide_explanation_tooltip ] )
+        set_explanation_tooltips( {} )
+    }, [ decorated_html ] )
 
     // Close on Escape
     useEffect( () => {
@@ -501,10 +473,7 @@ export default function ExplanationPopover( { original, translated, source_langu
             if( e.target === e.currentTarget ) on_close()
         } }
     >
-        <Panel
-            ref={ panel_ref }
-            onPointerDown={ dismiss_explanation_tooltip_on_panel_press }
-        >
+        <Panel ref={ panel_ref }>
 
             <Header>
                 <Title>Translation Explanation</Title>
@@ -528,17 +497,37 @@ export default function ExplanationPopover( { original, translated, source_langu
 
             { explanation_body }
 
-            { explanation_tooltip && <FloatingTooltip
-                $x={ explanation_tooltip.x }
-                $y={ explanation_tooltip.y }
-                $arrow_offset={ explanation_tooltip.arrow_offset }
-            >
-                <span>
-                    { explanation_tooltip_state?.loading
-                        ? `...`
-                        : explanation_tooltip_state?.content || LOOKUP_UNAVAILABLE }
-                </span>
-            </FloatingTooltip> }
+            { Object.entries( explanation_tooltips ).map( ( [ tooltip_key, tooltip ] ) => {
+                const tooltip_state = get_lookup_state( tooltip.word )
+
+                return <FloatingTooltip
+                    key={ tooltip_key }
+                    $x={ tooltip.x }
+                    $y={ tooltip.y }
+                    $arrow_offset={ tooltip.arrow_offset }
+                    role="button"
+                    tabIndex={ 0 }
+                    aria-label="Dismiss word tooltip"
+                    onPointerDown={ e => e.stopPropagation() }
+                    onClick={ ( e ) => {
+                        e.stopPropagation()
+                        dismiss_explanation_tooltip( tooltip_key )
+                    } }
+                    onKeyDown={ ( e ) => {
+                        if( ![ `Enter`, ` `, `Spacebar` ].includes( e.key ) ) return
+
+                        e.preventDefault()
+                        e.stopPropagation()
+                        dismiss_explanation_tooltip( tooltip_key )
+                    } }
+                >
+                    <span>
+                        { tooltip_state?.loading
+                            ? `...`
+                            : tooltip_state?.content || LOOKUP_UNAVAILABLE }
+                    </span>
+                </FloatingTooltip>
+            } ) }
 
         </Panel>
     </Overlay>

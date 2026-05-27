@@ -2,7 +2,7 @@
  * Pass 35 — Console warnings, network shapes, combined feature interactions
  */
 import { test, expect } from '@playwright/test'
-import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth } from './helpers/setup.js'
+import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth, long_press } from './helpers/setup.js'
 
 test.describe( `Pass 35 — Walkthrough`, () => {
 
@@ -107,14 +107,11 @@ test.describe( `Pass 35 — Walkthrough`, () => {
         await page.getByRole( `button`, { name: `Close` } ).click()
         await page.waitForTimeout( 300 )
 
-        // Toggle a sentence
+        // Inspect a sentence and then toggle it back.
         const sentence = page.locator( `span[data-sentence-id]` ).first()
-        await sentence.dblclick()
-        await page.waitForTimeout( 300 )
+        await long_press( page, sentence )
 
-        // Toggle back
-        await sentence.dblclick()
-        await page.waitForTimeout( 300 )
+        await long_press( page, sentence )
 
         // Change font size
         await page.getByRole( `button`, { name: `Settings` } ).click()
