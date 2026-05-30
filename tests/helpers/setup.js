@@ -68,7 +68,9 @@ export const long_press = async ( page, locator, duration_ms = 700 ) => {
     const box = await locator.boundingBox()
     if( !box ) throw new Error( `Cannot hold an element without a bounding box` )
 
-    await page.mouse.move( box.x + box.width / 2, box.y + box.height / 2 )
+    // Prefer the lower-left text area so floating controls attached to the sentence
+    // do not accidentally receive repeated long-presses.
+    await page.mouse.move( box.x + Math.min( 24, box.width / 2 ), box.y + box.height - 4 )
     await page.mouse.down()
     await page.waitForTimeout( duration_ms )
     await page.mouse.up()
@@ -88,12 +90,17 @@ export const mock_openrouter = async ( page ) => {
         // Detect request type by distinctive markers in the user message
         const is_explanation = user_msg.includes( `Explain this translation` )
         const is_word_lookup = user_msg.includes( `Word:` )
+        const is_sentence_meaning = user_msg.includes( `Adapted translation:` )
 
         let content
         if( is_explanation ) {
             content = `[EXPLANATION] This sentence means something interesting. The original uses formal language that was simplified for the target level.`
         } else if( is_word_lookup ) {
             content = `[WORD] definition of the word`
+        } else if( is_sentence_meaning ) {
+            const sentence_match = user_msg.match( /Adapted translation:\n(.+?)\n\nTranslate the meaning/s )
+            const sentence = sentence_match ? sentence_match[1].trim() : `unknown`
+            content = `[MEANING] ${ sentence.replace( /^\[TRANSLATED\]\s*/, `` ) }`
         } else {
             // Translation — extract the sentence from prompt
             const sentence_match = user_msg.match( /Translate this sentence:\n(.+)/s )

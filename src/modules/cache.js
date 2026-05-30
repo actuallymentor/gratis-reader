@@ -1,6 +1,6 @@
 
 const DB_NAME = `gratis_reader`
-const DB_VERSION = 3
+const DB_VERSION = 4
 
 // Cached connection to avoid reopening on every operation
 let cached_db = null
@@ -39,6 +39,11 @@ export const open_db = () => {
             // Translation cache store
             if( !db.objectStoreNames.contains( `translations` ) ) {
                 db.createObjectStore( `translations`, { keyPath: `key` } )
+            }
+
+            // Back-translated meanings shown when a sentence is long-pressed
+            if( !db.objectStoreNames.contains( `meanings` ) ) {
+                db.createObjectStore( `meanings`, { keyPath: `key` } )
             }
 
             // Reading progress store
@@ -128,23 +133,30 @@ export const delete_book = async ( id ) => {
         tx.onerror = () => reject( tx.error )
     } )
 
-    // Clean up orphaned translations (keys start with the raw book hash, without "book_" prefix)
+    const delete_prefixed_entries = async ( store_name, hash_prefix ) => {
+        if( !db.objectStoreNames.contains( store_name ) ) return
+
+        await new Promise( ( resolve, reject ) => {
+            const tx = db.transaction( store_name, `readwrite` )
+            const store = tx.objectStore( store_name )
+            const request = store.openCursor()
+
+            request.onsuccess = ( e ) => {
+                const cursor = e.target.result
+                if( !cursor ) return
+                if( cursor.key.startsWith( `${ hash_prefix }:` ) ) cursor.delete()
+                cursor.continue()
+            }
+
+            tx.oncomplete = () => resolve()
+            tx.onerror = () => reject( tx.error )
+        } )
+    }
+
+    // Clean up orphaned language artifacts (keys start with the raw book hash, without "book_" prefix)
     const hash_prefix = id.replace( /^book_/, `` )
-    await new Promise( ( resolve, reject ) => {
-        const tx = db.transaction( `translations`, `readwrite` )
-        const store = tx.objectStore( `translations` )
-        const request = store.openCursor()
-
-        request.onsuccess = ( e ) => {
-            const cursor = e.target.result
-            if( !cursor ) return
-            if( cursor.key.startsWith( `${ hash_prefix }:` ) ) cursor.delete()
-            cursor.continue()
-        }
-
-        tx.oncomplete = () => resolve()
-        tx.onerror = () => reject( tx.error )
-    } )
+    await delete_prefixed_entries( `translations`, hash_prefix )
+    await delete_prefixed_entries( `meanings`, hash_prefix )
 }
 
 // --- Translation cache operations ---
@@ -179,13 +191,43 @@ export const get_translation = async ( cache_key ) => {
 }
 
 /**
- * Clears all cached translations
+ * Saves a source-language meaning for an adapted translated sentence.
+ * @param {Object} entry - { key, translated, meaning, source_language, target_language, level, created_at }
+ */
+export const save_sentence_meaning = async ( entry ) => {
+    const db = await open_db()
+    return new Promise( ( resolve, reject ) => {
+        const tx = db.transaction( `meanings`, `readwrite` )
+        tx.objectStore( `meanings` ).put( entry )
+        tx.oncomplete = () => resolve()
+        tx.onerror = () => reject( tx.error )
+    } )
+}
+
+/**
+ * Gets a cached source-language meaning by key.
+ * @param {string} cache_key
+ * @returns {Promise<string|null>} The source-language meaning or null
+ */
+export const get_sentence_meaning = async ( cache_key ) => {
+    const db = await open_db()
+    return new Promise( ( resolve, reject ) => {
+        const tx = db.transaction( `meanings`, `readonly` )
+        const request = tx.objectStore( `meanings` ).get( cache_key )
+        request.onsuccess = () => resolve( request.result?.meaning || null )
+        request.onerror = () => reject( request.error )
+    } )
+}
+
+/**
+ * Clears all cached translations and source-language meanings
  */
 export const clear_translations = async () => {
     const db = await open_db()
     return new Promise( ( resolve, reject ) => {
-        const tx = db.transaction( `translations`, `readwrite` )
+        const tx = db.transaction( [ `translations`, `meanings` ], `readwrite` )
         tx.objectStore( `translations` ).clear()
+        tx.objectStore( `meanings` ).clear()
         tx.oncomplete = () => resolve()
         tx.onerror = () => reject( tx.error )
     } )

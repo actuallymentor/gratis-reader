@@ -57,7 +57,7 @@ test.describe( `Pass 32 — Walkthrough`, () => {
         await expect( modal ).toBeVisible( { timeout: 5000 } )
     } )
 
-    // ── 3. Sentence long-press cycle: translated → original → translated ──
+    // ── 3. Sentence long-press cycle: translated → meaning → translated ──
 
     test( `BW103 triple long-press keeps sentence toggle stable`, async ( { page } ) => {
         await upload_demo_book( page )
@@ -70,12 +70,15 @@ test.describe( `Pass 32 — Walkthrough`, () => {
         const id_before = await sentence.getAttribute( `data-sentence-id` )
 
         await long_press( page, sentence )
+        await page.waitForTimeout( 250 )
         const highlight_1 = await sentence.evaluate( el => window.getComputedStyle( el ).backgroundColor )
 
         await long_press( page, sentence )
+        await page.waitForTimeout( 250 )
         const highlight_2 = await sentence.evaluate( el => window.getComputedStyle( el ).backgroundColor )
 
         await long_press( page, sentence )
+        await page.waitForTimeout( 250 )
         const highlight_3 = await sentence.evaluate( el => window.getComputedStyle( el ).backgroundColor )
 
         // Sentence ID should persist through all long-presses

@@ -354,7 +354,14 @@ export default function ReaderPage() {
     }, [ current_chapter_content, ahead_chapters_content ] )
 
     // Translation hook
-    const { translations, is_translating, token_usage } = use_translation( {
+    const {
+        translations,
+        meanings,
+        meaning_errors,
+        request_sentence_meaning,
+        is_translating,
+        token_usage
+    } = use_translation( {
         all_sentences,
         target_language: language_chosen ? last_language : null,
         level: language_chosen ? last_level : null,
@@ -498,8 +505,11 @@ export default function ReaderPage() {
             sentence_id={ sentence.id }
             original={ sentence.text }
             translated={ translations[sentence.id] }
+            meaning={ meanings[sentence.id] }
+            meaning_error={ !!meaning_errors[sentence.id] }
             source_language={ source_language }
             target_language={ last_language }
+            on_reveal_meaning={ request_sentence_meaning }
             on_long_press={ handle_long_press }
         />
     </Fragment>

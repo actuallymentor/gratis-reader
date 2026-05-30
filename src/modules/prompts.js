@@ -148,6 +148,35 @@ export const build_translation_user_prompt = ( sentence, context ) => {
 }
 
 /**
+ * Builds a prompt for translating an adapted target-language sentence back into the source language.
+ * @param {string} source_language
+ * @param {string} target_language
+ * @param {string} translated_sentence
+ * @returns {Object} { system, user } message pair
+ */
+export const build_back_translation_prompt = ( source_language, target_language, translated_sentence ) => ( {
+
+    system: multiline_trim( `
+        You translate adapted learner text from ${ target_language } back into ${ source_language }.
+
+        The input may be simplified, condensed, or intentionally rough because it was written for a language learner.
+        Translate only the meaning that is present in the adapted sentence.
+        Do not reconstruct missing details, nuance, style, or clauses that are not in the adapted sentence.
+
+        Output ONLY the ${ source_language } meaning.
+        No quotes, explanations, notes, comments, markup, or formatting.
+    ` ),
+
+    user: multiline_trim( `
+        Adapted translation:
+        ${ translated_sentence }
+
+        Translate the meaning above into ${ source_language }.
+    ` )
+
+} )
+
+/**
  * Builds the prompt for explaining a translation (long-press feature)
  * @param {string} source_language
  * @param {string} target_language

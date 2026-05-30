@@ -23,7 +23,6 @@ test.describe( `Sentence Interactions`, () => {
             await start_btn.click()
         } catch { /* modal not shown */ }
 
-        // Wait for translations to appear — mocked translations start with [TRANSLATED]
         await expect( page.getByText( /\[TRANSLATED\]/ ).first() ).toBeVisible( { timeout: 15_000 } )
 
     }
@@ -190,25 +189,74 @@ test.describe( `Sentence Interactions`, () => {
 
     } )
 
-    test( `long press toggles original text and Explain opens the modal`, async ( { page } ) => {
+    test( `long press toggles source-language meaning and Explain opens the modal`, async ( { page } ) => {
 
-        await enter_reader_with_translations( page )
+        const adapted_sentence = `Big work. Smart way.`
+        const source_meaning = `The simplified sentence says to work in a smart way.`
 
+        await page.route( CHAT_URL, async route => {
+            const body = JSON.parse( route.request().postData() )
+            const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
+            const is_explanation = user_msg.includes( `Explain this translation` )
+            const is_word_lookup = user_msg.includes( `Word:` )
+            const is_sentence_meaning = user_msg.includes( `Adapted translation:` )
+
+            let content
+            if( is_explanation ) {
+                content = `Detailed explanation here.`
+            } else if( is_word_lookup ) {
+                content = `[WORD] definition of the word`
+            } else if( is_sentence_meaning ) {
+                content = source_meaning
+            } else {
+                await new Promise( resolve => setTimeout( resolve, 250 ) )
+                content = adapted_sentence
+            }
+
+            await route.fulfill( {
+                contentType: `application/json`,
+                body: JSON.stringify( {
+                    choices: [ { message: { content } } ],
+                    usage: { prompt_tokens: 25, completion_tokens: 15, total_tokens: 40 }
+                } )
+            } )
+        } )
+
+        await page.locator( `img[alt]` ).first().click()
+        await page.waitForURL( /\/read\// )
+
+        const start_btn = page.getByRole( `button`, { name: `Start Reading` } )
+        try {
+            await start_btn.waitFor( { state: `visible`, timeout: 3000 } )
+            await start_btn.click()
+        } catch { /* modal not shown */ }
+
+        // Capture the visible original before the debounced translation request replaces it.
         const sentence = page.locator( `span[data-sentence-id]` ).first()
+        await expect( sentence ).toBeVisible( { timeout: 10_000 } )
+        const original_sentence = await sentence.textContent() || ``
+
+        expect( original_sentence ).not.toBe( `` )
+        await expect( sentence ).toContainText( adapted_sentence )
+
         await long_press( page, sentence )
 
-        await expect( sentence ).not.toContainText( `[TRANSLATED]` )
+        await expect( sentence ).toContainText( source_meaning, { timeout: 5000 } )
+        await expect( sentence ).not.toContainText( adapted_sentence )
+        expect( await sentence.textContent() ).not.toContain( original_sentence )
         await expect( sentence.getByRole( `button`, { name: `Explain` } ) ).toBeVisible()
 
         await long_press( page, sentence )
 
-        await expect( sentence ).toContainText( `[TRANSLATED]` )
+        await expect( sentence ).toContainText( adapted_sentence )
         await expect( sentence.getByRole( `button`, { name: `Explain` } ) ).not.toBeVisible()
 
         await long_press( page, sentence )
         await sentence.getByRole( `button`, { name: `Explain` } ).click()
 
-        await expect( page.getByText( `Translation Explanation` ) ).toBeVisible( { timeout: 5000 } )
+        const dialog = page.getByRole( `dialog`, { name: `Translation Explanation` } )
+        await expect( dialog ).toBeVisible( { timeout: 5000 } )
+        expect( await dialog.textContent() ).toContain( original_sentence )
 
     } )
 
@@ -297,13 +345,13 @@ test.describe( `Sentence Interactions`, () => {
 
     } )
 
-    test( `clicking an original sentence does not error`, async ( { page } ) => {
+    test( `clicking a source-language meaning does not error`, async ( { page } ) => {
 
         await enter_reader_with_translations( page )
 
         const sentence = page.locator( `span[data-sentence-id]` ).first()
         await long_press( page, sentence )
-        await expect( sentence ).not.toContainText( `[TRANSLATED]` )
+        await expect( sentence ).toContainText( `[MEANING]`, { timeout: 5000 } )
 
         await sentence.click()
         await page.waitForTimeout( 300 )

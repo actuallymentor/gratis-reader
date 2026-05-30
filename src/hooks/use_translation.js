@@ -1,12 +1,28 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { log } from 'mentie'
 import { chat_completion } from '../modules/open_router.js'
-import { build_translation_system_prompt, build_translation_user_prompt, DEFAULT_LEVEL, LEVELS } from '../modules/prompts.js'
-import { save_translation, get_translation, add_token_usage, get_token_usage } from '../modules/cache.js'
+import {
+    build_back_translation_prompt,
+    build_translation_system_prompt,
+    build_translation_user_prompt,
+    DEFAULT_LEVEL,
+    LEVELS
+} from '../modules/prompts.js'
+import {
+    save_translation,
+    get_translation,
+    save_sentence_meaning,
+    get_sentence_meaning,
+    add_token_usage,
+    get_token_usage
+} from '../modules/cache.js'
 import { use_settings_store } from '../stores/settings_store.js'
 
 // Max parallel translation requests
 const MAX_CONCURRENT = 5
+
+const sentence_meaning_cache_key = ( sentence_id, source_language, target_language, level ) =>
+    `${ sentence_id }:${ target_language }:${ source_language }:${ level }`
 
 export function is_nonsense( text ) {
 
@@ -46,20 +62,131 @@ export function is_nonsense( text ) {
  * @param {string} options.level - Level code e.g. 'a1', 'b2'
  * @param {string} options.source_language
  * @param {string} [options.book_id] - For tracking per-book token usage
- * @returns {{ translations, is_translating, translation_progress, token_usage }}
+ * @returns {{ translations, meanings, meaning_errors, request_sentence_meaning, is_translating, translation_progress, token_usage }}
  */
 export const use_translation = ( { all_sentences = [], target_language, level, source_language, book_id } ) => {
 
     const [ translations, set_translations ] = useState( {} )
+    const [ meanings, set_meanings ] = useState( {} )
+    const [ meaning_loading, set_meaning_loading ] = useState( {} )
+    const [ meaning_errors, set_meaning_errors ] = useState( {} )
     const [ is_translating, set_is_translating ] = useState( false )
     const [ token_usage, set_token_usage ] = useState( { prompt_tokens: 0, completion_tokens: 0 } )
     const token_usage_loaded = useRef( false )
     const abort_ref = useRef( null )
+    const meaning_requests_ref = useRef( {} )
+    const mounted_ref = useRef( true )
     const api_key = use_settings_store( state => state.api_key )
     const model = use_settings_store( state => state.model )
 
     // Get level info
     const level_info = LEVELS.find( l => l.code === level ) || DEFAULT_LEVEL
+
+    const request_sentence_meaning = useCallback( async ( { sentence_id, translated } ) => {
+
+        if( !sentence_id || !translated || !source_language || !target_language || !level ) return
+
+        if( meanings[sentence_id] || meaning_loading[sentence_id] || meaning_requests_ref.current[sentence_id] ) return
+
+        if( !api_key ) {
+            set_meaning_errors( prev => ( { ...prev, [sentence_id]: true } ) )
+            return
+        }
+
+        const cache_key = sentence_meaning_cache_key( sentence_id, source_language, target_language, level )
+        const controller = new AbortController()
+
+        meaning_requests_ref.current = { ...meaning_requests_ref.current, [sentence_id]: controller }
+        set_meaning_loading( prev => ( { ...prev, [sentence_id]: true } ) )
+        set_meaning_errors( prev => {
+            if( !prev[sentence_id] ) return prev
+
+            const next_errors = { ...prev }
+            delete next_errors[sentence_id]
+            return next_errors
+        } )
+
+        try {
+            const cached = await get_sentence_meaning( cache_key )
+            if( controller.signal.aborted ) return
+
+            if( cached ) {
+                if( mounted_ref.current ) set_meanings( prev => ( { ...prev, [sentence_id]: cached } ) )
+                return
+            }
+
+            const { system, user } = build_back_translation_prompt( source_language, target_language, translated )
+
+            const { content, usage } = await chat_completion( {
+                api_key,
+                model,
+                system_prompt: system,
+                user_message: user,
+                temperature: 0.1,
+                signal: controller.signal
+            } )
+
+            if( controller.signal.aborted ) return
+
+            if( mounted_ref.current ) set_meanings( prev => ( { ...prev, [sentence_id]: content } ) )
+
+            const prompt_tokens = usage?.prompt_tokens || 0
+            const completion_tokens = usage?.completion_tokens || 0
+
+            if( prompt_tokens > 0 || completion_tokens > 0 ) {
+                set_token_usage( prev => ( {
+                    prompt_tokens: prev.prompt_tokens + prompt_tokens,
+                    completion_tokens: prev.completion_tokens + completion_tokens
+                } ) )
+                if( book_id ) {
+                    add_token_usage( book_id, prompt_tokens, completion_tokens ).catch( () => {} )
+                }
+            }
+
+            try {
+                await save_sentence_meaning( {
+                    key: cache_key,
+                    translated,
+                    meaning: content,
+                    source_language,
+                    target_language,
+                    level,
+                    created_at: new Date().toISOString()
+                } )
+            } catch {
+                // Meaning cache writes are best-effort; the inline result is already available.
+            }
+        } catch ( error ) {
+            if( controller.signal.aborted || error?.name === `AbortError` ) return
+
+            log.warn( `Sentence meaning failed:`, error?.message || error )
+            if( mounted_ref.current ) set_meaning_errors( prev => ( { ...prev, [sentence_id]: true } ) )
+        } finally {
+            const remaining_requests = { ...meaning_requests_ref.current }
+            delete remaining_requests[sentence_id]
+            meaning_requests_ref.current = remaining_requests
+
+            if( mounted_ref.current ) {
+                set_meaning_loading( prev => {
+                    if( !prev[sentence_id] ) return prev
+
+                    const next_loading = { ...prev }
+                    delete next_loading[sentence_id]
+                    return next_loading
+                } )
+            }
+        }
+
+    }, [
+        meanings,
+        meaning_loading,
+        source_language,
+        target_language,
+        level,
+        api_key,
+        model,
+        book_id
+    ] )
 
     // Translate a batch of sentences
     const translate_batch = useCallback( async ( sentences_to_translate, signal ) => {
@@ -203,10 +330,25 @@ export const use_translation = ( { all_sentences = [], target_language, level, s
 
     }, [ all_sentences, target_language, level, api_key, translate_batch ] )
 
-    // Clear translations when language/level changes
+    // Clear translations and meanings when the language context changes
     useEffect( () => {
         set_translations( {} )
-    }, [ target_language, level ] )
+        set_meanings( {} )
+        set_meaning_loading( {} )
+        set_meaning_errors( {} )
+        Object.values( meaning_requests_ref.current ).forEach( controller => controller.abort() )
+        meaning_requests_ref.current = {}
+    }, [ source_language, target_language, level ] )
+
+    useEffect( () => {
+        mounted_ref.current = true
+
+        return () => {
+            mounted_ref.current = false
+            Object.values( meaning_requests_ref.current ).forEach( controller => controller.abort() )
+            meaning_requests_ref.current = {}
+        }
+    }, [] )
 
     // Load saved token usage for this book on mount
     // Uses functional update to merge with any in-flight additions (avoids race condition)
@@ -229,6 +371,14 @@ export const use_translation = ( { all_sentences = [], target_language, level, s
         ? Math.round(  Object.keys( translations ).length / all_sentences.length  * 100 )
         : 0
 
-    return { translations, is_translating, translation_progress, token_usage }
+    return {
+        translations,
+        meanings,
+        meaning_errors,
+        request_sentence_meaning,
+        is_translating,
+        translation_progress,
+        token_usage
+    }
 
 }

@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.13.0] - 2026-05-29
+
+### Changed
+- Show long-pressed sentence meanings instead of originals inline
+
 ## [1.12.1] - 2026-05-27
 
 ### Changed
