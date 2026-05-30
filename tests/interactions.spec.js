@@ -193,6 +193,7 @@ test.describe( `Sentence Interactions`, () => {
 
         const adapted_sentence = `Big work. Smart way.`
         const source_meaning = `The simplified sentence says to work in a smart way.`
+        let meaning_prompt = ``
 
         await page.route( CHAT_URL, async route => {
             const body = JSON.parse( route.request().postData() )
@@ -207,6 +208,7 @@ test.describe( `Sentence Interactions`, () => {
             } else if( is_word_lookup ) {
                 content = `[WORD] definition of the word`
             } else if( is_sentence_meaning ) {
+                meaning_prompt = user_msg
                 content = source_meaning
             } else {
                 await new Promise( resolve => setTimeout( resolve, 250 ) )
@@ -242,6 +244,8 @@ test.describe( `Sentence Interactions`, () => {
         await long_press( page, sentence )
 
         await expect( sentence ).toContainText( source_meaning, { timeout: 5000 } )
+        expect( meaning_prompt ).toContain( adapted_sentence )
+        expect( meaning_prompt ).not.toContain( original_sentence )
         await expect( sentence ).not.toContainText( adapted_sentence )
         expect( await sentence.textContent() ).not.toContain( original_sentence )
         await expect( sentence.getByRole( `button`, { name: `Explain` } ) ).toBeVisible()
