@@ -263,6 +263,15 @@ export default function SettingsDrawer( { is_open, on_close, show_language = tru
         if( force_update_reset_timer_ref.current ) clearTimeout( force_update_reset_timer_ref.current )
     }, [] )
 
+    useEffect( () => {
+        if( is_open ) return
+        if( !force_update_reset_timer_ref.current ) return
+
+        clearTimeout( force_update_reset_timer_ref.current )
+        force_update_reset_timer_ref.current = null
+        set_forcing_update( false )
+    }, [ is_open ] )
+
     if( !is_open ) return null
 
     const handle_clear_cache = async () => {

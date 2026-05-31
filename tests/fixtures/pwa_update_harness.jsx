@@ -36,16 +36,20 @@ export const mount_update_prompt = ( { need_refresh = true, updating = false } =
  * @param {number} options.reload_fallback_ms
  * @param {boolean} options.update_waiting_on_reload
  * @param {boolean} options.auto_update_already_applied
+ * @param {number|null} options.auto_update_applied_at
  */
 export const mount_update_badge = ( {
     need_refresh = true,
     reject_update = false,
     reload_fallback_ms = 20,
     update_waiting_on_reload = false,
-    auto_update_already_applied = false
+    auto_update_already_applied = false,
+    auto_update_applied_at = null
 } = {} ) => {
 
-    if( auto_update_already_applied ) {
+    if( auto_update_applied_at !== null ) {
+        sessionStorage.setItem( PWA_RELOAD_AUTO_UPDATE_STORAGE_KEY, String( auto_update_applied_at ) )
+    } else if( auto_update_already_applied ) {
         sessionStorage.setItem( PWA_RELOAD_AUTO_UPDATE_STORAGE_KEY, String( Date.now() ) )
     } else {
         sessionStorage.removeItem( PWA_RELOAD_AUTO_UPDATE_STORAGE_KEY )

@@ -36,10 +36,17 @@ const reload_auto_update_was_recently_applied = cooldown_ms => {
     const storage = get_session_storage()
     if( !storage ) return false
 
-    const applied_at = Number( storage.getItem( PWA_RELOAD_AUTO_UPDATE_STORAGE_KEY ) )
-    if( !Number.isFinite( applied_at ) ) return false
+    const stored_applied_at = storage.getItem( PWA_RELOAD_AUTO_UPDATE_STORAGE_KEY )
+    if( !stored_applied_at ) return false
 
-    return Date.now() - applied_at < cooldown_ms
+    const applied_at = Number( stored_applied_at )
+    const now = Date.now()
+
+    if( !Number.isFinite( applied_at ) ) return false
+    if( applied_at <= 0 ) return false
+    if( applied_at > now ) return false
+
+    return now - applied_at < cooldown_ms
 
 }
 

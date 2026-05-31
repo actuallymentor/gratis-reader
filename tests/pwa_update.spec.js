@@ -20,6 +20,13 @@ test.describe( `PWA updates`, () => {
         await page.goto( `/` )
     } )
 
+    test.afterEach( async ( { page } ) => {
+        await page.evaluate( () => {
+            const descriptor = Object.getOwnPropertyDescriptor( Navigator.prototype, `serviceWorker` )
+            if( descriptor?.configurable ) delete Navigator.prototype.serviceWorker
+        } ).catch( () => {} )
+    } )
+
     test( `renders an accessible update badge when a version is waiting`, async ( { page } ) => {
 
         await mount_update_prompt( page, { need_refresh: true, updating: false } )
@@ -83,6 +90,21 @@ test.describe( `PWA updates`, () => {
         await expect( page.getByRole( `button`, { name: `New version available, click here to update` } ) ).toBeVisible()
         await expect.poll( () => page.evaluate( () => window.__pwa_update_test.update_calls ) ).toBe( 0 )
         await expect.poll( () => page.evaluate( () => window.__pwa_update_test.reloads ) ).toBe( 0 )
+
+    } )
+
+    test( `reload auto-apply ignores invalid future cooldown timestamps`, async ( { page } ) => {
+
+        await mount_update_badge( page, {
+            need_refresh: true,
+            reload_fallback_ms: 500,
+            update_waiting_on_reload: true,
+            auto_update_applied_at: Date.now() + 60_000
+        } )
+
+        await expect( page.getByRole( `button`, { name: `Updating...` } ) ).toBeDisabled()
+        await expect.poll( () => page.evaluate( () => window.__pwa_update_test.update_calls ) ).toBe( 1 )
+        await expect.poll( () => page.evaluate( () => window.__pwa_update_test.reloads ) ).toBe( 1 )
 
     } )
 
