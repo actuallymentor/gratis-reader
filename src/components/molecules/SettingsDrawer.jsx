@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import styled from 'styled-components'
 import { use_settings_store } from '../../stores/settings_store.js'
 import LanguagePicker from './LanguagePicker.jsx'
@@ -221,6 +221,8 @@ const FONT_OPTIONS = [
     `system-ui`
 ]
 
+const FORCE_UPDATE_BUSY_RESET_MS = 2_000
+
 /**
  * Settings drawer — slides in from the right
  * @param {Object} props
@@ -245,6 +247,7 @@ export default function SettingsDrawer( { is_open, on_close, show_language = tru
     const [ key_draft, set_key_draft ] = useState( `` )
     const [ validating_key, set_validating_key ] = useState( false )
     const [ forcing_update, set_forcing_update ] = useState( false )
+    const force_update_reset_timer_ref = useRef( null )
 
     // Close on Escape
     useEffect( () => {
@@ -255,6 +258,10 @@ export default function SettingsDrawer( { is_open, on_close, show_language = tru
         window.addEventListener( `keydown`, handle_key )
         return () => window.removeEventListener( `keydown`, handle_key )
     }, [ is_open, on_close ] )
+
+    useEffect( () => () => {
+        if( force_update_reset_timer_ref.current ) clearTimeout( force_update_reset_timer_ref.current )
+    }, [] )
 
     if( !is_open ) return null
 
@@ -278,6 +285,11 @@ export default function SettingsDrawer( { is_open, on_close, show_language = tru
         try {
             await force_pwa_update()
             toast.success( `Reloading latest app version...` )
+            if( force_update_reset_timer_ref.current ) clearTimeout( force_update_reset_timer_ref.current )
+            force_update_reset_timer_ref.current = setTimeout( () => {
+                set_forcing_update( false )
+                force_update_reset_timer_ref.current = null
+            }, FORCE_UPDATE_BUSY_RESET_MS )
         } catch {
             toast.error( `Could not force app update` )
             set_forcing_update( false )
@@ -442,7 +454,7 @@ export default function SettingsDrawer( { is_open, on_close, show_language = tru
                             set_editing_key( true )
                         } }
                         >
-                            Update
+                            Update Key
                         </SmallBtn>
                     </KeyRow> }
 

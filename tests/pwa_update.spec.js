@@ -71,6 +71,21 @@ test.describe( `PWA updates`, () => {
 
     } )
 
+    test( `reload auto-apply is throttled after one recovery attempt`, async ( { page } ) => {
+
+        await mount_update_badge( page, {
+            need_refresh: true,
+            reload_fallback_ms: 500,
+            update_waiting_on_reload: true,
+            auto_update_already_applied: true
+        } )
+
+        await expect( page.getByRole( `button`, { name: `New version available, click here to update` } ) ).toBeVisible()
+        await expect.poll( () => page.evaluate( () => window.__pwa_update_test.update_calls ) ).toBe( 0 )
+        await expect.poll( () => page.evaluate( () => window.__pwa_update_test.reloads ) ).toBe( 0 )
+
+    } )
+
     test( `registration checks for service worker updates after mounting`, async ( { page } ) => {
 
         await mount_update_badge( page, { need_refresh: false } )
@@ -153,6 +168,51 @@ test.describe( `PWA updates`, () => {
         expect( calls.messages ).toEqual( [ { type: `SKIP_WAITING` } ] )
         expect( calls.unregisters ).toBe( 0 )
         expect( calls.cache_deletes ).toEqual( [] )
+        expect( calls.reloads ).toBe( 1 )
+
+    } )
+
+    test( `force update reloads as soon as the waiting worker takes control`, async ( { page } ) => {
+
+        await page.evaluate( async () => {
+            const calls = {
+                messages: [],
+                reloads: 0,
+                updates: 0
+            }
+            const service_worker = new EventTarget()
+            service_worker.getRegistrations = async () => [ {
+                waiting: {
+                    postMessage: message => calls.messages.push( message )
+                },
+                update: async () => {
+                    calls.updates += 1
+                }
+            } ]
+
+            Object.defineProperty( Navigator.prototype, `serviceWorker`, {
+                configurable: true,
+                get: () => service_worker
+            } )
+
+            const { force_pwa_update } = await import( `/src/modules/pwa_update.js` )
+            const result = await force_pwa_update( {
+                reload_app: () => {
+                    calls.reloads += 1
+                },
+                reload_delay_ms: 10_000
+            } )
+
+            service_worker.dispatchEvent( new Event( `controllerchange` ) )
+            service_worker.dispatchEvent( new Event( `controllerchange` ) )
+
+            window.__force_pwa_update_test = { calls, result }
+        } )
+
+        const { calls, result } = await page.evaluate( () => window.__force_pwa_update_test )
+        expect( result.mode ).toBe( `waiting` )
+        expect( calls.updates ).toBe( 1 )
+        expect( calls.messages ).toEqual( [ { type: `SKIP_WAITING` } ] )
         expect( calls.reloads ).toBe( 1 )
 
     } )

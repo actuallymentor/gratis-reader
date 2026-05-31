@@ -7,6 +7,8 @@ export const PWA_UPDATE_BADGE_TEXT = `New version available, click here to updat
 export const PWA_UPDATING_STATUS_TEXT = `Updating...`
 export const PWA_UPDATE_RELOAD_FALLBACK_MS = 8_000
 export const PWA_UPDATE_CHECK_INTERVAL_MS = 30 * 60 * 1_000
+export const PWA_RELOAD_AUTO_UPDATE_COOLDOWN_MS = 60_000
+export const PWA_RELOAD_AUTO_UPDATE_STORAGE_KEY = `gratis_reader_pwa_reload_auto_update_at`
 
 const page_was_reloaded = () => {
 
@@ -15,6 +17,42 @@ const page_was_reloaded = () => {
 
     const [ navigation ] = performance.getEntriesByType( `navigation` )
     return navigation?.type === `reload`
+
+}
+
+const get_session_storage = () => {
+
+    try {
+        if( typeof sessionStorage === `undefined` ) return null
+        return sessionStorage
+    } catch {
+        return null
+    }
+
+}
+
+const reload_auto_update_was_recently_applied = cooldown_ms => {
+
+    const storage = get_session_storage()
+    if( !storage ) return false
+
+    const applied_at = Number( storage.getItem( PWA_RELOAD_AUTO_UPDATE_STORAGE_KEY ) )
+    if( !Number.isFinite( applied_at ) ) return false
+
+    return Date.now() - applied_at < cooldown_ms
+
+}
+
+const remember_reload_auto_update = () => {
+
+    const storage = get_session_storage()
+    if( !storage ) return
+
+    try {
+        storage.setItem( PWA_RELOAD_AUTO_UPDATE_STORAGE_KEY, String( Date.now() ) )
+    } catch {
+        // Storage can be unavailable in restrictive browser modes; the in-memory guard still applies.
+    }
 
 }
 
@@ -107,6 +145,7 @@ export function PWAUpdatePrompt( { need_refresh, updating, update_app } ) {
  * @param {Function} [props.reload_app]
  * @param {number} [props.reload_fallback_ms]
  * @param {number} [props.update_check_interval_ms]
+ * @param {number} [props.reload_auto_update_cooldown_ms]
  * @param {Function} [props.should_apply_waiting_update]
  * @returns {JSX.Element|null}
  */
@@ -115,6 +154,7 @@ export default function PWAUpdateBadge( {
     reload_app = () => window.location.reload(),
     reload_fallback_ms = PWA_UPDATE_RELOAD_FALLBACK_MS,
     update_check_interval_ms = PWA_UPDATE_CHECK_INTERVAL_MS,
+    reload_auto_update_cooldown_ms = PWA_RELOAD_AUTO_UPDATE_COOLDOWN_MS,
     should_apply_waiting_update = page_was_reloaded
 } = {} ) {
 
@@ -201,11 +241,13 @@ export default function PWAUpdateBadge( {
         if( updating ) return
         if( applied_reload_update_ref.current ) return
         if( !should_apply_waiting_update() ) return
+        if( reload_auto_update_was_recently_applied( reload_auto_update_cooldown_ms ) ) return
 
         applied_reload_update_ref.current = true
+        remember_reload_auto_update()
         update_app()
 
-    }, [ need_refresh, should_apply_waiting_update, update_app, updating ] )
+    }, [ need_refresh, reload_auto_update_cooldown_ms, should_apply_waiting_update, update_app, updating ] )
 
     useEffect( () => () => {
         clear_reload_fallback()

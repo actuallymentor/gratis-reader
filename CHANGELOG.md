@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.13.2] - 2026-05-31
+
+### Fixed
+- Harden forced PWA update reload timing and repeat reload suppression (uncommitted)
+
 ## [1.13.1] - 2026-05-31
 
 ### Fixed

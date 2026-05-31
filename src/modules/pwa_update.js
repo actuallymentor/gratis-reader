@@ -36,6 +36,26 @@ const clear_cache_storage = async () => {
 
 }
 
+const schedule_reload_after_controller_change = ( { reload_app, reload_delay_ms } ) => {
+
+    let did_reload = false
+    let timer_id = null
+    const service_worker = navigator.serviceWorker
+
+    const reload_once = () => {
+        if( did_reload ) return
+
+        did_reload = true
+        if( timer_id ) clearTimeout( timer_id )
+        service_worker?.removeEventListener?.( `controllerchange`, reload_once )
+        reload_app()
+    }
+
+    service_worker?.addEventListener?.( `controllerchange`, reload_once, { once: true } )
+    timer_id = setTimeout( reload_once, reload_delay_ms )
+
+}
+
 /**
  * Forces the browser out of a stale PWA shell without clearing IndexedDB data.
  * @param {Object} options
@@ -55,7 +75,7 @@ export const force_pwa_update = async ( {
     const waiting_worker = registrations.find( registration => registration.waiting )?.waiting
     if( waiting_worker ) {
         waiting_worker.postMessage( SERVICE_WORKER_SKIP_WAITING_MESSAGE )
-        setTimeout( reload_app, reload_delay_ms )
+        schedule_reload_after_controller_change( { reload_app, reload_delay_ms } )
         return { mode: `waiting`, registrations: registrations.length, caches: 0 }
     }
 

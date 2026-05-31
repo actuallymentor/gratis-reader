@@ -27,8 +27,8 @@ test.describe( `API Key Management`, () => {
         await page.goto( `/library` )
         await page.getByRole( `button`, { name: `Settings` } ).click()
 
-        // Click Update
-        await page.getByText( `Update`, { exact: true } ).click()
+        // Click Update Key
+        await page.getByText( `Update Key`, { exact: true } ).click()
         await page.waitForTimeout( 300 )
 
         // Input should appear
@@ -43,7 +43,7 @@ test.describe( `API Key Management`, () => {
         await page.getByRole( `button`, { name: `Settings` } ).click()
 
         // Open update input
-        await page.getByText( `Update`, { exact: true } ).click()
+        await page.getByText( `Update Key`, { exact: true } ).click()
         await page.waitForTimeout( 300 )
 
         // Cancel
@@ -62,7 +62,7 @@ test.describe( `API Key Management`, () => {
         await page.getByRole( `button`, { name: `Settings` } ).click()
 
         // Open update input
-        await page.getByText( `Update`, { exact: true } ).click()
+        await page.getByText( `Update Key`, { exact: true } ).click()
         await page.waitForTimeout( 300 )
 
         // Enter new key
@@ -89,7 +89,7 @@ test.describe( `API Key Management`, () => {
         await page.goto( `/library` )
         await page.getByRole( `button`, { name: `Settings` } ).click()
 
-        await page.getByText( `Update`, { exact: true } ).click()
+        await page.getByText( `Update Key`, { exact: true } ).click()
         await page.locator( `input[placeholder*="sk-or"]` ).fill( `sk-or-bad-key` )
         await page.getByText( `Save`, { exact: true } ).click()
         await page.waitForTimeout( 1500 )
@@ -108,7 +108,7 @@ test.describe( `API Key Management`, () => {
         await page.getByRole( `button`, { name: `Settings` } ).click()
 
         // Update key
-        await page.getByText( `Update`, { exact: true } ).click()
+        await page.getByText( `Update Key`, { exact: true } ).click()
         await page.locator( `input[placeholder*="sk-or"]` ).fill( `sk-or-persistent-new-WXYZ` )
         await page.getByText( `Save`, { exact: true } ).click()
         await page.waitForTimeout( 1500 )

@@ -1,5 +1,8 @@
 import { createRoot } from 'react-dom/client'
-import PWAUpdateBadge, { PWAUpdatePrompt } from '../../src/components/molecules/PWAUpdateBadge.jsx'
+import PWAUpdateBadge, {
+    PWA_RELOAD_AUTO_UPDATE_STORAGE_KEY,
+    PWAUpdatePrompt
+} from '../../src/components/molecules/PWAUpdateBadge.jsx'
 
 const mount = ( element ) => {
     const root_el = document.createElement( `div` )
@@ -32,13 +35,21 @@ export const mount_update_prompt = ( { need_refresh = true, updating = false } =
  * @param {boolean} options.reject_update
  * @param {number} options.reload_fallback_ms
  * @param {boolean} options.update_waiting_on_reload
+ * @param {boolean} options.auto_update_already_applied
  */
 export const mount_update_badge = ( {
     need_refresh = true,
     reject_update = false,
     reload_fallback_ms = 20,
-    update_waiting_on_reload = false
+    update_waiting_on_reload = false,
+    auto_update_already_applied = false
 } = {} ) => {
+
+    if( auto_update_already_applied ) {
+        sessionStorage.setItem( PWA_RELOAD_AUTO_UPDATE_STORAGE_KEY, String( Date.now() ) )
+    } else {
+        sessionStorage.removeItem( PWA_RELOAD_AUTO_UPDATE_STORAGE_KEY )
+    }
 
     window.__pwa_update_test = {
         prompt_clicks: 0,
@@ -76,6 +87,7 @@ export const mount_update_badge = ( {
             window.__pwa_update_test.reloads += 1
         } }
         reload_fallback_ms={ reload_fallback_ms }
+        reload_auto_update_cooldown_ms={ 60_000 }
         should_apply_waiting_update={ () => update_waiting_on_reload }
     /> )
 
