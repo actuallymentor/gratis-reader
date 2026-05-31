@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.15.0] - 2026-05-31
+
+### Added
+- Add reader vocabulary panel with viewport-sized word list (uncommitted)
+
 ## [1.14.0] - 2026-05-31
 
 ### Added

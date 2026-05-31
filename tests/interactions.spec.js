@@ -171,6 +171,64 @@ test.describe( `Sentence Interactions`, () => {
 
     } )
 
+    test( `vocabulary panel lists common translated words for the viewport height`, async ( { page } ) => {
+
+        await page.setViewportSize( { width: 1280, height: 900 } )
+
+        const translated_sentence = `alpha alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi omicron pi rho sigma tau`
+
+        await page.route( CHAT_URL, async route => {
+            const body = JSON.parse( route.request().postData() )
+            const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
+            const word_match = user_msg.match( /Word:\s*(.+)$/ )
+
+            if( word_match ) {
+                const word = word_match[1].trim()
+
+                await route.fulfill( {
+                    contentType: `application/json`,
+                    body: JSON.stringify( {
+                        choices: [ { message: { content: `source:${ word }` } } ]
+                    } )
+                } )
+                return
+            }
+
+            await route.fulfill( {
+                contentType: `application/json`,
+                body: JSON.stringify( {
+                    choices: [ { message: { content: translated_sentence } } ],
+                    usage: { prompt_tokens: 25, completion_tokens: 15, total_tokens: 40 }
+                } )
+            } )
+        } )
+
+        await page.locator( `img[alt]` ).first().click()
+        await page.waitForURL( /\/read\// )
+
+        const start_btn = page.getByRole( `button`, { name: `Start Reading` } )
+        try {
+            await start_btn.waitFor( { state: `visible`, timeout: 3000 } )
+            await start_btn.click()
+        } catch { /* modal not shown */ }
+
+        await page.setViewportSize( { width: 1280, height: 500 } )
+        await expect( page.getByText( /alpha alpha beta/ ).first() ).toBeVisible( { timeout: 15_000 } )
+
+        await page.getByRole( `button`, { name: `Expand vocabulary list` } ).click()
+
+        const rows = page.locator( `[data-reader-vocabulary-row]` )
+        await expect.poll( () => rows.count() ).toBe( 7 )
+        await expect( rows.first() ).toContainText( /alpha - source:alpha \(\d+x\)/, { timeout: 5000 } )
+
+        await page.setViewportSize( { width: 1280, height: 900 } )
+
+        await expect.poll( () => rows.count() ).toBe( 18 )
+        await page.getByRole( `button`, { name: `Collapse vocabulary list` } ).click()
+        await expect( page.getByRole( `button`, { name: `Expand vocabulary list` } ) ).toBeVisible()
+
+    } )
+
     test( `double click does not toggle sentence text`, async ( { page } ) => {
 
         await enter_reader_with_translations( page )

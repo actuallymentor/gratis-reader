@@ -9,6 +9,7 @@ import { DEFAULT_LEVEL, LEVELS } from '../../modules/prompts.js'
 import Sentence from '../molecules/Sentence.jsx'
 import ExplanationPopover from '../molecules/ExplanationPopover.jsx'
 import SettingsDrawer from '../molecules/SettingsDrawer.jsx'
+import ReaderVocabularyPanel from '../molecules/ReaderVocabularyPanel.jsx'
 import LanguagePicker from '../molecules/LanguagePicker.jsx'
 import LevelPicker from '../molecules/LevelPicker.jsx'
 import ProgressBar from '../atoms/ProgressBar.jsx'
@@ -346,12 +347,16 @@ export default function ReaderPage() {
         return sentences
     }
 
+    const current_chapter_sentences = useMemo(
+        () => extract_sentences( current_chapter_content ),
+        [ current_chapter_content ]
+    )
+
     // Flatten current chapter + 2 ahead chapters for translation read-ahead
     const all_sentences = useMemo( () => {
-        const current = extract_sentences( current_chapter_content )
         const ahead = ahead_chapters_content.flatMap( extract_sentences )
-        return [ ...current, ...ahead ]
-    }, [ current_chapter_content, ahead_chapters_content ] )
+        return [ ...current_chapter_sentences, ...ahead ]
+    }, [ current_chapter_sentences, ahead_chapters_content ] )
 
     // Translation hook
     const {
@@ -512,6 +517,11 @@ export default function ReaderPage() {
 
     // Get level info for badge
     const level_info = LEVELS.find( l => l.code === last_level ) || DEFAULT_LEVEL
+
+    const current_chapter_translations = useMemo(
+        () => current_chapter_sentences.map( sentence => translations[sentence.id] ).filter( Boolean ),
+        [ current_chapter_sentences, translations ]
+    )
 
     // --- Render helpers ---
 
@@ -687,6 +697,12 @@ export default function ReaderPage() {
                 && <ChapterError>This chapter has no translatable text content.</ChapterError> }
 
         </ReadingArea>
+
+        { language_chosen && <ReaderVocabularyPanel
+            translated_texts={ current_chapter_translations }
+            source_language={ source_language }
+            target_language={ last_language }
+        /> }
 
         <BottomBar>
             <StatusRow>
