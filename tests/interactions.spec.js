@@ -175,7 +175,7 @@ test.describe( `Sentence Interactions`, () => {
 
         await page.setViewportSize( { width: 1280, height: 900 } )
 
-        const translated_sentence = `alpha alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi omicron pi rho sigma tau`
+        const translated_sentence = `猫が猫を見た。犬が走る。猫は寝る。 alpha alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi omicron pi rho sigma tau`
 
         await page.route( CHAT_URL, async route => {
             const body = JSON.parse( route.request().postData() )
@@ -215,17 +215,25 @@ test.describe( `Sentence Interactions`, () => {
         await page.setViewportSize( { width: 1280, height: 500 } )
         await expect( page.getByText( /alpha alpha beta/ ).first() ).toBeVisible( { timeout: 15_000 } )
 
+        const panel = page.locator( `#reader-vocabulary-panel` )
+        await expect( panel ).toHaveAttribute( `aria-hidden`, `true` )
+        await expect( panel ).toHaveAttribute( `inert`, `` )
+
         await page.getByRole( `button`, { name: `Expand vocabulary list` } ).click()
 
         const rows = page.locator( `[data-reader-vocabulary-row]` )
         await expect.poll( () => rows.count() ).toBe( 7 )
-        await expect( rows.first() ).toContainText( /alpha - source:alpha \(\d+x\)/, { timeout: 5000 } )
+        await expect( panel ).toHaveAttribute( `aria-hidden`, `false` )
+        await expect( panel ).not.toHaveAttribute( `inert`, `` )
+        await expect( rows.first() ).toContainText( /猫 - source:猫 \(\d+x\)/, { timeout: 5000 } )
 
         await page.setViewportSize( { width: 1280, height: 900 } )
 
         await expect.poll( () => rows.count() ).toBe( 18 )
         await page.getByRole( `button`, { name: `Collapse vocabulary list` } ).click()
         await expect( page.getByRole( `button`, { name: `Expand vocabulary list` } ) ).toBeVisible()
+        await expect( panel ).toHaveAttribute( `aria-hidden`, `true` )
+        await expect( panel ).toHaveAttribute( `inert`, `` )
 
     } )
 

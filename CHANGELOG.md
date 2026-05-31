@@ -3,7 +3,10 @@
 ## [1.15.0] - 2026-05-31
 
 ### Added
-- Add reader vocabulary panel with viewport-sized word list (uncommitted)
+- Add reader vocabulary panel with viewport-sized, segmenter-backed word list (uncommitted)
+
+### Fixed
+- Hide collapsed reader vocabulary panel from assistive technology (uncommitted)
 
 ## [1.14.0] - 2026-05-31
 

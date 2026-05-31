@@ -8,6 +8,7 @@ const ROW_HEIGHT_PX = 36
 const RESERVED_VIEWPORT_HEIGHT_PX = 240
 const MIN_WORD_COUNT = 4
 const MAX_WORD_COUNT = 28
+const PANEL_ID = `reader-vocabulary-panel`
 
 const ToggleButton = styled.button`
     position: fixed;
@@ -108,10 +109,31 @@ const count_limit_for_height = ( viewport_height ) => {
 
 }
 
+const segment_target_words = ( text ) => {
+
+    const visible_text = String( text || `` )
+    if( !visible_text.trim() ) return []
+
+    if( typeof Intl !== `undefined` && Intl.Segmenter ) {
+        try {
+            const segmenter = new Intl.Segmenter( undefined, { granularity: `word` } )
+
+            return Array.from( segmenter.segment( visible_text ) )
+                .filter( segment => segment.isWordLike )
+                .map( segment => segment.segment )
+        } catch {
+            // Some runtimes expose Segmenter but reject the requested granularity.
+        }
+    }
+
+    return visible_text.split( /\s+/ )
+
+}
+
 const count_target_words = ( translated_texts, limit ) => {
 
     const word_counts = translated_texts
-        .flatMap( text => String( text || `` ).split( /\s+/ ) )
+        .flatMap( segment_target_words )
         .map( clean_lookup_word )
         .filter( Boolean )
         .reduce( ( counts, word ) => {
@@ -189,11 +211,18 @@ export default function ReaderVocabularyPanel( {
             onClick={ toggle_expanded }
             aria-label={ expanded ? `Collapse vocabulary list` : `Expand vocabulary list` }
             aria-expanded={ expanded }
+            aria-controls={ PANEL_ID }
         >
             { expanded ? <ChevronRight aria-hidden="true" /> : <ChevronLeft aria-hidden="true" /> }
         </ToggleButton>
 
-        <Panel $expanded={ expanded } aria-label="Common words">
+        <Panel
+            id={ PANEL_ID }
+            $expanded={ expanded }
+            aria-label="Common words"
+            aria-hidden={ !expanded }
+            inert={ !expanded }
+        >
             <WordList>
                 { words.map( ( { word, count } ) => {
                     const { content, loading } = get_lookup_state( word )
