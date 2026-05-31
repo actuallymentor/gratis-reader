@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.14.0] - 2026-05-31
+
+### Added
+- Add manual sentence re-translation from explanation modal (uncommitted)
+
+### Fixed
+- Retry failed sentence translations with backoff (uncommitted)
+
 ## [1.13.2] - 2026-05-31
 
 ### Fixed

@@ -191,6 +191,20 @@ export const get_translation = async ( cache_key ) => {
 }
 
 /**
+ * Deletes a cached translation by key
+ * @param {string} cache_key
+ */
+export const delete_translation = async ( cache_key ) => {
+    const db = await open_db()
+    return new Promise( ( resolve, reject ) => {
+        const tx = db.transaction( `translations`, `readwrite` )
+        tx.objectStore( `translations` ).delete( cache_key )
+        tx.oncomplete = () => resolve()
+        tx.onerror = () => reject( tx.error )
+    } )
+}
+
+/**
  * Saves a source-language meaning for an adapted translated sentence.
  * @param {Object} entry - { key, translated, meaning, source_language, target_language, level, created_at }
  */
@@ -216,6 +230,20 @@ export const get_sentence_meaning = async ( cache_key ) => {
         const request = tx.objectStore( `meanings` ).get( cache_key )
         request.onsuccess = () => resolve( request.result?.meaning || null )
         request.onerror = () => reject( request.error )
+    } )
+}
+
+/**
+ * Deletes a cached source-language meaning by key.
+ * @param {string} cache_key
+ */
+export const delete_sentence_meaning = async ( cache_key ) => {
+    const db = await open_db()
+    return new Promise( ( resolve, reject ) => {
+        const tx = db.transaction( `meanings`, `readwrite` )
+        tx.objectStore( `meanings` ).delete( cache_key )
+        tx.oncomplete = () => resolve()
+        tx.onerror = () => reject( tx.error )
     } )
 }
 

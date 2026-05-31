@@ -359,6 +359,7 @@ export default function ReaderPage() {
         meanings,
         meaning_errors,
         request_sentence_meaning,
+        retranslate_sentence,
         is_translating,
         token_usage
     } = use_translation( {
@@ -433,6 +434,22 @@ export default function ReaderPage() {
         suppress_swipe_ref.current = true
         set_explanation_data( data )
     }, [] )
+
+    const handle_retranslate_sentence = useCallback( async ( { sentence_id } ) => {
+        const result = await retranslate_sentence( { sentence_id } )
+        if( !result ) return null
+
+        set_explanation_data( current => {
+            if( current?.sentence_id !== sentence_id ) return current
+            return {
+                ...current,
+                translated: result.translated,
+                refresh_key: ( current.refresh_key || 0 ) + 1
+            }
+        } )
+
+        return result
+    }, [ retranslate_sentence ] )
 
     // Swipe navigation for mobile
     const touch_start_ref = useRef( null )
@@ -701,10 +718,13 @@ export default function ReaderPage() {
 
         { /* Explanation Popover */ }
         { explanation_data && <ExplanationPopover
+            sentence_id={ explanation_data.sentence_id }
             original={ explanation_data.original }
             translated={ explanation_data.translated }
+            refresh_key={ explanation_data.refresh_key || 0 }
             source_language={ source_language }
             target_language={ last_language }
+            on_retranslate={ handle_retranslate_sentence }
             on_close={ () => set_explanation_data( null ) }
         /> }
 

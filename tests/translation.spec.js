@@ -1,6 +1,8 @@
 import { test, expect } from '@playwright/test'
 import { setup_api_key, upload_demo_book, mock_openrouter, clear_storage } from './helpers/setup.js'
 
+const CHAT_URL = `**/openrouter.ai/api/v1/chat/completions`
+
 test.describe( `Translation (mocked)`, () => {
 
     test.beforeEach( async ( { page } ) => {
@@ -32,6 +34,46 @@ test.describe( `Translation (mocked)`, () => {
 
         // Wait for translations to appear — mocked translations start with [TRANSLATED]
         await expect( page.getByText( /\[TRANSLATED\]/ ).first() ).toBeVisible( { timeout: 15_000 } )
+
+    } )
+
+    test( `retries failed sentence translations periodically`, async ( { page } ) => {
+
+        const attempts_by_sentence = {}
+
+        await page.route( CHAT_URL, async route => {
+            const body = JSON.parse( route.request().postData() )
+            const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
+            const sentence_match = user_msg.match( /Translate this sentence:\n(.+)/s )
+            const sentence = sentence_match ? sentence_match[1].trim() : `unknown`
+
+            attempts_by_sentence[sentence] = ( attempts_by_sentence[sentence] || 0 ) + 1
+
+            if( attempts_by_sentence[sentence] === 1 ) {
+                await route.fulfill( { status: 500, body: `Temporary translation failure` } )
+                return
+            }
+
+            await route.fulfill( {
+                contentType: `application/json`,
+                body: JSON.stringify( {
+                    choices: [ { message: { content: `[RETRIED] ${ sentence }` } } ],
+                    usage: { prompt_tokens: 25, completion_tokens: 15, total_tokens: 40 }
+                } )
+            } )
+        } )
+
+        await page.locator( `img[alt]` ).first().click()
+        await page.waitForURL( /\/read\// )
+
+        const start_btn = page.getByRole( `button`, { name: `Start Reading` } )
+        try {
+            await start_btn.waitFor( { state: `visible`, timeout: 3000 } )
+            await start_btn.click()
+        } catch { /* modal not shown */ }
+
+        await expect( page.getByText( /\[RETRIED\]/ ).first() ).toBeVisible( { timeout: 20_000 } )
+        expect( Object.values( attempts_by_sentence ).some( attempts => attempts > 1 ) ).toBe( true )
 
     } )
 

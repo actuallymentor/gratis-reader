@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import styled from 'styled-components'
 import { marked } from 'marked'
+import { RotateCw } from 'lucide-react'
 import { chat_completion } from '../../modules/open_router.js'
 import { build_explanation_prompt, DEFAULT_LEVEL, LEVELS } from '../../modules/prompts.js'
 import { use_settings_store } from '../../stores/settings_store.js'
@@ -81,6 +82,14 @@ const Header = styled.div`
     justify-content: space-between;
     align-items: center;
     margin-bottom: var(--space-l);
+    gap: var(--space-m);
+`
+
+const TitleRow = styled.div`
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    min-width: 0;
 `
 
 const Title = styled.h3`
@@ -88,11 +97,17 @@ const Title = styled.h3`
     color: var(--text);
 `
 
-const CloseButton = styled.button`
+const HeaderActions = styled.div`
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    flex-shrink: 0;
+`
+
+const IconButton = styled.button`
     background: none;
     border: none;
     color: var(--text-muted);
-    font-size: 1.5em;
     line-height: 1;
     padding: var(--space-xs);
     min-width: 44px;
@@ -106,6 +121,15 @@ const CloseButton = styled.button`
         background: var(--bg-hover);
         color: var(--text);
     }
+
+    &:disabled {
+        cursor: wait;
+        opacity: 0.55;
+    }
+`
+
+const CloseButton = styled( IconButton )`
+    font-size: 1.5em;
 `
 
 const SentenceBlock = styled.div`
@@ -309,14 +333,27 @@ const decorate_explanation_html = ( html, translated_words ) => {
  * @param {Object} props
  * @param {string} props.original
  * @param {string} props.translated
+ * @param {number} props.refresh_key
  * @param {string} props.source_language
  * @param {string} props.target_language
+ * @param {string} props.sentence_id
+ * @param {Function} [props.on_retranslate]
  * @param {Function} props.on_close
  */
-export default function ExplanationPopover( { original, translated, source_language, target_language, on_close } ) {
+export default function ExplanationPopover( {
+    original,
+    translated,
+    refresh_key = 0,
+    source_language,
+    target_language,
+    sentence_id,
+    on_retranslate,
+    on_close
+} ) {
 
     const [ explanation, set_explanation ] = useState( null )
     const [ loading, set_loading ] = useState( true )
+    const [ retranslating, set_retranslating ] = useState( false )
     const [ explanation_tooltips, set_explanation_tooltips ] = useState( {} )
     const explanation_ref = useRef( null )
     const panel_ref = useRef( null )
@@ -349,6 +386,26 @@ export default function ExplanationPopover( { original, translated, source_langu
     )
     const decorated_inner_html = useMemo( () => ( { __html: decorated_html } ), [ decorated_html ] )
 
+    const retranslate = useCallback( async () => {
+        if( !on_retranslate || retranslating ) return
+        if( !window.confirm( `Do you want to re-translate this sentence?` ) ) return
+
+        set_retranslating( true )
+        set_loading( true )
+        set_explanation( null )
+        set_explanation_tooltips( {} )
+
+        try {
+            const result = await on_retranslate( { sentence_id } )
+            if( !result ) {
+                set_explanation( `Failed to re-translate sentence. Please try again.` )
+                set_loading( false )
+            }
+        } finally {
+            set_retranslating( false )
+        }
+    }, [ on_retranslate, retranslating, sentence_id ] )
+
     const dismiss_explanation_tooltip = useCallback( ( tooltip_key ) => {
         set_explanation_tooltips( tooltips => {
             if( !tooltips[tooltip_key] ) return tooltips
@@ -364,6 +421,8 @@ export default function ExplanationPopover( { original, translated, source_langu
 
         let cancelled = false
         const controller = new AbortController()
+        set_loading( true )
+        set_explanation( null )
 
         const fetch_explanation = async () => {
             try {
@@ -397,7 +456,7 @@ export default function ExplanationPopover( { original, translated, source_langu
             controller.abort()
         }
 
-    }, [ original, translated, source_language, target_language, api_key, model, level_info ] )
+    }, [ original, translated, refresh_key, source_language, target_language, api_key, model, level_info ] )
 
     const show_explanation_tooltip = useCallback( ( e ) => {
         const is_keyboard_activation = e.type === `keydown`
@@ -476,8 +535,20 @@ export default function ExplanationPopover( { original, translated, source_langu
         <Panel ref={ panel_ref }>
 
             <Header>
-                <Title>Translation Explanation</Title>
-                <CloseButton onClick={ on_close } aria-label="Close">×</CloseButton>
+                <TitleRow>
+                    <Title>Translation Explanation</Title>
+                    <IconButton
+                        type="button"
+                        onClick={ retranslate }
+                        aria-label="Re-translate sentence"
+                        disabled={ retranslating || !on_retranslate }
+                    >
+                        <RotateCw size={ 18 } aria-hidden="true" />
+                    </IconButton>
+                </TitleRow>
+                <HeaderActions>
+                    <CloseButton onClick={ on_close } aria-label="Close">×</CloseButton>
+                </HeaderActions>
             </Header>
 
             <SentenceBlock>

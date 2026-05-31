@@ -285,6 +285,107 @@ test.describe( `Sentence Interactions`, () => {
 
     } )
 
+    test( `retranslate icon confirms before refreshing the sentence and explanation`, async ( { page } ) => {
+
+        const attempts_by_sentence = {}
+
+        await page.route( CHAT_URL, async route => {
+            const body = JSON.parse( route.request().postData() )
+            const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
+            const is_explanation = user_msg.includes( `Explain this translation` )
+            const is_word_lookup = user_msg.includes( `Word:` )
+            const is_sentence_meaning = user_msg.includes( `Adapted translation:` )
+
+            if( is_explanation ) {
+                const translation_match = user_msg.match( /Translation: "(.+?)"/s )
+                const translation = translation_match ? translation_match[1] : `unknown`
+
+                await route.fulfill( {
+                    contentType: `application/json`,
+                    body: JSON.stringify( {
+                        choices: [ { message: { content: `Explanation for ${ translation }.` } } ]
+                    } )
+                } )
+                return
+            }
+
+            if( is_word_lookup ) {
+                await route.fulfill( {
+                    contentType: `application/json`,
+                    body: JSON.stringify( {
+                        choices: [ { message: { content: `[WORD] definition of the word` } } ]
+                    } )
+                } )
+                return
+            }
+
+            if( is_sentence_meaning ) {
+                await route.fulfill( {
+                    contentType: `application/json`,
+                    body: JSON.stringify( {
+                        choices: [ { message: { content: `[MEANING] sentence meaning` } } ]
+                    } )
+                } )
+                return
+            }
+
+            const sentence_match = user_msg.match( /Translate this sentence:\n(.+)/s )
+            const sentence = sentence_match ? sentence_match[1].trim() : `unknown`
+            attempts_by_sentence[sentence] = ( attempts_by_sentence[sentence] || 0 ) + 1
+
+            await route.fulfill( {
+                contentType: `application/json`,
+                body: JSON.stringify( {
+                    choices: [ { message: { content: `[TRANSLATED:${ attempts_by_sentence[sentence] }] ${ sentence }` } } ],
+                    usage: { prompt_tokens: 25, completion_tokens: 15, total_tokens: 40 }
+                } )
+            } )
+        } )
+
+        await page.locator( `img[alt]` ).first().click()
+        await page.waitForURL( /\/read\// )
+
+        const start_btn = page.getByRole( `button`, { name: `Start Reading` } )
+        try {
+            await start_btn.waitFor( { state: `visible`, timeout: 3000 } )
+            await start_btn.click()
+        } catch { /* modal not shown */ }
+
+        const sentence = page.locator( `span[data-sentence-id]` ).first()
+        await expect( sentence ).toContainText( `[TRANSLATED:1]`, { timeout: 15_000 } )
+
+        await sentence.click( { button: `right` } )
+
+        const dialog = page.getByRole( `dialog`, { name: `Translation Explanation` } )
+        await expect( dialog ).toBeVisible( { timeout: 5000 } )
+        await expect( dialog.getByText( /Explanation for \[TRANSLATED:1\]/ ).first() ).toBeVisible( { timeout: 5000 } )
+
+        const retranslate_button = dialog.getByRole( `button`, { name: `Re-translate sentence` } )
+
+        page.once( `dialog`, async confirm_dialog => {
+            expect( confirm_dialog.message() ).toBe( `Do you want to re-translate this sentence?` )
+            await confirm_dialog.dismiss()
+        } )
+
+        await retranslate_button.click()
+        await page.waitForTimeout( 500 )
+
+        await expect( sentence ).toContainText( `[TRANSLATED:1]` )
+        await expect( sentence ).not.toContainText( `[TRANSLATED:2]` )
+
+        page.once( `dialog`, async confirm_dialog => {
+            expect( confirm_dialog.message() ).toBe( `Do you want to re-translate this sentence?` )
+            await confirm_dialog.accept()
+        } )
+
+        await retranslate_button.click()
+
+        await expect( sentence ).toContainText( `[TRANSLATED:2]`, { timeout: 10_000 } )
+        await expect( dialog ).toContainText( `[TRANSLATED:2]`, { timeout: 10_000 } )
+        await expect( dialog.getByText( /Explanation for \[TRANSLATED:2\]/ ).first() ).toBeVisible( { timeout: 10_000 } )
+
+    } )
+
     test( `popover closes on outside click`, async ( { page } ) => {
 
         await enter_reader_with_translations( page )
