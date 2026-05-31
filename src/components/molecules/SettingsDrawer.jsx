@@ -214,6 +214,13 @@ const ValidationStatus = styled.p`
     margin-top: var(--space-xs);
 `
 
+const VersionLine = styled.p`
+    color: var(--text-muted);
+    font-size: 0.75em;
+    margin-top: var(--space-xl);
+    text-align: center;
+`
+
 const FONT_OPTIONS = [
     `Nunito`,
     `Georgia`,
@@ -222,6 +229,7 @@ const FONT_OPTIONS = [
 ]
 
 const FORCE_UPDATE_BUSY_RESET_MS = 2_000
+const APP_VERSION = import.meta.env.VITE_COMMIT_HASH || `unknown`
 
 /**
  * Settings drawer — slides in from the right
@@ -475,6 +483,8 @@ export default function SettingsDrawer( { is_open, on_close, show_language = tru
                     Remove API Key
                 </DangerBtn>
             </Section>
+
+            <VersionLine>Version: { APP_VERSION }</VersionLine>
 
         </Drawer>
     </>

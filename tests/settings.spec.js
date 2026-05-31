@@ -1,5 +1,20 @@
 import { test, expect } from '@playwright/test'
+import { execSync } from 'node:child_process'
 import { setup_api_key, upload_demo_book, mock_openrouter, clear_storage } from './helpers/setup.js'
+
+const expected_commit_hash = () => {
+
+    const environment_commit = [
+        process.env.CF_PAGES_COMMIT_SHA,
+        process.env.GITHUB_SHA,
+        process.env.COMMIT_REF,
+        process.env.COMMIT_SHA
+    ].find( Boolean )
+
+    if( environment_commit ) return environment_commit.slice( 0, 12 )
+    return execSync( `git rev-parse --short=12 HEAD`, { encoding: `utf8` } ).trim()
+
+}
 
 test.describe( `Settings`, () => {
 
@@ -147,6 +162,15 @@ test.describe( `Settings`, () => {
 
         await expect( page.getByText( `APP UPDATE` ) ).toBeVisible()
         await expect( page.getByRole( `button`, { name: `Force Update` } ) ).toBeVisible()
+
+    } )
+
+    test( `settings shows build commit hash`, async ( { page } ) => {
+
+        await page.goto( `/library` )
+        await page.getByRole( `button`, { name: `Settings` } ).click()
+
+        await expect( page.getByText( `Version: ${ expected_commit_hash() }` ) ).toBeVisible()
 
     } )
 

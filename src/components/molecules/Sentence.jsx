@@ -5,6 +5,8 @@ import WordTooltipText from './WordTooltipText.jsx'
 
 const LONG_PRESS_MS = 600
 const PRESS_MOVE_CANCEL_PX = 12
+const CONTEXT_MENU_BLOCK_MS = 1_200
+const TOUCH_CONTEXT_MENU_BLOCK_MS = LONG_PRESS_MS + CONTEXT_MENU_BLOCK_MS
 
 const SentenceSpan = styled.span`
     position: relative;
@@ -65,6 +67,12 @@ const event_point = ( e ) => {
     if( Number.isFinite( x ) && Number.isFinite( y ) ) return { x, y }
     return null
 }
+
+const is_touch_context_menu = ( e ) => 
+    e.pointerType === `touch`
+    || e.nativeEvent?.pointerType === `touch`
+    || e.nativeEvent?.sourceCapabilities?.firesTouchEvents
+
 
 /**
  * Interactive sentence — click words for tooltip, long-press for source-language meaning and explanation access.
@@ -143,12 +151,21 @@ export default function Sentence( {
         const point = event_point( e )
         if( !point ) return
 
+        // Mobile browsers can synthesize contextmenu before our long-press timer
+        // fires, so touch presses block that route immediately.
+        if( e.type === `touchstart` ) {
+            context_menu_blocked_until_ref.current = Date.now() + TOUCH_CONTEXT_MENU_BLOCK_MS
+        }
+
         press_started_at_ref.current = Date.now()
         press_start_point_ref.current = point
 
         if( translated ) {
             explanation_timer_ref.current = setTimeout( () => {
-                context_menu_blocked_until_ref.current = Date.now() + 1200
+                context_menu_blocked_until_ref.current = Math.max(
+                    context_menu_blocked_until_ref.current,
+                    Date.now() + CONTEXT_MENU_BLOCK_MS
+                )
                 toggle_meaning_prompt()
             }, LONG_PRESS_MS )
         }
@@ -192,7 +209,7 @@ export default function Sentence( {
     }, [] )
 
     const handle_context_menu = useCallback( ( e ) => {
-        if( Date.now() < context_menu_blocked_until_ref.current ) {
+        if( is_touch_context_menu( e ) || Date.now() < context_menu_blocked_until_ref.current ) {
             e.preventDefault()
             return
         }

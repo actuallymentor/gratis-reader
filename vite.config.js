@@ -1,6 +1,28 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+import { execSync } from 'node:child_process'
+
+const build_commit_hash = () => {
+
+    const environment_commit = [
+        process.env.CF_PAGES_COMMIT_SHA,
+        process.env.GITHUB_SHA,
+        process.env.COMMIT_REF,
+        process.env.COMMIT_SHA
+    ].find( Boolean )
+
+    if( environment_commit ) return environment_commit.slice( 0, 12 )
+
+    try {
+        return execSync( `git rev-parse --short=12 HEAD`, { encoding: `utf8` } ).trim()
+    } catch {
+        return `unknown`
+    }
+
+}
+
+const commit_hash = build_commit_hash()
 
 export default defineConfig( {
 
@@ -47,7 +69,8 @@ export default defineConfig( {
     server: { port: 5173 },
 
     define: {
-        'process.env': {}
+        'process.env': {},
+        'import.meta.env.VITE_COMMIT_HASH': JSON.stringify( commit_hash )
     }
 
 } )

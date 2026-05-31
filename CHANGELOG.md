@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.16.0] - 2026-05-31
+
+### Added
+- Show the build commit hash in settings (uncommitted)
+
+### Fixed
+- Keep touch long-press from opening explanations directly (uncommitted)
+
 ## [1.15.0] - 2026-05-31
 
 ### Added
