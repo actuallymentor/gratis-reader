@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import styled from 'styled-components'
 import { useRegisterSW as use_register_sw } from 'virtual:pwa-register/react'
 import { log } from 'mentie'
@@ -6,6 +6,17 @@ import { log } from 'mentie'
 export const PWA_UPDATE_BADGE_TEXT = `New version available, click here to update`
 export const PWA_UPDATING_STATUS_TEXT = `Updating...`
 export const PWA_UPDATE_RELOAD_FALLBACK_MS = 8_000
+export const PWA_UPDATE_CHECK_INTERVAL_MS = 30 * 60 * 1_000
+
+const page_was_reloaded = () => {
+
+    if( typeof performance === `undefined` ) return false
+    if( typeof performance.getEntriesByType !== `function` ) return false
+
+    const [ navigation ] = performance.getEntriesByType( `navigation` )
+    return navigation?.type === `reload`
+
+}
 
 const BadgeButton = styled.button`
     position: fixed;
@@ -95,30 +106,75 @@ export function PWAUpdatePrompt( { need_refresh, updating, update_app } ) {
  * @param {Function} [props.register_sw_hook]
  * @param {Function} [props.reload_app]
  * @param {number} [props.reload_fallback_ms]
+ * @param {number} [props.update_check_interval_ms]
+ * @param {Function} [props.should_apply_waiting_update]
  * @returns {JSX.Element|null}
  */
 export default function PWAUpdateBadge( {
     register_sw_hook = use_register_sw,
     reload_app = () => window.location.reload(),
-    reload_fallback_ms = PWA_UPDATE_RELOAD_FALLBACK_MS
+    reload_fallback_ms = PWA_UPDATE_RELOAD_FALLBACK_MS,
+    update_check_interval_ms = PWA_UPDATE_CHECK_INTERVAL_MS,
+    should_apply_waiting_update = page_was_reloaded
 } = {} ) {
 
     const [ updating, set_updating ] = useState( false )
     const reload_timer_ref = useRef( null )
+    const update_checks_cleanup_ref = useRef( null )
+    const applied_reload_update_ref = useRef( false )
+
+    const clear_reload_fallback = useCallback( () => {
+        if( !reload_timer_ref.current ) return
+        clearTimeout( reload_timer_ref.current )
+        reload_timer_ref.current = null
+    }, [] )
+
+    const check_registration_for_update = useCallback( registration => {
+
+        if( !registration?.update ) return
+
+        registration.update().catch( error => {
+            log.error( `Could not check service worker update:`, error )
+        } )
+
+    }, [] )
+
+    const schedule_update_checks = useCallback( registration => {
+
+        update_checks_cleanup_ref.current?.()
+        update_checks_cleanup_ref.current = null
+
+        if( !registration?.update ) return
+
+        const check_when_visible = () => {
+            if( document.hidden ) return
+            check_registration_for_update( registration )
+        }
+
+        const interval_id = setInterval( check_when_visible, update_check_interval_ms )
+        window.addEventListener( `focus`, check_when_visible )
+        document.addEventListener( `visibilitychange`, check_when_visible )
+        check_when_visible()
+
+        update_checks_cleanup_ref.current = () => {
+            clearInterval( interval_id )
+            window.removeEventListener( `focus`, check_when_visible )
+            document.removeEventListener( `visibilitychange`, check_when_visible )
+        }
+
+    }, [ check_registration_for_update, update_check_interval_ms ] )
+
     const {
         needRefresh: [ need_refresh ],
         updateServiceWorker
     } = register_sw_hook( {
+        onRegisteredSW: ( _sw_script_url, registration ) => {
+            schedule_update_checks( registration )
+        },
         onRegisterError: error => log.error( `Could not register service worker:`, error )
     } )
 
-    const clear_reload_fallback = () => {
-        if( !reload_timer_ref.current ) return
-        clearTimeout( reload_timer_ref.current )
-        reload_timer_ref.current = null
-    }
-
-    const update_app = async () => {
+    const update_app = useCallback( async () => {
 
         set_updating( true )
         clear_reload_fallback()
@@ -137,9 +193,24 @@ export default function PWAUpdateBadge( {
             set_updating( false )
         }
 
-    }
+    }, [ clear_reload_fallback, reload_app, reload_fallback_ms, updateServiceWorker ] )
 
-    useEffect( () => clear_reload_fallback, [] )
+    useEffect( () => {
+
+        if( !need_refresh ) return
+        if( updating ) return
+        if( applied_reload_update_ref.current ) return
+        if( !should_apply_waiting_update() ) return
+
+        applied_reload_update_ref.current = true
+        update_app()
+
+    }, [ need_refresh, should_apply_waiting_update, update_app, updating ] )
+
+    useEffect( () => () => {
+        clear_reload_fallback()
+        update_checks_cleanup_ref.current?.()
+    }, [ clear_reload_fallback ] )
 
     return <PWAUpdatePrompt
         need_refresh={ need_refresh }

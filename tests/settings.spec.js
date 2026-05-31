@@ -140,6 +140,16 @@ test.describe( `Settings`, () => {
 
     } )
 
+    test( `settings exposes force update fallback`, async ( { page } ) => {
+
+        await page.goto( `/library` )
+        await page.getByRole( `button`, { name: `Settings` } ).click()
+
+        await expect( page.getByText( `APP UPDATE` ) ).toBeVisible()
+        await expect( page.getByRole( `button`, { name: `Force Update` } ) ).toBeVisible()
+
+    } )
+
     test( `remove API key returns to onboarding`, async ( { page } ) => {
 
         await page.goto( `/library` )

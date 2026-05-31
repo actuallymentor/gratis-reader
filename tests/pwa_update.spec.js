@@ -57,6 +57,28 @@ test.describe( `PWA updates`, () => {
 
     } )
 
+    test( `reloads can automatically apply a waiting service worker`, async ( { page } ) => {
+
+        await mount_update_badge( page, {
+            need_refresh: true,
+            reload_fallback_ms: 500,
+            update_waiting_on_reload: true
+        } )
+
+        await expect( page.getByRole( `button`, { name: `Updating...` } ) ).toBeDisabled()
+        await expect.poll( () => page.evaluate( () => window.__pwa_update_test.update_calls ) ).toBe( 1 )
+        await expect.poll( () => page.evaluate( () => window.__pwa_update_test.reloads ) ).toBe( 1 )
+
+    } )
+
+    test( `registration checks for service worker updates after mounting`, async ( { page } ) => {
+
+        await mount_update_badge( page, { need_refresh: false } )
+
+        await expect.poll( () => page.evaluate( () => window.__pwa_update_test.registration_update_calls ) ).toBe( 1 )
+
+    } )
+
     test( `failed service worker update re-enables the badge`, async ( { page } ) => {
 
         await page.evaluate( () => {
@@ -70,6 +92,123 @@ test.describe( `PWA updates`, () => {
         await expect.poll( () => page.evaluate( () => window.__pwa_update_test.update_calls ) ).toBe( 1 )
         await expect( update_button ).toBeEnabled()
         await expect.poll( () => page.evaluate( () => window.__pwa_update_test.reloads ) ).toBe( 0 )
+
+    } )
+
+    test( `force update activates a waiting service worker`, async ( { page } ) => {
+
+        await page.evaluate( async () => {
+            const calls = {
+                cache_deletes: [],
+                messages: [],
+                reloads: 0,
+                unregisters: 0,
+                updates: 0
+            }
+            const waiting_worker = {
+                postMessage: message => calls.messages.push( message )
+            }
+            const registration = {
+                waiting: waiting_worker,
+                update: async () => {
+                    calls.updates += 1
+                },
+                unregister: async () => {
+                    calls.unregisters += 1
+                }
+            }
+
+            Object.defineProperty( Navigator.prototype, `serviceWorker`, {
+                configurable: true,
+                get: () => ( {
+                    getRegistrations: async () => [ registration ]
+                } )
+            } )
+            Object.defineProperty( window, `caches`, {
+                configurable: true,
+                value: {
+                    keys: async () => [ `workbox-precache` ],
+                    delete: async cache_name => {
+                        calls.cache_deletes.push( cache_name )
+                        return true
+                    }
+                }
+            } )
+
+            const { force_pwa_update } = await import( `/src/modules/pwa_update.js` )
+            const result = await force_pwa_update( {
+                reload_app: () => {
+                    calls.reloads += 1
+                },
+                reload_delay_ms: 0
+            } )
+
+            await new Promise( resolve => setTimeout( resolve, 0 ) )
+            window.__force_pwa_update_test = { calls, result }
+        } )
+
+        const { calls, result } = await page.evaluate( () => window.__force_pwa_update_test )
+        expect( result.mode ).toBe( `waiting` )
+        expect( calls.updates ).toBe( 1 )
+        expect( calls.messages ).toEqual( [ { type: `SKIP_WAITING` } ] )
+        expect( calls.unregisters ).toBe( 0 )
+        expect( calls.cache_deletes ).toEqual( [] )
+        expect( calls.reloads ).toBe( 1 )
+
+    } )
+
+    test( `force update resets app shell caches when no worker is waiting`, async ( { page } ) => {
+
+        await page.evaluate( async () => {
+            const calls = {
+                cache_deletes: [],
+                reloads: 0,
+                unregisters: 0,
+                updates: 0
+            }
+            const registration = {
+                waiting: null,
+                update: async () => {
+                    calls.updates += 1
+                },
+                unregister: async () => {
+                    calls.unregisters += 1
+                }
+            }
+
+            Object.defineProperty( Navigator.prototype, `serviceWorker`, {
+                configurable: true,
+                get: () => ( {
+                    getRegistrations: async () => [ registration ]
+                } )
+            } )
+            Object.defineProperty( window, `caches`, {
+                configurable: true,
+                value: {
+                    keys: async () => [ `workbox-precache`, `google-fonts-webfonts` ],
+                    delete: async cache_name => {
+                        calls.cache_deletes.push( cache_name )
+                        return true
+                    }
+                }
+            } )
+
+            const { force_pwa_update } = await import( `/src/modules/pwa_update.js` )
+            const result = await force_pwa_update( {
+                reload_app: () => {
+                    calls.reloads += 1
+                }
+            } )
+
+            window.__force_pwa_update_test = { calls, result }
+        } )
+
+        const { calls, result } = await page.evaluate( () => window.__force_pwa_update_test )
+        expect( result.mode ).toBe( `reset` )
+        expect( calls.updates ).toBe( 1 )
+        expect( calls.unregisters ).toBe( 1 )
+        expect( calls.cache_deletes ).toEqual( [ `workbox-precache`, `google-fonts-webfonts` ] )
+        expect( calls.reloads ).toBe( 1 )
 
     } )
 

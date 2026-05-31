@@ -77,7 +77,7 @@ test.describe( `Pass 37 — Settings key update resilience`, () => {
         await page.waitForTimeout( 300 )
 
         // Click Update to enter edit mode
-        await page.getByRole( `button`, { name: `Update` } ).click()
+        await page.getByRole( `button`, { name: `Update`, exact: true } ).click()
         await page.waitForTimeout( 200 )
 
         // Type spaces and click Save
@@ -94,7 +94,7 @@ test.describe( `Pass 37 — Settings key update resilience`, () => {
         await page.getByRole( `button`, { name: `Settings` } ).click()
         await page.waitForTimeout( 300 )
 
-        await page.getByRole( `button`, { name: `Update` } ).click()
+        await page.getByRole( `button`, { name: `Update`, exact: true } ).click()
         await page.waitForTimeout( 200 )
 
         // Now route auth to fail BEFORE typing the key
@@ -113,7 +113,7 @@ test.describe( `Pass 37 — Settings key update resilience`, () => {
         await page.getByRole( `button`, { name: `Settings` } ).click()
         await page.waitForTimeout( 300 )
 
-        await page.getByRole( `button`, { name: `Update` } ).click()
+        await page.getByRole( `button`, { name: `Update`, exact: true } ).click()
         await page.waitForTimeout( 200 )
 
         // Route auth to return 401
@@ -134,7 +134,7 @@ test.describe( `Pass 37 — Settings key update resilience`, () => {
         await page.getByRole( `button`, { name: `Settings` } ).click()
         await page.waitForTimeout( 300 )
 
-        await page.getByRole( `button`, { name: `Update` } ).click()
+        await page.getByRole( `button`, { name: `Update`, exact: true } ).click()
         await page.waitForTimeout( 200 )
 
         const input = page.locator( `input[placeholder="sk-or-..."]` )

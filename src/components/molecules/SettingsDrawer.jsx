@@ -6,6 +6,7 @@ import LevelPicker from './LevelPicker.jsx'
 import toast from 'react-hot-toast'
 import { clear_translations } from '../../modules/cache.js'
 import { validate_api_key } from '../../modules/open_router.js'
+import { force_pwa_update } from '../../modules/pwa_update.js'
 
 const Overlay = styled.div`
     position: fixed;
@@ -144,6 +145,24 @@ const DangerBtn = styled.button`
     &:hover { background: rgba(229, 62, 62, 0.1); }
 `
 
+const ActionBtn = styled.button`
+    width: 100%;
+    padding: var(--space-s) var(--space-m);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-s);
+    background: var(--bg);
+    color: var(--text);
+    font-size: 0.85em;
+    min-height: 44px;
+
+    &:hover:not(:disabled) { background: var(--bg-hover); }
+
+    &:disabled {
+        opacity: 0.6;
+        cursor: wait;
+    }
+`
+
 const KeyRow = styled.div`
     display: flex;
     align-items: center;
@@ -225,6 +244,7 @@ export default function SettingsDrawer( { is_open, on_close, show_language = tru
     const [ editing_key, set_editing_key ] = useState( false )
     const [ key_draft, set_key_draft ] = useState( `` )
     const [ validating_key, set_validating_key ] = useState( false )
+    const [ forcing_update, set_forcing_update ] = useState( false )
 
     // Close on Escape
     useEffect( () => {
@@ -249,6 +269,20 @@ export default function SettingsDrawer( { is_open, on_close, show_language = tru
         if( window.confirm( `Remove your API key? You'll need to enter it again.` ) ) {
             clear_api_key()
         }
+    }
+
+    const handle_force_update = async () => {
+
+        set_forcing_update( true )
+
+        try {
+            await force_pwa_update()
+            toast.success( `Reloading latest app version...` )
+        } catch {
+            toast.error( `Could not force app update` )
+            set_forcing_update( false )
+        }
+
     }
 
     const cancel_key_edit = () => {
@@ -362,6 +396,13 @@ export default function SettingsDrawer( { is_open, on_close, show_language = tru
                 <DangerBtn onClick={ handle_clear_cache }>
                     Clear Translation Cache
                 </DangerBtn>
+            </Section>
+
+            <Section>
+                <Label>App Update</Label>
+                <ActionBtn onClick={ handle_force_update } disabled={ forcing_update }>
+                    { forcing_update ? `Forcing Update...` : `Force Update` }
+                </ActionBtn>
             </Section>
 
             <Section>

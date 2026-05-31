@@ -31,22 +31,35 @@ export const mount_update_prompt = ( { need_refresh = true, updating = false } =
  * @param {boolean} options.need_refresh
  * @param {boolean} options.reject_update
  * @param {number} options.reload_fallback_ms
+ * @param {boolean} options.update_waiting_on_reload
  */
 export const mount_update_badge = ( {
     need_refresh = true,
     reject_update = false,
-    reload_fallback_ms = 20
+    reload_fallback_ms = 20,
+    update_waiting_on_reload = false
 } = {} ) => {
 
     window.__pwa_update_test = {
         prompt_clicks: 0,
         update_calls: 0,
         reloads: 0,
-        register_errors: 0
+        register_errors: 0,
+        registration_update_calls: 0
     }
 
-    const register_sw_hook = ( { onRegisterError } = {} ) => {
+    const register_sw_hook = ( { onRegisteredSW, onRegisterError } = {} ) => {
         window.__pwa_update_test.register_errors += typeof onRegisterError === `function` ? 0 : 1
+
+        if( typeof onRegisteredSW === `function` ) {
+            setTimeout( () => {
+                onRegisteredSW( `/sw.js`, {
+                    update: async () => {
+                        window.__pwa_update_test.registration_update_calls += 1
+                    }
+                } )
+            }, 0 )
+        }
 
         return {
             needRefresh: [ need_refresh, () => {} ],
@@ -63,6 +76,7 @@ export const mount_update_badge = ( {
             window.__pwa_update_test.reloads += 1
         } }
         reload_fallback_ms={ reload_fallback_ms }
+        should_apply_waiting_update={ () => update_waiting_on_reload }
     /> )
 
 }

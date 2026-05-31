@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.13.1] - 2026-05-31
+
+### Fixed
+- Make stale PWA clients recover through reload and force update (uncommitted)
+
 ## [1.13.0] - 2026-05-29
 
 ### Changed
