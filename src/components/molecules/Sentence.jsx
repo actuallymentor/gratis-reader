@@ -23,6 +23,15 @@ const SentenceSpan = styled.span`
         background-color: var(--accent-light);
     ` }
 
+    ${ p => p.$pending_meaning && `
+        color: var(--text-muted);
+        text-decoration-line: underline;
+        text-decoration-style: dotted;
+        text-decoration-color: var(--accent-dark);
+        text-decoration-thickness: 0.08em;
+        text-underline-offset: 0.18em;
+    ` }
+
     ${ p => p.$is_skeleton && `
         cursor: default;
     ` }
@@ -114,8 +123,10 @@ export default function Sentence( {
     const showing_meaning_ref = useRef( false )
 
     const { showing_meaning, explain_visible } = sentence_focus
-    const meaning_text = meaning_error ? `Meaning unavailable` : meaning || `...`
-    const display_text = showing_meaning ? meaning_text : translated || original
+    const pending_meaning = showing_meaning && !meaning && !meaning_error
+    const meaning_text = meaning_error ? `Meaning unavailable` : meaning
+    const sentence_text = translated || original
+    const display_text = showing_meaning && !pending_meaning ? meaning_text : sentence_text
     const is_translated = !!translated && !showing_meaning
 
     const clear_explanation_timer = useCallback( () => {
@@ -300,6 +311,9 @@ export default function Sentence( {
     return <SentenceSpan
         data-sentence-id={ sentence_id }
         $highlighted={ showing_meaning }
+        $pending_meaning={ pending_meaning }
+        aria-busy={ pending_meaning }
+        data-meaning-pending={ pending_meaning ? `true` : undefined }
         onMouseDown={ handle_press_start }
         onMouseUp={ handle_press_end }
         onMouseMove={ handle_press_move }

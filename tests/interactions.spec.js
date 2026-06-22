@@ -275,6 +275,7 @@ test.describe( `Sentence Interactions`, () => {
                 content = `[WORD] definition of the word`
             } else if( is_sentence_meaning ) {
                 meaning_prompt = user_msg
+                await new Promise( resolve => setTimeout( resolve, 1000 ) )
                 content = source_meaning
             } else {
                 await new Promise( resolve => setTimeout( resolve, 250 ) )
@@ -309,7 +310,11 @@ test.describe( `Sentence Interactions`, () => {
 
         await long_press( page, sentence )
 
+        await expect( sentence ).toHaveAttribute( `data-meaning-pending`, `true` )
+        await expect( sentence ).toContainText( adapted_sentence )
+        await expect( sentence ).not.toContainText( `...` )
         await expect( sentence ).toContainText( source_meaning, { timeout: 5000 } )
+        await expect( sentence ).not.toHaveAttribute( `data-meaning-pending`, `true` )
         expect( meaning_prompt ).toContain( adapted_sentence )
         expect( meaning_prompt ).not.toContain( original_sentence )
         await expect( sentence ).not.toContainText( adapted_sentence )

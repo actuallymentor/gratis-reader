@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.16.2] - 2026-06-22
+
+### Fixed
+- Keep long-press meaning lookups from replacing sentences with ellipses
+
 ## [1.16.1] - 2026-06-22
 
 ### Fixed
