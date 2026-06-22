@@ -88,6 +88,56 @@ const dispatch_touch_context_menu_long_press = async ( locator ) => locator.eval
 
 } )
 
+const dispatch_cancelled_touch_context_menu_long_press = async ( locator ) => locator.evaluate( async el => {
+
+    const rect = el.getBoundingClientRect()
+    const x = rect.left + Math.min( 24, rect.width / 2 )
+    const y = rect.top + rect.height - 4
+    const touch = new Touch( { identifier: 1, target: el, clientX: x, clientY: y } )
+
+    el.dispatchEvent( new TouchEvent( `touchstart`, {
+        bubbles: true,
+        cancelable: true,
+        touches: [ touch ],
+        targetTouches: [ touch ],
+        changedTouches: [ touch ]
+    } ) )
+
+    await new Promise( resolve => setTimeout( resolve, 500 ) )
+
+    const context_menu_event = new PointerEvent( `contextmenu`, {
+        bubbles: true,
+        cancelable: true,
+        pointerType: `touch`,
+        clientX: x,
+        clientY: y,
+        button: 0
+    } )
+    const context_menu_dispatch_result = el.dispatchEvent( context_menu_event )
+
+    el.dispatchEvent( new TouchEvent( `touchcancel`, {
+        bubbles: true,
+        cancelable: true,
+        touches: [],
+        targetTouches: [],
+        changedTouches: [ touch ]
+    } ) )
+
+    el.dispatchEvent( new TouchEvent( `touchend`, {
+        bubbles: true,
+        cancelable: true,
+        changedTouches: [ touch ]
+    } ) )
+
+    await new Promise( resolve => setTimeout( resolve, 250 ) )
+
+    return {
+        context_menu_default_prevented: context_menu_event.defaultPrevented,
+        context_menu_dispatch_result
+    }
+
+} )
+
 test.describe( `Touch sentence interactions`, () => {
 
     test.use( {
@@ -126,6 +176,29 @@ test.describe( `Touch sentence interactions`, () => {
         await sentence.getByRole( `button`, { name: `Explain` } ).tap()
         await expect( page.getByRole( `dialog`, { name: `Translation Explanation` } ) ).toBeVisible()
         expect( calls.explanation ).toBeGreaterThanOrEqual( 1 )
+
+    } )
+
+    test( `touch long press survives Android touch cancellation`, async ( { page } ) => {
+
+        const translated_sentence = `Big work. Smart way.`
+        const source_meaning = `The simplified sentence survives native touch cancellation.`
+        const calls = { explanation: 0 }
+
+        await install_translation_mock( page, { translated_sentence, source_meaning, calls } )
+        await open_reader( page )
+
+        const sentence = page.locator( `span[data-sentence-id]` ).first()
+        await expect( sentence ).toContainText( translated_sentence, { timeout: 15_000 } )
+
+        const context_menu = await dispatch_cancelled_touch_context_menu_long_press( sentence )
+
+        expect( context_menu.context_menu_default_prevented ).toBe( true )
+        expect( context_menu.context_menu_dispatch_result ).toBe( false )
+        await expect( sentence ).toContainText( source_meaning, { timeout: 5000 } )
+        await expect( sentence.getByRole( `button`, { name: `Explain` } ) ).toBeVisible()
+        await expect( page.getByRole( `dialog`, { name: `Translation Explanation` } ) ).not.toBeVisible()
+        expect( calls.explanation ).toBe( 0 )
 
     } )
 

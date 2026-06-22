@@ -440,6 +440,11 @@ export default function ReaderPage() {
         set_explanation_data( data )
     }, [] )
 
+    const handle_reveal_sentence_meaning = useCallback( ( data ) => {
+        suppress_swipe_ref.current = true
+        request_sentence_meaning( data )
+    }, [ request_sentence_meaning ] )
+
     const handle_retranslate_sentence = useCallback( async ( { sentence_id } ) => {
         const result = await retranslate_sentence( { sentence_id } )
         if( !result ) return null
@@ -536,7 +541,7 @@ export default function ReaderPage() {
             meaning_error={ !!meaning_errors[sentence.id] }
             source_language={ source_language }
             target_language={ last_language }
-            on_reveal_meaning={ request_sentence_meaning }
+            on_reveal_meaning={ handle_reveal_sentence_meaning }
             on_long_press={ handle_long_press }
         />
     </Fragment>

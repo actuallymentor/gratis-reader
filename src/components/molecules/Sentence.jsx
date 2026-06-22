@@ -11,6 +11,10 @@ const TOUCH_CONTEXT_MENU_BLOCK_MS = LONG_PRESS_MS + CONTEXT_MENU_BLOCK_MS
 const SentenceSpan = styled.span`
     position: relative;
     cursor: pointer;
+    touch-action: manipulation;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
     transition: background-color 0.2s ease;
     border-radius: 2px;
     padding: 1px 0;
@@ -143,8 +147,29 @@ export default function Sentence( {
         } )
     }, [ sentence_id, translated, on_reveal_meaning ] )
 
+    const reveal_from_long_press = useCallback( () => {
+        context_menu_blocked_until_ref.current = Math.max(
+            context_menu_blocked_until_ref.current,
+            Date.now() + CONTEXT_MENU_BLOCK_MS
+        )
+        explanation_timer_ref.current = null
+        press_started_at_ref.current = null
+        press_start_point_ref.current = null
+        toggle_meaning_prompt()
+    }, [ toggle_meaning_prompt ] )
+
+    const schedule_long_press = useCallback( ( delay_ms ) => {
+        clear_explanation_timer()
+        explanation_timer_ref.current = setTimeout( reveal_from_long_press, delay_ms )
+    }, [ clear_explanation_timer, reveal_from_long_press ] )
+
     const handle_press_start = useCallback( ( e ) => {
         if( e.type === `mousedown` && e.button !== 0 ) return
+
+        if( e.type === `touchstart` && e.touches?.length !== 1 ) {
+            reset_press()
+            return
+        }
 
         reset_press()
 
@@ -161,18 +186,17 @@ export default function Sentence( {
         press_start_point_ref.current = point
 
         if( translated ) {
-            explanation_timer_ref.current = setTimeout( () => {
-                context_menu_blocked_until_ref.current = Math.max(
-                    context_menu_blocked_until_ref.current,
-                    Date.now() + CONTEXT_MENU_BLOCK_MS
-                )
-                toggle_meaning_prompt()
-            }, LONG_PRESS_MS )
+            schedule_long_press( LONG_PRESS_MS )
         }
-    }, [ translated, reset_press, toggle_meaning_prompt ] )
+    }, [ translated, reset_press, schedule_long_press ] )
 
     const handle_press_move = useCallback( ( e ) => {
         if( !press_start_point_ref.current ) return
+
+        if( e.touches?.length > 1 ) {
+            reset_press()
+            return
+        }
 
         const point = event_point( e )
         if( !point ) {
@@ -186,7 +210,7 @@ export default function Sentence( {
         if( dx > PRESS_MOVE_CANCEL_PX || dy > PRESS_MOVE_CANCEL_PX ) {
             clear_explanation_timer()
         }
-    }, [ clear_explanation_timer ] )
+    }, [ clear_explanation_timer, reset_press ] )
 
     const handle_press_end = useCallback( () => {
         const started_at = press_started_at_ref.current
@@ -194,6 +218,26 @@ export default function Sentence( {
 
         reset_press()
     }, [ reset_press ] )
+
+    const handle_press_cancel = useCallback( () => {
+        const started_at = press_started_at_ref.current
+        const has_pending_long_press = !!explanation_timer_ref.current
+
+        if( !started_at ) return
+
+        // Android can cancel the touch stream when native long-press handling starts.
+        // Keep the app's pending hold alive so the sentence still reveals meaning.
+        if( has_pending_long_press && Date.now() < context_menu_blocked_until_ref.current ) {
+            const elapsed_ms = Date.now() - started_at
+            const remaining_ms = Math.max( 0, LONG_PRESS_MS - elapsed_ms )
+            schedule_long_press( remaining_ms )
+            press_started_at_ref.current = null
+            press_start_point_ref.current = null
+            return
+        }
+
+        reset_press()
+    }, [ reset_press, schedule_long_press ] )
 
     const open_explanation = useCallback( ( e ) => {
         e.preventDefault()
@@ -263,7 +307,7 @@ export default function Sentence( {
         onTouchStart={ handle_press_start }
         onTouchEnd={ handle_press_end }
         onTouchMove={ handle_press_move }
-        onTouchCancel={ reset_press }
+        onTouchCancel={ handle_press_cancel }
         onContextMenu={ handle_context_menu }
     >
         { render_words() }

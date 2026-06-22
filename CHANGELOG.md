@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.16.1] - 2026-06-22
+
+### Fixed
+- Keep Android touch-cancelled sentence long-presses revealing meaning
+
 ## [1.16.0] - 2026-05-31
 
 ### Added
