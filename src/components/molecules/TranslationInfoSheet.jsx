@@ -1,4 +1,3 @@
-import { Fragment } from 'react'
 import styled, { keyframes } from 'styled-components'
 import Skeleton from '../atoms/Skeleton.jsx'
 
@@ -71,14 +70,6 @@ const Meaning = styled.div`
     overflow-wrap: anywhere;
 `
 
-const AlignedSource = styled.span`
-    ${ p => p.$selected && `
-        text-decoration-line: underline;
-        text-decoration-thickness: 0.11em;
-        text-underline-offset: 0.18em;
-    ` }
-`
-
 const MeaningError = styled.span`
     color: var(--text-muted);
 `
@@ -103,20 +94,10 @@ const ExplainButton = styled.button`
     }
 `
 
-const split_outer_whitespace = ( text ) => {
-    const match = String( text || `` ).match( /^(\s*)(.*?)(\s*)$/s )
-    if( !match ) return { before: ``, content: text, after: `` }
-
-    const [ , before, content, after ] = match
-    return { before, content, after }
-}
-
 /**
  * Shows the simplified source-language fragment and access to its full explanation.
  * @param {Object} props
- * @param {number} props.selected_word_index - Selected target token index
  * @param {string} [props.meaning] - Simplified source-language fragment
- * @param {Array} [props.alignment_segments] - Source segments mapped to target token indexes
  * @param {boolean} [props.loading] - Whether the source fragment is loading
  * @param {boolean} [props.error] - Whether the source fragment could not be loaded
  * @param {Function} props.on_close - Closes the sheet
@@ -124,9 +105,7 @@ const split_outer_whitespace = ( text ) => {
  * @returns {JSX.Element}
  */
 export default function TranslationInfoSheet( {
-    selected_word_index,
     meaning,
-    alignment_segments = [],
     loading = false,
     error = false,
     on_close,
@@ -136,25 +115,7 @@ export default function TranslationInfoSheet( {
     let meaning_content = <Skeleton width="100%" height="1.5em" />
 
     if( error ) meaning_content = <MeaningError>Meaning unavailable</MeaningError>
-    else if( meaning ) {
-        meaning_content = alignment_segments.length > 0
-            ? alignment_segments.map( ( segment, index ) => {
-                const { before, content, after } = split_outer_whitespace( segment.text )
-                const selected = segment.target_token_indexes?.includes( selected_word_index )
-
-                return <Fragment key={ index }>
-                    { before }
-                    <AlignedSource
-                        $selected={ selected }
-                        data-aligned-source={ selected ? `true` : undefined }
-                    >
-                        { content }
-                    </AlignedSource>
-                    { after }
-                </Fragment>
-            } )
-            : meaning
-    }
+    else if( meaning ) meaning_content = meaning
 
     return <Sheet
         data-translation-info-sheet
@@ -166,7 +127,7 @@ export default function TranslationInfoSheet( {
         </CloseButton>
 
         <SheetContent>
-            <Meaning aria-live="polite">
+            <Meaning data-translation-meaning aria-live="polite">
                 { meaning_content }
             </Meaning>
 

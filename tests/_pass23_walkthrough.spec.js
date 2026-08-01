@@ -286,7 +286,7 @@ test.describe( `Pass 23 — Edge Cases & Error States`, () => {
         expect( translated ).toBeGreaterThan( 1 )
     } )
 
-    test( `P23-13 selecting a translated word shows an underline`, async ( { page } ) => {
+    test( `P23-13 selecting a translated word shows its contextual tooltip`, async ( { page } ) => {
         await setup_key( page )
         await upload_book( page )
         await enter_reader( page )
@@ -295,7 +295,7 @@ test.describe( `Pass 23 — Edge Cases & Error States`, () => {
         const word = page.locator( `span[data-sentence-id] [data-translation-word-index]` ).first()
         await word.click()
 
-        await expect( word ).toHaveCSS( `text-decoration-line`, `underline` )
+        await expect( page.locator( `[data-reader-word-tooltip]` ) ).toBeVisible()
         await expect( page.locator( `[data-translation-info-sheet]` ) ).toBeVisible()
     } )
 

@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import { use_book } from '../../hooks/use_book.js'
 import { use_translation } from '../../hooks/use_translation.js'
+import { use_word_lookup } from '../../hooks/use_word_lookup.js'
 import { use_settings_store } from '../../stores/settings_store.js'
 import { save_progress, get_progress } from '../../modules/cache.js'
 import { DEFAULT_LEVEL, LEVELS } from '../../modules/prompts.js'
@@ -370,7 +371,6 @@ export default function ReaderPage() {
     const {
         translations,
         meanings,
-        meaning_alignments,
         meaning_loading,
         meaning_errors,
         request_sentence_meaning,
@@ -384,6 +384,30 @@ export default function ReaderPage() {
         source_language,
         book_id
     } )
+
+    const selected_sentence = useMemo(
+        () => current_chapter_sentences.find(
+            sentence => sentence.id === translation_selection?.sentence_id
+        ) || null,
+        [ current_chapter_sentences, translation_selection ]
+    )
+    const selected_translation = selected_sentence
+        ? translations[selected_sentence.id]
+        : null
+    const { lookup_word, get_lookup_state } = use_word_lookup( {
+        source_language,
+        target_language: last_language,
+        sentence_context: selected_translation || ``,
+        cache_by_context: true
+    } )
+    const selected_word_lookup = translation_selection?.word
+        ? get_lookup_state( translation_selection.word )
+        : null
+
+    useEffect( () => {
+        if( !translation_selection?.word || !selected_translation ) return
+        lookup_word( translation_selection.word )
+    }, [ translation_selection, selected_translation, lookup_word ] )
 
     // Save progress on chapter change
     useEffect( () => {
@@ -459,9 +483,9 @@ export default function ReaderPage() {
         translation_selection
     ] )
 
-    const select_translation_word = useCallback( ( { sentence_id, word_index, element } ) => {
+    const select_translation_word = useCallback( ( { sentence_id, word_index, word, element } ) => {
         selected_word_element_ref.current = element
-        set_translation_selection( { sentence_id, word_index } )
+        set_translation_selection( { sentence_id, word_index, word } )
     }, [] )
 
     const close_translation_sheet = useCallback( () => {
@@ -473,6 +497,9 @@ export default function ReaderPage() {
         const result = await retranslate_sentence( { sentence_id } )
         if( !result ) return null
 
+        // The refreshed translation may no longer have the selected token index.
+        close_translation_sheet()
+
         set_explanation_data( current => {
             if( current?.sentence_id !== sentence_id ) return current
             return {
@@ -483,7 +510,7 @@ export default function ReaderPage() {
         } )
 
         return result
-    }, [ retranslate_sentence ] )
+    }, [ retranslate_sentence, close_translation_sheet ] )
 
     // Swipe navigation for mobile
     const touch_start_ref = useRef( null )
@@ -568,16 +595,6 @@ export default function ReaderPage() {
         }
     }, [ translation_selection ] )
 
-    const selected_sentence = useMemo(
-        () => current_chapter_sentences.find(
-            sentence => sentence.id === translation_selection?.sentence_id
-        ) || null,
-        [ current_chapter_sentences, translation_selection ]
-    )
-    const selected_translation = selected_sentence
-        ? translations[selected_sentence.id]
-        : null
-
     useEffect( () => {
         if( !selected_sentence || !selected_translation ) return
 
@@ -632,6 +649,9 @@ export default function ReaderPage() {
             translated={ translations[sentence.id] }
             selected_word_index={ translation_selection?.sentence_id === sentence.id
                 ? translation_selection.word_index
+                : null }
+            word_lookup={ translation_selection?.sentence_id === sentence.id
+                ? selected_word_lookup
                 : null }
             on_select_word={ select_translation_word }
         />
@@ -802,9 +822,7 @@ export default function ReaderPage() {
 
         <ReaderDock ref={ reader_dock_ref } data-reader-dock>
             { translation_selection && selected_sentence && <TranslationInfoSheet
-                selected_word_index={ translation_selection.word_index }
                 meaning={ meanings[selected_sentence.id] }
-                alignment_segments={ meaning_alignments[selected_sentence.id] }
                 loading={ !!meaning_loading[selected_sentence.id] }
                 error={ !!meaning_errors[selected_sentence.id] }
                 on_close={ close_translation_sheet }

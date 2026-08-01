@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.18.0] - 2026-08-01
+
+### Added
+- Show contextual source-language tooltips above tapped reader words (uncommitted)
+
+### Changed
+- Keep the bottom sheet fragment-level without inferred word alignment (uncommitted)
+
 ## [1.17.0] - 2026-08-01
 
 ### Added

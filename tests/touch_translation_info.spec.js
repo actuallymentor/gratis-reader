@@ -1,8 +1,8 @@
 import { test, expect } from '@playwright/test'
 import { setup_api_key, upload_demo_book, open_reader, clear_storage } from './helpers/setup.js'
-import { segment_translation_text } from '../src/modules/translation_alignment.js'
 
 const CHAT_URL = `**/openrouter.ai/api/v1/chat/completions`
+const READER_WORD_TOOLTIP = `[data-reader-word-tooltip]`
 
 const adapted_translation_from = ( prompt ) => {
     const match = prompt.match( /Adapted translation:\n(.+?)(?:\n\n|$)/s )
@@ -12,18 +12,6 @@ const adapted_translation_from = ( prompt ) => {
 const translated_sentence_from = ( prompt ) => {
     const match = prompt.match( /Translate this sentence:\n(.+)/s )
     return match ? match[1].trim() : `unknown`
-}
-
-const alignment_for = ( adapted_translation, fragment_number ) => {
-    const target_words = segment_translation_text( adapted_translation )
-        .filter( segment => segment.is_word )
-
-    return JSON.stringify( {
-        segments: target_words.map( ( word, index ) => ( {
-            text: `${ index === 0 ? `Simplified ${ fragment_number } ` : `` }${ word.text }${ index < target_words.length - 1 ? ` ` : `` }`,
-            target_token_indexes: [ index ]
-        } ) )
-    } )
 }
 
 const install_translation_mock = async ( page ) => {
@@ -43,10 +31,11 @@ const install_translation_mock = async ( page ) => {
             content = `Detailed explanation here.`
         } else if( user_msg.includes( `Word:` ) ) {
             calls.word_lookup += 1
-            content = `Unexpected reader word lookup.`
+            const word_match = user_msg.match( /Word:\s*(.+)$/ )
+            content = `Source ${ word_match ? word_match[1].trim() : `word` }`
         } else if( user_msg.includes( `Adapted translation:` ) ) {
             calls.meaning += 1
-            content = alignment_for( adapted_translation_from( user_msg ), calls.meaning )
+            content = `Simplified ${ calls.meaning } ${ adapted_translation_from( user_msg ) }`
         } else {
             content = `Target ${ translated_sentence_from( user_msg ) }`
         }
@@ -79,7 +68,7 @@ test.describe( `Touch translation information`, () => {
         await upload_demo_book( page )
     } )
 
-    test( `tapping words opens one persistent sheet and moves both underlines`, async ( { page } ) => {
+    test( `tapping words keeps one sheet and moves one contextual tooltip`, async ( { page } ) => {
 
         const calls = await install_translation_mock( page )
         await open_reader( page )
@@ -97,10 +86,11 @@ test.describe( `Touch translation information`, () => {
         await expect( sheet ).toBeVisible()
         await expect( sheet ).toContainText( `Simplified 1 Target` )
         await expect( first_word ).toHaveAttribute( `aria-pressed`, `true` )
-        await expect( first_word ).toHaveCSS( `text-decoration-line`, `underline` )
-        await expect( sheet.locator( `[data-aligned-source="true"]` ) ).toHaveCSS( `text-decoration-line`, `underline` )
+        await expect( first_word ).toHaveCSS( `text-decoration-line`, `none` )
+        await expect( page.locator( READER_WORD_TOOLTIP ) ).toHaveText(
+            `Source ${ await first_word.getAttribute( `data-translation-word` ) }`
+        )
         await expect( page.getByRole( `dialog`, { name: `Translation Explanation` } ) ).not.toBeVisible()
-        const first_aligned_source = await sheet.locator( `[data-aligned-source="true"]` ).textContent()
 
         await sheet.evaluate( element => { window.__translation_info_sheet = element } )
         await second_word.tap()
@@ -109,14 +99,24 @@ test.describe( `Touch translation information`, () => {
         expect( await sheet.evaluate( element => element === window.__translation_info_sheet ) ).toBe( true )
         await expect( first_word ).toHaveAttribute( `aria-pressed`, `false` )
         await expect( second_word ).toHaveAttribute( `aria-pressed`, `true` )
-        await expect( second_word ).toHaveCSS( `text-decoration-line`, `underline` )
-        await expect.poll( () => sheet.locator( `[data-aligned-source="true"]` ).textContent() ).not.toBe( first_aligned_source )
-        await expect( sheet.locator( `[data-aligned-source="true"]` ) ).toHaveText(
-            await second_word.getAttribute( `data-translation-word` )
+        await expect( second_word ).toHaveCSS( `text-decoration-line`, `none` )
+        await expect( page.locator( READER_WORD_TOOLTIP ) ).toHaveCount( 1 )
+        await expect( page.locator( READER_WORD_TOOLTIP ) ).toHaveText(
+            `Source ${ await second_word.getAttribute( `data-translation-word` ) }`
         )
+
+        const [ word_box, tooltip_box ] = await Promise.all( [
+            second_word.boundingBox(),
+            page.locator( READER_WORD_TOOLTIP ).boundingBox()
+        ] )
+        expect( word_box ).not.toBeNull()
+        expect( tooltip_box ).not.toBeNull()
+        expect( tooltip_box.y + tooltip_box.height ).toBeLessThanOrEqual( word_box.y + 1 )
+        expect( tooltip_box.x ).toBeGreaterThanOrEqual( 0 )
+        expect( tooltip_box.x + tooltip_box.width ).toBeLessThanOrEqual( 390 )
         expect( calls.meaning ).toBe( 1 )
         expect( calls.explanation ).toBe( 0 )
-        expect( calls.word_lookup ).toBe( 0 )
+        expect( calls.word_lookup ).toBe( 2 )
 
     } )
 
@@ -156,7 +156,7 @@ test.describe( `Touch translation information`, () => {
         await expect( first_word ).toHaveAttribute( `aria-pressed`, `false` )
         await expect.poll( () => sheet.textContent() ).not.toBe( first_meaning )
         expect( calls.meaning ).toBeGreaterThanOrEqual( 2 )
-        expect( calls.word_lookup ).toBe( 0 )
+        expect( calls.word_lookup ).toBeGreaterThanOrEqual( 2 )
 
     } )
 
@@ -171,12 +171,15 @@ test.describe( `Touch translation information`, () => {
 
         await word.tap()
         await expect( sheet ).toBeVisible()
+        await expect( page.locator( READER_WORD_TOOLTIP ) ).toBeVisible()
 
         await page.locator( `main` ).tap( { position: { x: 195, y: 4 } } )
         await expect( sheet ).toBeVisible()
+        await expect( page.locator( READER_WORD_TOOLTIP ) ).toBeVisible()
 
         await sheet.getByRole( `button`, { name: `Close translation information` } ).tap()
         await expect( sheet ).not.toBeVisible()
+        await expect( page.locator( READER_WORD_TOOLTIP ) ).not.toBeVisible()
         await expect( word ).toHaveAttribute( `aria-pressed`, `false` )
 
     } )
@@ -202,7 +205,7 @@ test.describe( `Touch translation information`, () => {
         await expect( dialog ).toContainText( `Translation` )
         await expect( dialog ).toContainText( `Detailed explanation here.` )
         expect( calls.explanation ).toBeGreaterThanOrEqual( 1 )
-        expect( calls.word_lookup ).toBe( 0 )
+        expect( calls.word_lookup ).toBe( 1 )
 
     } )
 
@@ -222,6 +225,7 @@ test.describe( `Touch translation information`, () => {
         const explain_button = sheet.getByRole( `button`, { name: `Explain` } )
 
         await expect( sheet ).toBeVisible()
+        await expect( page.locator( READER_WORD_TOOLTIP ) ).toBeVisible()
         await expect( footer ).toBeVisible()
         await expect( page.getByRole( `button`, { name: /next/i } ) ).toBeVisible()
 

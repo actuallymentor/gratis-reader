@@ -1,5 +1,4 @@
 import { expect } from '@playwright/test'
-import { segment_translation_text } from '../../src/modules/translation_alignment.js'
 
 /**
  * Injects API key into localStorage so the app thinks we're authenticated.
@@ -82,17 +81,9 @@ export const mock_openrouter = async ( page ) => {
         } else if( is_word_lookup ) {
             content = `[WORD] definition of the word`
         } else if( is_sentence_meaning ) {
-            const sentence_match = user_msg.match( /Adapted translation:\n(.+?)\n\nTarget word tokens/s )
+            const sentence_match = user_msg.match( /Adapted translation:\n(.+?)(?:\n\n|$)/s )
             const sentence = sentence_match ? sentence_match[1].trim() : `unknown`
-            const aligned_words = segment_translation_text( sentence )
-                .filter( segment => segment.is_word )
-
-            content = JSON.stringify( {
-                segments: aligned_words.map( ( word, index ) => ( {
-                    text: `${ index === 0 ? `[MEANING] ` : `` }${ word.text }${ index < aligned_words.length - 1 ? ` ` : `` }`,
-                    target_token_indexes: [ index ]
-                } ) )
-            } )
+            content = `[MEANING] ${ sentence }`
         } else {
             // Translation — extract the sentence from prompt
             const sentence_match = user_msg.match( /Translate this sentence:\n(.+)/s )

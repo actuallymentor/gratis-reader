@@ -11,9 +11,10 @@ export const use_cache = () => {
     // Use ref to avoid re-creating callbacks when cache updates
     const word_cache_ref = useRef( {} )
 
-    const get_word_translation = useCallback( async ( word, source_lang, target_lang ) => {
+    const get_word_translation = useCallback( async ( word, source_lang, target_lang, lookup_context = `` ) => {
 
-        const key = `word:${ word.toLowerCase() }:${ source_lang }:${ target_lang }`
+        const context_suffix = lookup_context ? `:${ encodeURIComponent( lookup_context ) }` : ``
+        const key = `word:${ word.toLowerCase() }:${ source_lang }:${ target_lang }${ context_suffix }`
 
         // Check in-memory cache first
         if( word_cache_ref.current[key] ) return word_cache_ref.current[key]
@@ -29,9 +30,16 @@ export const use_cache = () => {
 
     }, [] )
 
-    const cache_word_translation = useCallback( async ( word, source_lang, target_lang, translation ) => {
+    const cache_word_translation = useCallback( async (
+        word,
+        source_lang,
+        target_lang,
+        translation,
+        lookup_context = ``
+    ) => {
 
-        const key = `word:${ word.toLowerCase() }:${ source_lang }:${ target_lang }`
+        const context_suffix = lookup_context ? `:${ encodeURIComponent( lookup_context ) }` : ``
+        const key = `word:${ word.toLowerCase() }:${ source_lang }:${ target_lang }${ context_suffix }`
 
         // Save to IndexedDB
         await save_translation( {

@@ -10,6 +10,7 @@ import {
 const CHAT_URL = `**/openrouter.ai/api/v1/chat/completions`
 const INFO_SHEET = `[data-translation-info-sheet]`
 const READER_WORD = `span[data-sentence-id] [data-translation-word-index]`
+const READER_WORD_TOOLTIP = `[data-reader-word-tooltip]`
 
 const enter_reader_with_translations = async ( page ) => {
     await mock_openrouter( page )
@@ -38,7 +39,7 @@ test.describe( `Sentence Interactions`, () => {
         await upload_demo_book( page )
     } )
 
-    test( `click on a translated word opens the simplified-fragment sheet without a word lookup`, async ( { page } ) => {
+    test( `click on a translated word opens its contextual tooltip and the simplified-fragment sheet`, async ( { page } ) => {
 
         await enter_reader_with_translations( page )
 
@@ -58,10 +59,10 @@ test.describe( `Sentence Interactions`, () => {
         await expect( sheet ).toBeVisible()
         await expect( sheet ).toContainText( `[MEANING]`, { timeout: 5000 } )
         await expect( word ).toHaveAttribute( `aria-pressed`, `true` )
-        await expect( word ).toHaveCSS( `text-decoration-line`, `underline` )
-        await expect( sheet.locator( `[data-aligned-source="true"]` ) ).toHaveCSS( `text-decoration-line`, `underline` )
+        await expect( word ).toHaveCSS( `text-decoration-line`, `none` )
+        await expect( page.locator( READER_WORD_TOOLTIP ) ).toHaveText( `[WORD] definition of the word` )
         await expect( page.getByRole( `dialog`, { name: `Translation Explanation` } ) ).not.toBeVisible()
-        expect( word_lookup_calls ).toBe( 0 )
+        expect( word_lookup_calls ).toBe( 1 )
 
     } )
 
@@ -99,7 +100,7 @@ test.describe( `Sentence Interactions`, () => {
 
     } )
 
-    test( `cached unaligned meanings stay readable without another API request`, async ( { page } ) => {
+    test( `cached meanings stay readable without another API request`, async ( { page } ) => {
 
         let meaning_calls = 0
 
@@ -133,15 +134,6 @@ test.describe( `Sentence Interactions`, () => {
         await first_word.click()
         await expect( page.locator( INFO_SHEET ) ).toContainText( `Readable unaligned meaning.` )
 
-        await expect.poll( () => page.evaluate( () => new Promise( resolve => {
-            const request = indexedDB.open( `gratis_reader` )
-            request.onsuccess = () => {
-                const transaction = request.result.transaction( `meanings`, `readonly` )
-                const meanings_request = transaction.objectStore( `meanings` ).getAll()
-                meanings_request.onsuccess = () => resolve( meanings_request.result[0]?.alignment_version )
-            }
-        } ) ) ).toBe( 0 )
-
         await page.getByLabel( `Back to library` ).click()
         await page.waitForURL( /\/library/ )
         await open_reader( page )
@@ -152,17 +144,19 @@ test.describe( `Sentence Interactions`, () => {
 
     } )
 
-    test( `same-fragment clicks move the underline without remounting the sheet`, async ( { page } ) => {
+    test( `same-fragment clicks move one tooltip without remounting the sheet`, async ( { page } ) => {
 
         await enter_reader_with_translations( page )
 
         const words = page.locator( `span[data-sentence-id]` ).first().locator( `[data-translation-word-index]` )
         const first_word = words.nth( 0 )
-        const second_word = words.nth( 1 )
+        const second_word = words.last()
         const sheet = page.locator( INFO_SHEET )
 
         await first_word.click()
         await expect( sheet ).toBeVisible()
+        await expect( page.locator( READER_WORD_TOOLTIP ) ).toHaveText( `[WORD] definition of the word` )
+        const first_word_box = await first_word.boundingBox()
         await sheet.evaluate( element => { window.__desktop_translation_sheet = element } )
 
         await second_word.click()
@@ -170,7 +164,22 @@ test.describe( `Sentence Interactions`, () => {
         expect( await sheet.evaluate( element => element === window.__desktop_translation_sheet ) ).toBe( true )
         await expect( first_word ).toHaveAttribute( `aria-pressed`, `false` )
         await expect( second_word ).toHaveAttribute( `aria-pressed`, `true` )
-        await expect( second_word ).toHaveCSS( `text-decoration-line`, `underline` )
+        await expect( page.locator( READER_WORD_TOOLTIP ) ).toHaveCount( 1 )
+        await expect( page.locator( READER_WORD_TOOLTIP ) ).toHaveText( `[WORD] definition of the word` )
+
+        const [ second_word_box, tooltip_box ] = await Promise.all( [
+            second_word.boundingBox(),
+            page.locator( READER_WORD_TOOLTIP ).boundingBox()
+        ] )
+        const horizontal_distance = ( first, second ) => Math.abs(
+            first.x + first.width / 2 - ( second.x + second.width / 2 )
+        )
+
+        expect( first_word_box ).not.toBeNull()
+        expect( second_word_box ).not.toBeNull()
+        expect( tooltip_box ).not.toBeNull()
+        expect( horizontal_distance( tooltip_box, second_word_box ) )
+            .toBeLessThan( horizontal_distance( tooltip_box, first_word_box ) )
 
     } )
 
@@ -184,6 +193,7 @@ test.describe( `Sentence Interactions`, () => {
 
         await expect( page.locator( INFO_SHEET ) ).toBeVisible()
         await expect( word ).toHaveAttribute( `aria-pressed`, `true` )
+        await expect( page.locator( READER_WORD_TOOLTIP ) ).toHaveText( `[WORD] definition of the word` )
 
     } )
 
@@ -193,14 +203,12 @@ test.describe( `Sentence Interactions`, () => {
             const body = JSON.parse( route.request().postData() )
             const user_msg = body.messages?.find( message => message.role === `user` )?.content || ``
             const is_meaning = user_msg.includes( `Adapted translation:` )
-            const content = is_meaning
-                ? JSON.stringify( {
-                    segments: [
-                        { text: `Translated `, target_token_indexes: [ 0 ] },
-                        { text: `word`, target_token_indexes: [ 1 ] }
-                    ]
-                } )
-                : `Translated 123 alpha`
+            const word_match = user_msg.match( /Word:\s*(.+)$/ )
+            const content = word_match
+                ? `source:${ word_match[1].trim() }`
+                : is_meaning
+                    ? `Translated word`
+                    : `Translated 123 alpha`
 
             await route.fulfill( {
                 contentType: `application/json`,
@@ -222,6 +230,7 @@ test.describe( `Sentence Interactions`, () => {
 
         await expect( page.locator( INFO_SHEET ) ).toBeVisible()
         await expect( word ).toHaveAttribute( `aria-pressed`, `true` )
+        await expect( page.locator( READER_WORD_TOOLTIP ) ).toHaveText( `source:alpha` )
 
     } )
 
@@ -289,11 +298,12 @@ test.describe( `Sentence Interactions`, () => {
         await enter_reader_with_translations( page )
 
         const sentence = page.locator( `span[data-sentence-id]` ).first()
-        const translated_text = await sentence.textContent()
         const word = sentence.locator( `[data-translation-word-index]` ).nth( 1 )
+        const translated_word_count = await sentence.locator( `[data-translation-word-index]` ).count()
 
         await word.dblclick()
-        await expect( sentence ).toHaveText( translated_text )
+        await expect( sentence.locator( `[data-translation-word-index]` ) ).toHaveCount( translated_word_count )
+        await expect( page.locator( READER_WORD_TOOLTIP ) ).toHaveCount( 1 )
         await expect( page.locator( INFO_SHEET ) ).toHaveCount( 1 )
 
     } )
@@ -317,17 +327,11 @@ test.describe( `Sentence Interactions`, () => {
                 content = `Detailed explanation here.`
             } else if( is_word_lookup ) {
                 word_lookup_calls += 1
-                content = `Unexpected lookup`
+                const word_match = user_msg.match( /Word:\s*(.+)$/ )
+                content = `source:${ word_match ? word_match[1].trim() : `word` }`
             } else if( is_sentence_meaning ) {
                 meaning_prompt = user_msg
-                content = JSON.stringify( {
-                    segments: [
-                        { text: `Big `, target_token_indexes: [ 0 ] },
-                        { text: `work. `, target_token_indexes: [ 1 ] },
-                        { text: `Smart `, target_token_indexes: [ 2 ] },
-                        { text: `path.`, target_token_indexes: [ 3 ] }
-                    ]
-                } )
+                content = source_meaning
             } else {
                 content = adapted_sentence
             }
@@ -351,9 +355,10 @@ test.describe( `Sentence Interactions`, () => {
 
         const sheet = page.locator( INFO_SHEET )
         await expect( sheet ).toContainText( source_meaning, { timeout: 5000 } )
+        await expect( page.locator( READER_WORD_TOOLTIP ) ).toHaveText( `source:work` )
         await expect( sentence ).toContainText( adapted_sentence )
         expect( meaning_prompt ).toContain( adapted_sentence )
-        expect( word_lookup_calls ).toBe( 0 )
+        expect( word_lookup_calls ).toBe( 1 )
 
         await sheet.getByRole( `button`, { name: `Explain` } ).click()
 
@@ -415,9 +420,7 @@ test.describe( `Sentence Interactions`, () => {
                 await route.fulfill( {
                     contentType: `application/json`,
                     body: JSON.stringify( {
-                        choices: [ { message: { content: JSON.stringify( {
-                            segments: [ { text: `Sentence meaning`, target_token_indexes: [ 0 ] } ]
-                        } ) } } ]
+                        choices: [ { message: { content: `Sentence meaning` } } ]
                     } )
                 } )
                 return
@@ -512,8 +515,9 @@ test.describe( `Sentence Interactions`, () => {
         const sheet = page.locator( INFO_SHEET )
         await expect( sheet ).toContainText( `[MEANING]`, { timeout: 5000 } )
 
-        await sheet.locator( `[data-aligned-source]` ).first().click()
+        await sheet.locator( `[data-translation-meaning]` ).click()
         await expect( sheet ).toBeVisible()
+        await expect( page.locator( READER_WORD_TOOLTIP ) ).toBeVisible()
 
     } )
 

@@ -4,7 +4,7 @@ import { build_word_lookup_prompt } from '../modules/prompts.js'
 import { use_settings_store } from '../stores/settings_store.js'
 import { use_cache } from './use_cache.js'
 
-const WORD_PUNCTUATION_RE = /[.,!?;:'"()[\]{}]/g
+const WORD_BOUNDARY_PUNCTUATION_RE = /(^[\p{P}\p{S}]+)|([\p{P}\p{S}]+$)/gu
 const WORD_WITH_LETTERS_RE = /\p{L}/u
 const WORD_LOOKUP_MEMORY_LIMIT = 250
 
@@ -14,7 +14,7 @@ const WORD_LOOKUP_MEMORY_LIMIT = 250
  * @returns {string}
  */
 export const clean_lookup_word = ( word ) => {
-    const clean_word = String( word || `` ).replace( WORD_PUNCTUATION_RE, `` ).trim()
+    const clean_word = String( word || `` ).trim().replace( WORD_BOUNDARY_PUNCTUATION_RE, `` )
     return WORD_WITH_LETTERS_RE.test( clean_word ) ? clean_word : ``
 }
 
@@ -23,10 +23,13 @@ export const clean_lookup_word = ( word ) => {
  * @param {string} word
  * @param {string} source_language
  * @param {string} target_language
+ * @param {string} [lookup_context] - Optional context that scopes ambiguous translations
  * @returns {string}
  */
-export const word_cache_key = ( word, source_language, target_language ) =>
-    `${ clean_lookup_word( word ).toLowerCase() }:${ source_language }:${ target_language }`
+export const word_cache_key = ( word, source_language, target_language, lookup_context = `` ) => {
+    const context_suffix = lookup_context ? `:${ encodeURIComponent( lookup_context ) }` : ``
+    return `${ clean_lookup_word( word ).toLowerCase() }:${ source_language }:${ target_language }${ context_suffix }`
+}
 
 /**
  * Looks up target-language words and caches their source-language equivalents.
@@ -34,9 +37,15 @@ export const word_cache_key = ( word, source_language, target_language ) =>
  * @param {string} options.source_language
  * @param {string} options.target_language
  * @param {string} options.sentence_context
+ * @param {boolean} [options.cache_by_context] - Prevents ambiguous words sharing translations across fragments
  * @returns {Object}
  */
-export const use_word_lookup = ( { source_language, target_language, sentence_context } ) => {
+export const use_word_lookup = ( {
+    source_language,
+    target_language,
+    sentence_context,
+    cache_by_context = false
+} ) => {
 
     const [ , set_lookup_version ] = useState( 0 )
     const word_translations_ref = useRef( {} )
@@ -48,6 +57,7 @@ export const use_word_lookup = ( { source_language, target_language, sentence_co
     const api_key = use_settings_store( state => state.api_key )
     const model = use_settings_store( state => state.model )
     const { get_word_translation, cache_word_translation } = use_cache()
+    const lookup_context = cache_by_context ? sentence_context : ``
 
     const refresh_lookup_state = useCallback( () => {
         if( mounted_ref.current ) set_lookup_version( version => version + 1 )
@@ -85,7 +95,7 @@ export const use_word_lookup = ( { source_language, target_language, sentence_co
         const clean_word = clean_lookup_word( word )
         if( !clean_word || !api_key ) return
 
-        const cache_key = word_cache_key( clean_word, source_language, target_language )
+        const cache_key = word_cache_key( clean_word, source_language, target_language, lookup_context )
 
         if( word_translations_ref.current[cache_key] || loading_words_ref.current[cache_key] ) return
 
@@ -104,7 +114,12 @@ export const use_word_lookup = ( { source_language, target_language, sentence_co
         }
 
         try {
-            const cached = await get_word_translation( clean_word, source_language, target_language )
+            const cached = await get_word_translation(
+                clean_word,
+                source_language,
+                target_language,
+                lookup_context
+            )
             if( controller.signal.aborted ) return
 
             if( cached ) {
@@ -130,7 +145,13 @@ export const use_word_lookup = ( { source_language, target_language, sentence_co
             refresh_in_finally = false
 
             try {
-                await cache_word_translation( clean_word, source_language, target_language, content )
+                await cache_word_translation(
+                    clean_word,
+                    source_language,
+                    target_language,
+                    content,
+                    lookup_context
+                )
             } catch {
                 // Cache writes should not invalidate a successful lookup.
             }
@@ -157,6 +178,7 @@ export const use_word_lookup = ( { source_language, target_language, sentence_co
         source_language,
         target_language,
         sentence_context,
+        lookup_context,
         get_word_translation,
         cache_word_translation,
         remember_lookup_key,
@@ -164,7 +186,7 @@ export const use_word_lookup = ( { source_language, target_language, sentence_co
     ] )
 
     const get_lookup_state = useCallback( ( word ) => {
-        const cache_key = word_cache_key( word, source_language, target_language )
+        const cache_key = word_cache_key( word, source_language, target_language, lookup_context )
 
         return {
             cache_key,
@@ -173,7 +195,7 @@ export const use_word_lookup = ( { source_language, target_language, sentence_co
             error: !!lookup_errors_ref.current[cache_key],
             can_lookup: !!api_key
         }
-    }, [ source_language, target_language, api_key ] )
+    }, [ source_language, target_language, lookup_context, api_key ] )
 
     useEffect( () => {
         mounted_ref.current = true

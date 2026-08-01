@@ -443,9 +443,9 @@ test.describe( `Pass 27 — Coverage Expansion`, () => {
         expect( captured_system.toLowerCase() ).toMatch( /only.*translat|no explanat|no quote|no additional/i )
     } )
 
-    // ── Spec §7b: Visual cue on selected word ──
+    // ── Spec §7b: Contextual translation for selected word ──
 
-    test( `P27-15 selected translated word has visible underline`, async ( { page } ) => {
+    test( `P27-15 selected translated word shows and clears its contextual tooltip`, async ( { page } ) => {
         await upload_demo_book( page )
         await open_reader( page )
         await page.waitForTimeout( 3000 )
@@ -453,9 +453,10 @@ test.describe( `Pass 27 — Coverage Expansion`, () => {
         const word = page.locator( `span[data-sentence-id] [data-translation-word-index]` ).first()
         await word.click()
 
-        await expect( word ).toHaveCSS( `text-decoration-line`, `underline` )
+        await expect( page.locator( `[data-reader-word-tooltip]` ) ).toBeVisible()
         await page.getByRole( `button`, { name: `Close translation information` } ).click()
-        await expect( word ).toHaveCSS( `text-decoration-line`, `none` )
+        await expect( page.locator( `[data-reader-word-tooltip]` ) ).not.toBeVisible()
+        await expect( word ).toHaveAttribute( `aria-pressed`, `false` )
     } )
 
     // ── Spec §8: Settings drawer opens from config icon (top-right) ──

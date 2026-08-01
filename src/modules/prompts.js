@@ -1,5 +1,4 @@
 import { multiline_trim } from 'mentie'
-import { segment_translation_text } from './translation_alignment.js'
 
 // --- Level definitions ---
 
@@ -157,11 +156,6 @@ export const build_translation_user_prompt = ( sentence, context ) => {
  */
 export const build_back_translation_prompt = ( source_language, target_language, translated_sentence ) => {
 
-    const indexed_tokens = segment_translation_text( translated_sentence )
-        .filter( segment => segment.is_word )
-        .map( segment => `${ segment.word_index }: ${ JSON.stringify( segment.text ) }` )
-        .join( `\n` )
-
     return {
 
         system: multiline_trim( `
@@ -171,31 +165,15 @@ export const build_back_translation_prompt = ( source_language, target_language,
             Translate only the meaning that is present in the adapted fragment.
             Do not reconstruct missing details, nuance, style, or clauses that are not in the adapted fragment.
 
-            Return ONLY one valid JSON object with this exact shape:
-            {
-              "meaning": "The complete ${ source_language } meaning",
-              "segments": [
-                { "text": "A source-language text segment", "target_token_indexes": [0] }
-              ]
-            }
-
-            The ordered segment texts must concatenate exactly to "meaning", including every space and punctuation mark.
-            Every target token index must appear exactly once across the complete segments array.
-            Prefer one target word mapped to one source word whenever that is truthful.
-            When grammar requires it, map one target word to a source phrase, or several target words to one source phrase.
-            Put source-language glue with no direct target equivalent in a segment whose target_token_indexes is empty.
-            Align by translated meaning, never by spelling similarity, fuzzy matching, or cognate appearance.
-            Do not include markdown fences, explanations, notes, comments, or fields outside the JSON shape.
+            Return ONLY the complete ${ source_language } translation as plain text.
+            Do not include markdown, explanations, notes, comments, or alternatives.
         ` ),
 
         user: multiline_trim( `
             Adapted translation:
             ${ translated_sentence }
 
-            Target word tokens (the numbers are stable token IDs):
-            ${ indexed_tokens }
-
-            Translate the adapted fragment into ${ source_language } and align every numbered target token.
+            Translate the adapted fragment into ${ source_language }.
         ` )
 
     }

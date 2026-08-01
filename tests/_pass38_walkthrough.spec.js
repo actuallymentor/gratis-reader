@@ -119,7 +119,7 @@ test.describe( `Pass 38 — Reader core flows`, () => {
         expect( text.length ).toBeGreaterThan( 0 )
     } )
 
-    test( `BW175 selecting a word opens the simplified fragment with underline`, async ( { page } ) => {
+    test( `BW175 selecting a word opens the simplified fragment with contextual tooltip`, async ( { page } ) => {
         await upload_demo_book( page )
         await open_reader( page )
         await page.waitForTimeout( 2000 )
@@ -127,7 +127,7 @@ test.describe( `Pass 38 — Reader core flows`, () => {
         const word = page.locator( `span[data-sentence-id] [data-translation-word-index]` ).first()
         await word.click()
 
-        await expect( word ).toHaveCSS( `text-decoration-line`, `underline` )
+        await expect( page.locator( `[data-reader-word-tooltip]` ) ).toBeVisible()
         await expect( page.locator( `[data-translation-info-sheet]` ) ).toBeVisible()
     } )
 

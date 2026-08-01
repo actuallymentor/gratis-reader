@@ -205,13 +205,11 @@ export const delete_translation = async ( cache_key ) => {
 }
 
 /**
- * Saves a source-language meaning and its target-word alignment metadata.
+ * Saves a source-language meaning for an adapted translation fragment.
  * @param {Object} entry - Meaning cache record
  * @param {string} entry.key
  * @param {string} entry.translated
  * @param {string} entry.meaning
- * @param {Array} entry.alignment_segments
- * @param {number} entry.alignment_version
  * @param {string} entry.source_language
  * @param {string} entry.target_language
  * @param {string} entry.level
@@ -231,7 +229,7 @@ export const save_sentence_meaning = async ( entry ) => {
 /**
  * Gets a cached source-language meaning record by key.
  * @param {string} cache_key
- * @returns {Promise<Object|null>} The complete meaning/alignment record or null
+ * @returns {Promise<Object|null>} The complete meaning record or null
  */
 export const get_sentence_meaning = async ( cache_key ) => {
     const db = await open_db()
