@@ -1,6 +1,6 @@
-import { test, expect } from '@playwright/test'
 import { execSync } from 'node:child_process'
-import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, clear_storage } from './helpers/setup.js'
+import { test, expect, open_seeded_reader } from './helpers/app_fixture.js'
+import { mock_openrouter } from './helpers/setup.js'
 
 const expected_commit_hash = () => {
 
@@ -18,10 +18,7 @@ const expected_commit_hash = () => {
 
 test.describe( `Settings`, () => {
 
-    test.beforeEach( async ( { page } ) => {
-        await clear_storage( page )
-        await setup_api_key( page )
-    } )
+    test.use( { app_state: `authenticated` } )
 
     test( `settings drawer opens from gear icon on library`, async ( { page } ) => {
 
@@ -57,64 +54,64 @@ test.describe( `Settings`, () => {
 
     } )
 
-    test( `font size change applies to reader text`, async ( { page } ) => {
+    test.describe( `Reader settings`, () => {
 
-        await mock_openrouter( page )
-        await upload_demo_book( page )
+        test.use( { app_state: `reader` } )
 
-        await open_reader( page )
+        test( `font size change applies to reader text`, async ( { page } ) => {
 
-        // Get initial font size
-        const initial_size = await page.evaluate( () => {
-            const main = document.querySelector( `main` )
-            return main ? getComputedStyle( main ).fontSize : null
+            await mock_openrouter( page )
+            await open_seeded_reader( page )
+
+            // Get initial font size
+            const initial_size = await page.evaluate( () => {
+                const main = document.querySelector( `main` )
+                return main ? getComputedStyle( main ).fontSize : null
+            } )
+
+            // Open settings and change font size
+            await page.getByRole( `button`, { name: `Settings` } ).click()
+            const slider = page.locator( `input[type="range"]` )
+            await slider.fill( `24` )
+
+            // Check new font size
+            const reader = page.locator( `main` )
+            await expect( reader ).not.toHaveCSS( `font-size`, initial_size )
+            await expect( reader ).toHaveCSS( `font-size`, `24px` )
+
         } )
 
-        // Open settings and change font size
-        await page.getByRole( `button`, { name: `Settings` } ).click()
-        const slider = page.locator( `input[type="range"]` )
-        await slider.fill( `24` )
+        test( `settings drawer opens from gear icon on reader`, async ( { page } ) => {
 
-        // Check new font size
-        const reader = page.locator( `main` )
-        await expect( reader ).not.toHaveCSS( `font-size`, initial_size )
-        await expect( reader ).toHaveCSS( `font-size`, `24px` )
+            await mock_openrouter( page )
+            await open_seeded_reader( page )
 
-    } )
+            await page.getByRole( `button`, { name: `Settings` } ).click()
 
-    test( `settings drawer opens from gear icon on reader`, async ( { page } ) => {
+            // Reader settings should include language and level
+            await expect( page.getByText( `FONT SIZE` ) ).toBeVisible()
 
-        await mock_openrouter( page )
-        await upload_demo_book( page )
+        } )
 
-        await open_reader( page )
+        test( `font family change applies to reader`, async ( { page } ) => {
 
-        await page.getByRole( `button`, { name: `Settings` } ).click()
+            await mock_openrouter( page )
+            await open_seeded_reader( page )
 
-        // Reader settings should include language and level
-        await expect( page.getByText( `FONT SIZE` ) ).toBeVisible()
+            // Open settings and change font family
+            await page.getByRole( `button`, { name: `Settings` } ).click()
 
-    } )
+            // Find the font family select (not the model select)
+            const font_select = page.locator( `select` ).filter( { hasText: /Nunito|Georgia/ } )
+            await font_select.selectOption( `Georgia` )
+            await expect( page.locator( `main` ) ).toHaveCSS( `font-family`, /Georgia/ )
 
-    test( `font family change applies to reader`, async ( { page } ) => {
+            // Close settings and verify font applied
+            await page.keyboard.press( `Escape` )
+            await expect( page.locator( `aside` ).filter( { hasText: `Target Language` } ) ).not.toBeVisible()
+            await expect( page.locator( `main` ) ).toHaveCSS( `font-family`, /Georgia/ )
 
-        await mock_openrouter( page )
-        await upload_demo_book( page )
-
-        await open_reader( page )
-
-        // Open settings and change font family
-        await page.getByRole( `button`, { name: `Settings` } ).click()
-
-        // Find the font family select (not the model select)
-        const font_select = page.locator( `select` ).filter( { hasText: /Nunito|Georgia/ } )
-        await font_select.selectOption( `Georgia` )
-        await expect( page.locator( `main` ) ).toHaveCSS( `font-family`, /Georgia/ )
-
-        // Close settings and verify font applied
-        await page.keyboard.press( `Escape` )
-        await expect( page.locator( `aside` ).filter( { hasText: `Target Language` } ) ).not.toBeVisible()
-        await expect( page.locator( `main` ) ).toHaveCSS( `font-family`, /Georgia/ )
+        } )
 
     } )
 
@@ -195,25 +192,29 @@ test.describe( `Settings`, () => {
 
     } )
 
-    test( `font size setting persists after page reload`, async ( { page } ) => {
+    test.describe( `Reader setting persistence`, () => {
 
-        await mock_openrouter( page )
-        await upload_demo_book( page )
+        test.use( { app_state: `reader` } )
 
-        await open_reader( page )
+        test( `font size setting persists after page reload`, async ( { page } ) => {
 
-        // Set font size to 22
-        await page.getByRole( `button`, { name: `Settings` } ).click()
-        await page.locator( `input[type="range"]` ).fill( `22` )
-        await expect( page.locator( `main` ) ).toHaveCSS( `font-size`, `22px` )
-        await page.keyboard.press( `Escape` )
-        await expect( page.locator( `aside` ).filter( { hasText: `Target Language` } ) ).not.toBeVisible()
+            await mock_openrouter( page )
+            await open_seeded_reader( page )
 
-        // Reload
-        await page.reload( { waitUntil: `networkidle` } )
+            // Set font size to 22
+            await page.getByRole( `button`, { name: `Settings` } ).click()
+            await page.locator( `input[type="range"]` ).fill( `22` )
+            await expect( page.locator( `main` ) ).toHaveCSS( `font-size`, `22px` )
+            await page.keyboard.press( `Escape` )
+            await expect( page.locator( `aside` ).filter( { hasText: `Target Language` } ) ).not.toBeVisible()
 
-        // Font size should still be 22px
-        await expect( page.locator( `main` ) ).toHaveCSS( `font-size`, `22px` )
+            // Reload
+            await page.reload( { waitUntil: `networkidle` } )
+
+            // Font size should still be 22px
+            await expect( page.locator( `main` ) ).toHaveCSS( `font-size`, `22px` )
+
+        } )
 
     } )
 

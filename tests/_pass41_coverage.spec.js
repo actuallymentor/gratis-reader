@@ -6,7 +6,7 @@
  * - Clear cache actually clears IndexedDB translations
  * - Explanation popover receives proper mock content
  */
-import { test, expect } from '@playwright/test'
+import { test, expect, open_seeded_reader } from './helpers/app_fixture.js'
 import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth, clear_storage } from './helpers/setup.js'
 
 const get_store_count = async ( page, store_name ) => page.evaluate( async ( name ) => {
@@ -31,7 +31,7 @@ const accept_confirmation = async ( page, expected_message, action ) => {
                 expect( dialog.message() ).toBe( expected_message )
                 await dialog.accept()
                 resolve()
-            } catch( error ) {
+            } catch ( error ) {
                 reject( error )
             }
         } )
@@ -44,11 +44,11 @@ const accept_confirmation = async ( page, expected_message, action ) => {
 
 test.describe( `Pass 41 — Coverage Gaps`, () => {
 
-    test.beforeEach( async ( { page } ) => {
-        await clear_storage( page )
+    test.beforeEach( async ( { page, app_state } ) => {
+        if( app_state !== `reader` ) await clear_storage( page )
         await mock_openrouter( page )
         await mock_auth( page )
-        await setup_api_key( page )
+        if( app_state !== `reader` ) await setup_api_key( page )
     } )
 
 
@@ -82,62 +82,65 @@ test.describe( `Pass 41 — Coverage Gaps`, () => {
 
     } )
 
+    test.describe( `Seeded translation cache and explanation`, () => {
 
-    // ── 2. Clear cache actually empties IndexedDB translations ──
+        test.use( { app_state: `reader` } )
 
-    test( `BW209 clear cache button empties translations from IndexedDB`, async ( { page } ) => {
+        // ── 2. Clear cache actually empties IndexedDB translations ──
 
-        // Upload book and read to populate translation cache
-        await upload_demo_book( page )
-        await open_reader( page )
+        test( `BW209 clear cache button empties translations from IndexedDB`, async ( { page } ) => {
 
-        // Verify translations were cached
-        await expect.poll(
-            () => get_store_count( page, `translations` ),
-            { timeout: 30_000 }
-        ).toBeGreaterThan( 0 )
+            // Read the seeded book to populate translation cache.
+            await open_seeded_reader( page )
 
-        // Go back to library and open settings
-        await page.getByRole( `button`, { name: /back/i } ).click()
-        await page.waitForURL( /\/library/ )
+            // Verify translations were cached
+            await expect.poll(
+                () => get_store_count( page, `translations` ),
+                { timeout: 30_000 }
+            ).toBeGreaterThan( 0 )
 
-        await page.getByRole( `button`, { name: `Settings` } ).click()
+            // Go back to library and open settings
+            await page.getByRole( `button`, { name: /back/i } ).click()
+            await page.waitForURL( /\/library/ )
 
-        // Accept confirmation dialog and clear cache
-        await accept_confirmation(
-            page,
-            `Clear all cached translations? This cannot be undone.`,
-            () => page.getByRole( `button`, { name: `Clear Translation Cache` } ).click()
-        )
+            await page.getByRole( `button`, { name: `Settings` } ).click()
 
-        // Verify translations store is now empty
-        await expect( page.getByText( `Translation cache cleared` ) ).toBeVisible()
-        await expect.poll( () => get_store_count( page, `translations` ) ).toBe( 0 )
+            // Accept confirmation dialog and clear cache
+            await accept_confirmation(
+                page,
+                `Clear all cached translations? This cannot be undone.`,
+                () => page.getByRole( `button`, { name: `Clear Translation Cache` } ).click()
+            )
 
-    } )
+            // Verify translations store is now empty
+            await expect( page.getByText( `Translation cache cleared` ) ).toBeVisible()
+            await expect.poll( () => get_store_count( page, `translations` ) ).toBe( 0 )
+
+        } )
 
 
-    // ── 3. Explanation popover shows proper mock content ──
+        // ── 3. Explanation popover shows proper mock content ──
 
-    test( `BW210 explanation popover shows distinct explanation content`, async ( { page } ) => {
+        test( `BW210 explanation popover shows distinct explanation content`, async ( { page } ) => {
 
-        await upload_demo_book( page )
-        await open_reader( page )
+            await open_seeded_reader( page )
 
-        // Wait for translations
-        const first_sentence = page.locator( `span[data-sentence-id]` ).first()
-        await expect( first_sentence ).toContainText( `[TRANSLATED]`, { timeout: 30_000 } )
+            // Wait for translations
+            const first_sentence = page.locator( `span[data-sentence-id]` ).first()
+            await expect( first_sentence ).toContainText( `[TRANSLATED]`, { timeout: 30_000 } )
 
-        // Open the explanation from the selected word's sheet.
-        await first_sentence.locator( `[data-translation-word-index]` ).first().click()
-        await page.locator( `[data-translation-info-sheet]` ).getByRole( `button`, { name: `Explain` } ).click()
+            // Open the explanation from the selected word's sheet.
+            await first_sentence.locator( `[data-translation-word-index]` ).first().click()
+            await page.locator( `[data-translation-info-sheet]` ).getByRole( `button`, { name: `Explain` } ).click()
 
-        // Should show the explanation popover with [EXPLANATION] content from our mock
-        await expect( page.getByText( `Translation Explanation` ) ).toBeVisible( { timeout: 10_000 } )
+            // Should show the explanation popover with [EXPLANATION] content from our mock
+            await expect( page.getByText( `Translation Explanation` ) ).toBeVisible( { timeout: 10_000 } )
 
-        // The mock returns "[EXPLANATION] This sentence means something interesting..."
-        // Verify the explanation content is present (not a generic translation response)
-        await expect( page.getByText( /something interesting/i ) ).toBeVisible( { timeout: 10_000 } )
+            // The mock returns "[EXPLANATION] This sentence means something interesting..."
+            // Verify the explanation content is present (not a generic translation response)
+            await expect( page.getByText( /something interesting/i ) ).toBeVisible( { timeout: 10_000 } )
+
+        } )
 
     } )
 

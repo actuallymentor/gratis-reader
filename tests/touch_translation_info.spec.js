@@ -1,5 +1,4 @@
-import { test, expect } from '@playwright/test'
-import { setup_api_key, upload_demo_book, open_reader, clear_storage } from './helpers/setup.js'
+import { test, expect, open_seeded_reader } from './helpers/app_fixture.js'
 
 const CHAT_URL = `**/openrouter.ai/api/v1/chat/completions`
 const READER_WORD_TOOLTIP = `[data-reader-word-tooltip]`
@@ -61,21 +60,16 @@ const translation_words = ( sentence ) => sentence.locator( `[data-translation-w
 test.describe( `Touch translation information`, () => {
 
     test.use( {
+        app_state: `reader`,
         viewport: { width: 390, height: 844 },
         hasTouch: true,
         isMobile: true
     } )
 
-    test.beforeEach( async ( { page } ) => {
-        await clear_storage( page )
-        await setup_api_key( page )
-        await upload_demo_book( page )
-    } )
-
     test( `tapping words keeps one sheet and moves one contextual tooltip`, async ( { page } ) => {
 
         const calls = await install_translation_mock( page )
-        await open_reader( page )
+        await open_seeded_reader( page )
 
         const sentence = page.locator( `span[data-sentence-id]` ).first()
         const words = translation_words( sentence )
@@ -96,7 +90,9 @@ test.describe( `Touch translation information`, () => {
         )
         await expect( page.getByRole( `dialog`, { name: `Translation Explanation` } ) ).not.toBeVisible()
 
-        await sheet.evaluate( element => { window.__translation_info_sheet = element } )
+        await sheet.evaluate( element => {
+            window.__translation_info_sheet = element
+        } )
         await second_word.tap()
 
         await expect( sheet ).toHaveCount( 1 )
@@ -127,7 +123,7 @@ test.describe( `Touch translation information`, () => {
     test( `tapping another fragment replaces the sheet content`, async ( { page } ) => {
 
         const calls = await install_translation_mock( page )
-        await open_reader( page )
+        await open_seeded_reader( page )
 
         const sentences = page.locator( `span[data-sentence-id]` )
         await expect( page.locator( `[data-translation-word-index]` ).first() ).toBeVisible( { timeout: 15_000 } )
@@ -139,7 +135,7 @@ test.describe( `Touch translation information`, () => {
                 && fragment.textContent !== current_text
                 && fragment.querySelector( `[data-translation-word-index]` )
             ),
-            first_text
+        first_text
         )
         expect( different_fragment_index ).toBeGreaterThan( 0 )
 
@@ -167,7 +163,7 @@ test.describe( `Touch translation information`, () => {
     test( `outside taps preserve the sheet and the explicit close clears selection`, async ( { page } ) => {
 
         await install_translation_mock( page )
-        await open_reader( page )
+        await open_seeded_reader( page )
 
         const word = page.locator( `[data-translation-word-index]` ).first()
         const sheet = page.locator( `[data-translation-info-sheet]` )
@@ -191,7 +187,7 @@ test.describe( `Touch translation information`, () => {
     test( `Explain opens the retained sentence explanation modal`, async ( { page } ) => {
 
         const calls = await install_translation_mock( page )
-        await open_reader( page )
+        await open_seeded_reader( page )
 
         const word = page.locator( `[data-translation-word-index]` ).first()
         const sheet = page.locator( `[data-translation-info-sheet]` )
@@ -217,7 +213,7 @@ test.describe( `Touch translation information`, () => {
 
         await page.setViewportSize( { width: 320, height: 568 } )
         await install_translation_mock( page )
-        await open_reader( page )
+        await open_seeded_reader( page )
 
         const word = page.locator( `[data-translation-word-index]` ).first()
         await expect( word ).toBeVisible( { timeout: 15_000 } )
@@ -257,7 +253,7 @@ test.describe( `Touch translation information`, () => {
 
         const long_translation = `A deliberately long contextual translation that needs several lines`
         await install_translation_mock( page, { word_lookup_content: long_translation } )
-        await open_reader( page )
+        await open_seeded_reader( page )
 
         const word = page.locator( `[data-translation-word-index]` ).first()
         const tooltip = page.locator( READER_WORD_TOOLTIP )
@@ -296,7 +292,7 @@ test.describe( `Touch translation information`, () => {
     test( `dock resize hides an occluded tooltip and reveals it after the dock shrinks`, async ( { page } ) => {
 
         await install_translation_mock( page )
-        await open_reader( page )
+        await open_seeded_reader( page )
 
         const word = page.locator( `[data-translation-word-index]` ).first()
         const tooltip = page.locator( READER_WORD_TOOLTIP )
@@ -336,7 +332,7 @@ test.describe( `Touch translation information`, () => {
         await install_translation_mock( page, {
             translated_content: `Start ${ wrapped_word } finish`
         } )
-        await open_reader( page )
+        await open_seeded_reader( page )
 
         const word = page.locator( `[data-translation-word="${ wrapped_word }"]` ).first()
         const tooltip = page.locator( READER_WORD_TOOLTIP )
@@ -344,7 +340,7 @@ test.describe( `Touch translation information`, () => {
         await expect.poll( () => word.evaluate( element => element.getClientRects().length ) ).toBeGreaterThan( 1 )
 
         const tap_point = await word.evaluate( element => {
-            const rect = element.getClientRects()[0]
+            const [ rect ] = element.getClientRects()
             return {
                 x: rect.left + Math.min( 2, rect.width / 2 ),
                 y: rect.top + rect.height / 2
@@ -355,7 +351,7 @@ test.describe( `Touch translation information`, () => {
         await expect( tooltip ).toBeVisible()
         const [ first_word_rect, tooltip_box ] = await Promise.all( [
             word.evaluate( element => {
-                const rect = element.getClientRects()[0]
+                const [ rect ] = element.getClientRects()
                 return { top: rect.top, bottom: rect.bottom }
             } ),
             tooltip.boundingBox()
@@ -371,7 +367,7 @@ test.describe( `Touch translation information`, () => {
     test( `empty word lookup responses settle as unavailable`, async ( { page } ) => {
 
         const calls = await install_translation_mock( page, { word_lookup_content: `   ` } )
-        await open_reader( page )
+        await open_seeded_reader( page )
 
         const word = page.locator( `[data-translation-word-index]` ).first()
         const tooltip = page.locator( READER_WORD_TOOLTIP )

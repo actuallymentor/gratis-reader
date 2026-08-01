@@ -2,10 +2,12 @@
  * Pass 39 — Read-ahead translation buffer test
  * Verifies that the app pre-translates 2 chapters ahead of the current one
  */
-import { test, expect } from '@playwright/test'
-import { setup_api_key, upload_demo_book, open_reader, mock_auth } from './helpers/setup.js'
+import { test, expect, open_seeded_reader } from './helpers/app_fixture.js'
+import { mock_auth } from './helpers/setup.js'
 
 test.describe( `Pass 39 — Read-ahead buffer`, () => {
+
+    test.use( { app_state: `reader` } )
 
     test( `BW200 translates current chapter plus 2 ahead`, async ( { page } ) => {
 
@@ -29,9 +31,7 @@ test.describe( `Pass 39 — Read-ahead buffer`, () => {
         } )
 
         await mock_auth( page )
-        await setup_api_key( page )
-        await upload_demo_book( page )
-        await open_reader( page )
+        await open_seeded_reader( page )
 
         // The translating lifecycle covers the current chapter and both read-ahead chapters.
         const translating = page.getByText( `Translating...`, { exact: true } )

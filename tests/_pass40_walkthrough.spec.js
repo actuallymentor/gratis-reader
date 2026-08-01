@@ -1,8 +1,8 @@
 /**
  * Pass 40 — Read-ahead stress tests and regression checks
  */
-import { test, expect } from '@playwright/test'
-import { setup_api_key, upload_demo_book, open_reader, mock_auth } from './helpers/setup.js'
+import { test, expect, open_seeded_reader } from './helpers/app_fixture.js'
+import { mock_auth } from './helpers/setup.js'
 
 const wait_for_translations = async ( page ) => {
 
@@ -13,6 +13,8 @@ const wait_for_translations = async ( page ) => {
 }
 
 test.describe( `Pass 40 — Read-ahead buffer`, () => {
+
+    test.use( { app_state: `reader` } )
 
     test( `BW201 read-ahead translates sentences from next chapters`, async ( { page } ) => {
         // Track which sentence IDs are translated (by chapter index in the ID)
@@ -34,9 +36,7 @@ test.describe( `Pass 40 — Read-ahead buffer`, () => {
         } )
 
         await mock_auth( page )
-        await setup_api_key( page )
-        await upload_demo_book( page )
-        await open_reader( page )
+        await open_seeded_reader( page )
 
         await wait_for_translations( page )
 
@@ -61,9 +61,7 @@ test.describe( `Pass 40 — Read-ahead buffer`, () => {
         } )
 
         await mock_auth( page )
-        await setup_api_key( page )
-        await upload_demo_book( page )
-        await open_reader( page )
+        await open_seeded_reader( page )
 
         await wait_for_translations( page )
 
@@ -97,9 +95,7 @@ test.describe( `Pass 40 — Read-ahead buffer`, () => {
         } )
 
         await mock_auth( page )
-        await setup_api_key( page )
-        await upload_demo_book( page )
-        await open_reader( page )
+        await open_seeded_reader( page )
 
         // Rapidly navigate through 6 chapters
         for( let i = 0; i < 6; i++ ) {
@@ -135,9 +131,7 @@ test.describe( `Pass 40 — Read-ahead buffer`, () => {
         } )
 
         await mock_auth( page )
-        await setup_api_key( page )
-        await upload_demo_book( page )
-        await open_reader( page )
+        await open_seeded_reader( page )
 
         // Jump to last chapter using TOC
         const toc_select = page.locator( `select` ).first()
@@ -173,9 +167,7 @@ test.describe( `Pass 40 — Read-ahead buffer`, () => {
         } )
 
         await mock_auth( page )
-        await setup_api_key( page )
-        await upload_demo_book( page )
-        await open_reader( page )
+        await open_seeded_reader( page )
 
         await wait_for_translations( page )
         const count_after_load = translation_count
@@ -220,9 +212,7 @@ test.describe( `Pass 40 — Read-ahead buffer`, () => {
         } )
 
         await mock_auth( page )
-        await setup_api_key( page )
-        await upload_demo_book( page )
-        await open_reader( page )
+        await open_seeded_reader( page )
 
         // Token stats should appear in the footer
         const token_text = page.locator( `footer` ).getByText( /tokens/ )
@@ -250,9 +240,7 @@ test.describe( `Pass 40 — Read-ahead buffer`, () => {
         } )
 
         await mock_auth( page )
-        await setup_api_key( page )
-        await upload_demo_book( page )
-        await open_reader( page )
+        await open_seeded_reader( page )
 
         // Get initial token display
         const token_el = page.locator( `footer` ).getByText( /tokens/ )

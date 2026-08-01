@@ -1,11 +1,11 @@
-import { test, expect } from '@playwright/test'
-import { setup_api_key, clear_storage, mock_auth } from './helpers/setup.js'
+import { test, expect } from './helpers/app_fixture.js'
+import { mock_auth } from './helpers/setup.js'
 
 test.describe( `API Key Management`, () => {
 
+    test.use( { app_state: `authenticated` } )
+
     test.beforeEach( async ( { page } ) => {
-        await clear_storage( page )
-        await setup_api_key( page )
         await mock_auth( page )
     } )
 

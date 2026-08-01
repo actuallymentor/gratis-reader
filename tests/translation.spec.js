@@ -1,10 +1,8 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, open_seeded_reader } from './helpers/app_fixture.js'
 import {
     setup_api_key,
     upload_demo_book,
-    open_reader,
     mock_openrouter,
-    clear_storage,
     get_current_translation_entries
 } from './helpers/setup.js'
 
@@ -35,16 +33,12 @@ const wait_for_mocked_translations = async page => {
 
 test.describe( `Translation (mocked)`, () => {
 
-    test.beforeEach( async ( { page } ) => {
-        await clear_storage( page )
-        await setup_api_key( page )
-        await upload_demo_book( page )
-    } )
+    test.use( { app_state: `reader` } )
 
     const enter_reader = async ( page ) => {
 
         await mock_openrouter( page )
-        await open_reader( page )
+        await open_seeded_reader( page )
 
     }
 
@@ -83,7 +77,7 @@ test.describe( `Translation (mocked)`, () => {
             } )
         } )
 
-        await open_reader( page )
+        await open_seeded_reader( page )
 
         await expect( page.getByText( /\[RETRIED\]/ ).first() ).toBeVisible( { timeout: 20_000 } )
         expect( Object.values( attempts_by_sentence ).some( attempts => attempts > 1 ) ).toBe( true )
@@ -107,7 +101,7 @@ test.describe( `Translation (mocked)`, () => {
         } )
 
         const translation_request = page.waitForRequest( CHAT_URL )
-        await open_reader( page )
+        await open_seeded_reader( page )
         const request = await translation_request
 
         expect( request.postData() ).toContain( `Translate this sentence:` )
@@ -146,10 +140,8 @@ test.describe( `Translation (mocked)`, () => {
             } )
         } )
 
-        // Re-open book
-        await page.locator( `img[alt]` ).first().click()
-        await page.waitForURL( /\/read\// )
-        await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible()
+        // Re-open the seeded book without repeating its setup path.
+        await open_seeded_reader( page )
 
         // Advance the translation debounce, then await the complete cache-check
         // cycle before asserting that none of the cached sentences hit the API.
@@ -169,7 +161,7 @@ test.describe( `Translation (mocked)`, () => {
 
         // First load — populate cache with mocked translations
         await mock_openrouter( page )
-        await open_reader( page )
+        await open_seeded_reader( page )
 
         // Wait for translations to populate cache
         await expect( page.getByText( /\[TRANSLATED\]/ ).first() ).toBeVisible( { timeout: 15_000 } )
@@ -182,9 +174,8 @@ test.describe( `Translation (mocked)`, () => {
         // Now block all API calls to simulate offline
         await page.route( `**/openrouter.ai/**`, route => route.abort( `connectionrefused` ) )
 
-        // Re-open the book — cached translations should still show
-        await page.locator( `img[alt]` ).first().click()
-        await page.waitForURL( /\/read\// )
+        // Re-open the seeded book — cached translations should still show
+        await open_seeded_reader( page )
 
         // Cached translations should be visible
         await expect( page.getByText( /\[TRANSLATED\]/ ).first() ).toBeVisible()
@@ -195,13 +186,14 @@ test.describe( `Translation (mocked)`, () => {
 
 test.describe( `Translation (live)`, () => {
 
+    test.use( { app_state: `empty` } )
+
     // These tests hit the real OpenRouter API
     // Run with: LIVE_API=1 npx playwright test --grep @live
 
     test.skip( () => !process.env.LIVE_API, `Skipped unless LIVE_API=1` )
 
     test.beforeEach( async ( { page } ) => {
-        await clear_storage( page )
         await setup_api_key( page )
         await upload_demo_book( page )
     } )

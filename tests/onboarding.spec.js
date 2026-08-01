@@ -1,17 +1,17 @@
-import { test, expect } from '@playwright/test'
-import { clear_storage, mock_auth } from './helpers/setup.js'
+import { test, expect } from './helpers/app_fixture.js'
+import { mock_auth } from './helpers/setup.js'
 
 const deferred = () => {
     let release
-    const promise = new Promise( resolve => { release = resolve } )
+    const promise = new Promise( resolve => {
+        release = resolve
+    } )
     return { promise, release }
 }
 
 test.describe( `Onboarding`, () => {
 
-    test.beforeEach( async ( { page } ) => {
-        await clear_storage( page )
-    } )
+    test.use( { app_state: `empty` } )
 
     test( `shows onboarding page when no API key is stored`, async ( { page } ) => {
         await page.goto( `/` )

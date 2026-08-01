@@ -27,7 +27,8 @@ test.describe( `Pass 35 — Walkthrough`, () => {
         await expect(
             page.locator( `span[data-sentence-id] [data-translation-word-index]` ).first()
         ).toBeVisible( { timeout: 15_000 } )
-        await expect( page.getByText( `Translating...` ) ).not.toBeVisible()
+        await expect( page.getByText( `Translating...`, { exact: true } ) )
+            .not.toBeVisible( { timeout: 30_000 } )
 
         // Filter out known non-issues (e.g. React DevTools suggestions)
         const real_warnings = warnings.filter( w =>
@@ -174,7 +175,8 @@ test.describe( `Pass 35 — Walkthrough`, () => {
         await upload_demo_book( page )
         await open_reader( page )
         await expect( page.locator( `body` ) ).toContainText( `[CACHED]`, { timeout: 15_000 } )
-        await expect( page.getByText( `Translating...` ) ).not.toBeVisible()
+        await expect( page.getByText( `Translating...`, { exact: true } ) )
+            .not.toBeVisible( { timeout: 30_000 } )
 
         const first_count = api_call_count
 
@@ -192,7 +194,8 @@ test.describe( `Pass 35 — Walkthrough`, () => {
             await start.click()
         } catch { /* no modal */ }
         await expect( page.locator( `body` ) ).toContainText( `[CACHED]`, { timeout: 15_000 } )
-        await expect( page.getByText( `Translating...` ) ).not.toBeVisible()
+        await expect( page.getByText( `Translating...`, { exact: true } ) )
+            .not.toBeVisible( { timeout: 30_000 } )
 
         // Second visit should have fewer API calls (served from cache)
         expect( api_call_count ).toBeLessThan( first_count )

@@ -41,7 +41,7 @@ const setup_key = async ( page ) => {
     await page.goto( `/` )
     await page.evaluate( () => {
         const store = JSON.parse( localStorage.getItem( `settings-storage` ) || `{}` )
-        store.state = { ...( store.state || {} ), api_key: `sk-or-test-fake-key` }
+        store.state = { ... store.state || {} , api_key: `sk-or-test-fake-key` }
         localStorage.setItem( `settings-storage`, JSON.stringify( store ) )
     } )
 }
@@ -156,7 +156,7 @@ test.describe( `Pass 23 — Edge Cases & Error States`, () => {
 
         // Click Next rapidly 5 times
         const next_btn = page.getByRole( `button`, { name: /Next/ } )
-        const progress = page.locator( `text=/\d+\s*\/\s*\d+/` ).first()
+        const progress = page.locator( `footer` ).getByText( /\d+\s*\/\s*\d+/ ).first()
         const progress_before = await progress.textContent()
         for( let i = 0; i < 5; i++ ) {
             await next_btn.click()
@@ -420,7 +420,9 @@ test.describe( `Pass 23 — Edge Cases & Error States`, () => {
         await upload_book( page )
 
         let release_translations
-        const translation_gate = new Promise( resolve => { release_translations = resolve } )
+        const translation_gate = new Promise( resolve => {
+            release_translations = resolve
+        } )
 
         // Hold API responses until the loading indicator has been observed.
         await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {

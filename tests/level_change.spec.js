@@ -1,5 +1,5 @@
-import { test, expect } from '@playwright/test'
-import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, clear_storage } from './helpers/setup.js'
+import { test, expect, open_seeded_reader } from './helpers/app_fixture.js'
+import { mock_openrouter } from './helpers/setup.js'
 
 const CHAT_URL = `**/openrouter.ai/api/v1/chat/completions`
 
@@ -10,20 +10,15 @@ const system_prompt_from = request => {
 
 test.describe( `Level & Language Changes`, () => {
 
-    test.beforeEach( async ( { page } ) => {
-        await clear_storage( page )
-        await setup_api_key( page )
-        await mock_openrouter( page )
-        await upload_demo_book( page )
-    } )
+    test.use( { app_state: `reader` } )
 
-    const enter_reader = async ( page ) => {
-        await open_reader( page )
-    }
+    test.beforeEach( async ( { page } ) => {
+        await mock_openrouter( page )
+    } )
 
     test( `changing proficiency level re-translates visible sentences`, async ( { page } ) => {
 
-        await enter_reader( page )
+        await open_seeded_reader( page )
 
         // Wait for initial translations
         await expect( page.getByText( /\[TRANSLATED\]/ ).first() ).toBeVisible( { timeout: 15_000 } )
@@ -78,7 +73,7 @@ test.describe( `Level & Language Changes`, () => {
 
     test( `changing target language clears and re-translates`, async ( { page } ) => {
 
-        await enter_reader( page )
+        await open_seeded_reader( page )
 
         // Wait for initial translations
         await expect( page.getByText( /\[TRANSLATED\]/ ).first() ).toBeVisible( { timeout: 15_000 } )

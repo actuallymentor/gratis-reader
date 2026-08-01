@@ -2,214 +2,238 @@
  * Pass 33 — Fresh walkthrough: concurrent interactions, rapid state, boundaries
  * Targets angles that 32 previous passes haven't deeply covered
  */
-import { test, expect } from '@playwright/test'
-import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth, clear_storage } from './helpers/setup.js'
+import { test, expect, open_seeded_reader } from './helpers/app_fixture.js'
+import { setup_api_key, mock_openrouter, mock_auth } from './helpers/setup.js'
 
 test.describe( `Pass 33 — Walkthrough`, () => {
 
     test.beforeEach( async ( { page } ) => {
         await mock_openrouter( page )
         await mock_auth( page )
-        await setup_api_key( page )
     } )
 
-    // ── 1. Multiple sentences can be inspected independently ──
+    test.describe( `Seeded reader scenarios`, () => {
 
-    test( `BW116 inspecting one sentence does not affect others`, async ( { page } ) => {
-        await upload_demo_book( page )
-        await open_reader( page )
+        test.use( { app_state: `reader` } )
 
-        const sentences = page.locator( `span[data-sentence-id]` )
-        await expect( sentences.nth( 1 ) ).toBeVisible()
+        // ── 1. Multiple sentences can be inspected independently ──
 
-        const first_word = sentences.first().locator( `[data-translation-word-index]` ).first()
-        const second_word = sentences.nth( 1 ).locator( `[data-translation-word-index]` ).first()
-        await expect( first_word ).toBeVisible( { timeout: 15_000 } )
-        await expect( second_word ).toBeVisible( { timeout: 15_000 } )
-        await first_word.click()
+        test( `BW116 inspecting one sentence does not affect others`, async ( { page } ) => {
+            await open_seeded_reader( page )
 
-        await expect( first_word ).toHaveAttribute( `aria-pressed`, `true` )
-        await expect( second_word ).toHaveAttribute( `aria-pressed`, `false` )
-    } )
+            const sentences = page.locator( `span[data-sentence-id]` )
+            await expect( sentences.nth( 1 ) ).toBeVisible()
 
-    // ── 2. Reader handles chapter with headings correctly ──
+            const first_word = sentences.first().locator( `[data-translation-word-index]` ).first()
+            const second_word = sentences.nth( 1 ).locator( `[data-translation-word-index]` ).first()
+            await expect( first_word ).toBeVisible( { timeout: 15_000 } )
+            await expect( second_word ).toBeVisible( { timeout: 15_000 } )
+            await first_word.click()
 
-    test( `BW117 chapter headings render with correct HTML element types`, async ( { page } ) => {
-        await upload_demo_book( page )
-        await open_reader( page )
-
-        // The reading area should exist
-        const reading_area = page.locator( `[style*="font-size"], main, article, section` ).first()
-        await expect( reading_area ).toBeVisible( { timeout: 5000 } )
-
-        // Content should have at least one text element
-        const body_text = await page.locator( `body` ).textContent()
-        expect( body_text.length ).toBeGreaterThan( 50 )
-    } )
-
-    // ── 3. Settings persist across full page reload ──
-
-    test( `BW118 font size persists through hard reload`, async ( { page } ) => {
-        await upload_demo_book( page )
-        await open_reader( page )
-
-        // Open settings and change font size
-        await page.getByRole( `button`, { name: `Settings` } ).click()
-        await expect( page.getByText( `FONT SIZE` ) ).toBeVisible( { timeout: 3000 } )
-        const slider = page.locator( `input[type="range"]` ).first()
-        await slider.fill( `28` )
-        await expect( slider ).toHaveValue( `28` )
-        await page.getByRole( `button`, { name: `Close` } ).click()
-        await expect.poll( () => page.evaluate( () => {
-            const store = JSON.parse( localStorage.getItem( `settings-storage` ) || `{}` )
-            return store?.state?.font_size
-        } ) ).toBe( 28 )
-
-        // Hard reload
-        await page.reload()
-        await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible( { timeout: 10000 } )
-
-        // Re-open settings and verify
-        await page.getByRole( `button`, { name: `Settings` } ).click()
-        await expect( page.getByText( `FONT SIZE` ) ).toBeVisible( { timeout: 3000 } )
-        const value = await page.locator( `input[type="range"]` ).first().inputValue()
-        expect( value ).toBe( `28` )
-    } )
-
-    // ── 4. Rapid chapter navigation doesn't crash ──
-
-    test( `BW119 rapid arrow key navigation produces no page errors`, async ( { page } ) => {
-        const errors = []
-        page.on( `pageerror`, e => errors.push( e.message ) )
-
-        await upload_demo_book( page )
-        await open_reader( page )
-
-        const toc = page.locator( `header select` )
-        await expect( toc ).toBeVisible()
-
-        // Send each directional burst without serializing it on intermediate UI.
-        for( let i = 0; i < 5; i++ ) await page.keyboard.press( `ArrowRight` )
-        await expect( toc ).toHaveValue( `5` )
-
-        for( let i = 0; i < 5; i++ ) await page.keyboard.press( `ArrowLeft` )
-
-        await expect( toc ).toHaveValue( `0` )
-        await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible()
-        expect( errors ).toEqual( [] )
-    } )
-
-    // ── 5. Word click shows information sheet on desktop ──
-
-    test( `BW120 clicking a translated word shows information sheet`, async ( { page } ) => {
-        await upload_demo_book( page )
-        await open_reader( page )
-
-        // Find a word span inside a translated sentence
-        const word = page.locator( `span[data-sentence-id] [data-translation-word-index]` ).first()
-        await expect( word ).toBeVisible( { timeout: 15_000 } )
-        await word.click()
-        await expect( page.locator( `[data-translation-info-sheet]` ) ).toBeVisible()
-
-        // Main check: no errors from clicking
-        const errors = []
-        page.on( `pageerror`, e => errors.push( e.message ) )
-        expect( errors ).toEqual( [] )
-    } )
-
-    // ── 6. TOC dropdown has multiple options ──
-
-    test( `BW121 TOC dropdown shows chapter list`, async ( { page } ) => {
-        await upload_demo_book( page )
-        await open_reader( page )
-
-        // Find select/dropdown for TOC
-        const toc = page.locator( `select` ).first()
-        if( await toc.count() > 0 ) {
-            const options = await toc.locator( `option` ).count()
-            expect( options ).toBeGreaterThanOrEqual( 1 )
-        }
-    } )
-
-    // ── 7. API key is stored in localStorage correctly ──
-
-    test( `BW122 API key stored in settings-storage localStorage key`, async ( { page } ) => {
-        await page.goto( `/library` )
-
-        const stored = await page.evaluate( () => {
-            const raw = localStorage.getItem( `settings-storage` )
-            if( !raw ) return null
-            const parsed = JSON.parse( raw )
-            return parsed?.state?.api_key
+            await expect( first_word ).toHaveAttribute( `aria-pressed`, `true` )
+            await expect( second_word ).toHaveAttribute( `aria-pressed`, `false` )
         } )
 
-        expect( stored ).toBeTruthy()
-        expect( stored ).toContain( `sk-or` )
+        // ── 2. Reader handles chapter with headings correctly ──
+
+        test( `BW117 chapter headings render with correct HTML element types`, async ( { page } ) => {
+            await open_seeded_reader( page )
+
+            // The reading area should exist
+            const reading_area = page.locator( `[style*="font-size"], main, article, section` ).first()
+            await expect( reading_area ).toBeVisible( { timeout: 5000 } )
+
+            // Content should have at least one text element
+            const body_text = await page.locator( `body` ).textContent()
+            expect( body_text.length ).toBeGreaterThan( 50 )
+        } )
+
+        // ── 3. Settings persist across full page reload ──
+
+        test( `BW118 font size persists through hard reload`, async ( { page } ) => {
+            await open_seeded_reader( page )
+
+            // Open settings and change font size
+            await page.getByRole( `button`, { name: `Settings` } ).click()
+            await expect( page.getByText( `FONT SIZE` ) ).toBeVisible( { timeout: 3000 } )
+            const slider = page.locator( `input[type="range"]` ).first()
+            await slider.fill( `28` )
+            await expect( slider ).toHaveValue( `28` )
+            await page.getByRole( `button`, { name: `Close` } ).click()
+            await expect.poll( () => page.evaluate( () => {
+                const store = JSON.parse( localStorage.getItem( `settings-storage` ) || `{}` )
+                return store?.state?.font_size
+            } ) ).toBe( 28 )
+
+            // Hard reload
+            await page.reload()
+            await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible( { timeout: 10000 } )
+
+            // Re-open settings and verify
+            await page.getByRole( `button`, { name: `Settings` } ).click()
+            await expect( page.getByText( `FONT SIZE` ) ).toBeVisible( { timeout: 3000 } )
+            const value = await page.locator( `input[type="range"]` ).first().inputValue()
+            expect( value ).toBe( `28` )
+        } )
+
+        // ── 4. Rapid chapter navigation doesn't crash ──
+
+        test( `BW119 rapid arrow key navigation produces no page errors`, async ( { page } ) => {
+            const errors = []
+            page.on( `pageerror`, e => errors.push( e.message ) )
+
+            await open_seeded_reader( page )
+
+            const toc = page.locator( `header select` )
+            await expect( toc ).toBeVisible()
+
+            // Send each directional burst without serializing it on intermediate UI.
+            for( let i = 0; i < 5; i++ ) await page.keyboard.press( `ArrowRight` )
+            await expect( toc ).toHaveValue( `5` )
+
+            for( let i = 0; i < 5; i++ ) await page.keyboard.press( `ArrowLeft` )
+
+            await expect( toc ).toHaveValue( `0` )
+            await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible()
+            expect( errors ).toEqual( [] )
+        } )
+
+        // ── 5. Word click shows information sheet on desktop ──
+
+        test( `BW120 clicking a translated word shows information sheet`, async ( { page } ) => {
+            await open_seeded_reader( page )
+
+            // Find a word span inside a translated sentence
+            const word = page.locator( `span[data-sentence-id] [data-translation-word-index]` ).first()
+            await expect( word ).toBeVisible( { timeout: 15_000 } )
+            await word.click()
+            await expect( page.locator( `[data-translation-info-sheet]` ) ).toBeVisible()
+
+            // Main check: no errors from clicking
+            const errors = []
+            page.on( `pageerror`, e => errors.push( e.message ) )
+            expect( errors ).toEqual( [] )
+        } )
+
+        // ── 6. TOC dropdown has multiple options ──
+
+        test( `BW121 TOC dropdown shows chapter list`, async ( { page } ) => {
+            await open_seeded_reader( page )
+
+            // Find select/dropdown for TOC
+            const toc = page.locator( `select` ).first()
+            if( await toc.count() > 0 ) {
+                const options = await toc.locator( `option` ).count()
+                expect( options ).toBeGreaterThanOrEqual( 1 )
+            }
+        } )
+
     } )
 
-    // ── 8. Translation shows [TRANSLATED] prefix from mock ──
+    test.describe( `Fresh library scenarios`, () => {
 
-    test( `BW123 mock translations render with [TRANSLATED] prefix`, async ( { page } ) => {
-        await upload_demo_book( page )
-        await open_reader( page )
-        await expect( page.locator( `body` ) ).toContainText( `[TRANSLATED]`, { timeout: 15_000 } )
+        test.beforeEach( async ( { page } ) => {
+            await setup_api_key( page )
+        } )
 
-        const body_text = await page.locator( `body` ).textContent()
-        expect( body_text ).toContain( `[TRANSLATED]` )
+        // ── 7. API key is stored in localStorage correctly ──
+
+        test( `BW122 API key stored in settings-storage localStorage key`, async ( { page } ) => {
+            await page.goto( `/library` )
+
+            const stored = await page.evaluate( () => {
+                const raw = localStorage.getItem( `settings-storage` )
+                if( !raw ) return null
+                const parsed = JSON.parse( raw )
+                return parsed?.state?.api_key
+            } )
+
+            expect( stored ).toBeTruthy()
+            expect( stored ).toContain( `sk-or` )
+        } )
+
     } )
 
-    // ── 9. Reading area has proper structure ──
+    test.describe( `Seeded translation scenarios`, () => {
 
-    test( `BW124 reading area contains paragraph elements`, async ( { page } ) => {
-        await upload_demo_book( page )
-        await open_reader( page )
+        test.use( { app_state: `reader` } )
 
-        // Should have paragraph-like structures with sentences
-        const sentence_count = await page.locator( `span[data-sentence-id]` ).count()
-        expect( sentence_count ).toBeGreaterThan( 0 )
+        // ── 8. Translation shows [TRANSLATED] prefix from mock ──
 
-        // Each sentence should have non-empty text
-        const first_text = await page.locator( `span[data-sentence-id]` ).first().textContent()
-        expect( first_text.trim().length ).toBeGreaterThan( 0 )
+        test( `BW123 mock translations render with [TRANSLATED] prefix`, async ( { page } ) => {
+            await open_seeded_reader( page )
+            await expect( page.locator( `body` ) ).toContainText( `[TRANSLATED]`, { timeout: 15_000 } )
+
+            const body_text = await page.locator( `body` ).textContent()
+            expect( body_text ).toContain( `[TRANSLATED]` )
+        } )
+
+        // ── 9. Reading area has proper structure ──
+
+        test( `BW124 reading area contains paragraph elements`, async ( { page } ) => {
+            await open_seeded_reader( page )
+
+            // Should have paragraph-like structures with sentences
+            const sentence_count = await page.locator( `span[data-sentence-id]` ).count()
+            expect( sentence_count ).toBeGreaterThan( 0 )
+
+            // Each sentence should have non-empty text
+            const first_text = await page.locator( `span[data-sentence-id]` ).first().textContent()
+            expect( first_text.trim().length ).toBeGreaterThan( 0 )
+        } )
+
     } )
 
-    // ── 10. App renders without hydration errors ──
+    test.describe( `Fresh app scenarios`, () => {
 
-    test( `BW125 initial page load has no console errors`, async ( { page } ) => {
-        const errors = []
-        page.on( `pageerror`, e => errors.push( e.message ) )
+        test.beforeEach( async ( { page } ) => {
+            await setup_api_key( page )
+        } )
 
-        await page.goto( `/library` )
-        await expect(
-            page.getByText( /public domain books from Project Gutenberg/i )
-        ).toBeVisible( { timeout: 10_000 } )
+        // ── 10. App renders without hydration errors ──
 
-        expect( errors ).toEqual( [] )
+        test( `BW125 initial page load has no console errors`, async ( { page } ) => {
+            const errors = []
+            page.on( `pageerror`, e => errors.push( e.message ) )
+
+            await page.goto( `/library` )
+            await expect(
+                page.getByText( /public domain books from Project Gutenberg/i )
+            ).toBeVisible( { timeout: 10_000 } )
+
+            expect( errors ).toEqual( [] )
+        } )
+
+        // ── 11. File input accepts only .epub ──
+
+        test( `BW126 file input has accept=".epub" attribute`, async ( { page } ) => {
+            await page.goto( `/library` )
+            const accept = await page.locator( `input[type="file"]` ).getAttribute( `accept` )
+            expect( accept ).toBe( `.epub` )
+        } )
+
     } )
 
-    // ── 11. File input accepts only .epub ──
+    test.describe( `Seeded settings scenarios`, () => {
 
-    test( `BW126 file input has accept=".epub" attribute`, async ( { page } ) => {
-        await page.goto( `/library` )
-        const accept = await page.locator( `input[type="file"]` ).getAttribute( `accept` )
-        expect( accept ).toBe( `.epub` )
-    } )
+        test.use( { app_state: `reader` } )
 
-    // ── 12. Level picker shows all proficiency levels with labels ──
+        // ── 12. Level picker shows all proficiency levels with labels ──
 
-    test( `BW127 level picker shows A0 Caveman through C1-C2 Adult`, async ( { page } ) => {
-        await upload_demo_book( page )
-        await open_reader( page )
+        test( `BW127 level picker shows A0 Caveman through C1-C2 Adult`, async ( { page } ) => {
+            await open_seeded_reader( page )
 
-        await page.getByRole( `button`, { name: `Settings` } ).click()
-        await expect( page.getByText( `FONT SIZE` ) ).toBeVisible( { timeout: 3000 } )
+            await page.getByRole( `button`, { name: `Settings` } ).click()
+            await expect( page.getByText( `FONT SIZE` ) ).toBeVisible( { timeout: 3000 } )
 
-        const body = await page.locator( `body` ).textContent()
-        expect( body ).toContain( `A0` )
-        expect( body ).toContain( `A1` )
-        expect( body ).toContain( `A2` )
-        expect( body ).toContain( `Caveman` )
-        expect( body ).toContain( `Toddler` )
+            const body = await page.locator( `body` ).textContent()
+            expect( body ).toContain( `A0` )
+            expect( body ).toContain( `A1` )
+            expect( body ).toContain( `A2` )
+            expect( body ).toContain( `Caveman` )
+            expect( body ).toContain( `Toddler` )
+        } )
+
     } )
 
 } )

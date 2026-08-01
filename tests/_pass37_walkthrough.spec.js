@@ -3,7 +3,7 @@
  * Tests the 3 bugs fixed in this pass plus broader coverage
  */
 import { test, expect } from '@playwright/test'
-import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth, clear_storage } from './helpers/setup.js'
+import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth } from './helpers/setup.js'
 
 test.describe( `Pass 37 — Error handling & resilience`, () => {
 
@@ -160,7 +160,9 @@ test.describe( `Pass 37 — Reader resilience`, () => {
 
         // Make translation calls fail AFTER book upload
         let release_errors
-        const error_gate = new Promise( resolve => { release_errors = resolve } )
+        const error_gate = new Promise( resolve => {
+            release_errors = resolve
+        } )
         await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
             await error_gate
             await route.fulfill( { status: 500, body: `Internal Server Error` } )
@@ -169,7 +171,8 @@ test.describe( `Pass 37 — Reader resilience`, () => {
         await open_reader( page )
         await expect( page.getByText( `Translating...` ) ).toBeVisible()
         release_errors()
-        await expect( page.getByText( `Translating...` ) ).not.toBeVisible()
+        await expect( page.getByText( `Translating...`, { exact: true } ) )
+            .not.toBeVisible( { timeout: 30_000 } )
 
         // Page should still render original text (no crash)
         const sentences = await page.locator( `span[data-sentence-id]` ).count()
@@ -204,7 +207,8 @@ test.describe( `Pass 37 — Reader resilience`, () => {
         await expect(
             page.locator( `span[data-sentence-id] [data-translation-word-index]` ).first()
         ).toBeVisible( { timeout: 15_000 } )
-        await expect( page.getByText( `Translating...` ) ).not.toBeVisible()
+        await expect( page.getByText( `Translating...`, { exact: true } ) )
+            .not.toBeVisible( { timeout: 30_000 } )
 
         // Tap a sentence
         await page.locator( `span[data-sentence-id]` ).first().click()

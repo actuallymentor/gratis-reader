@@ -1,18 +1,17 @@
-import { test, expect } from '@playwright/test'
-import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, clear_storage } from './helpers/setup.js'
+import { test, expect, open_seeded_reader } from './helpers/app_fixture.js'
+import { mock_openrouter } from './helpers/setup.js'
 
 test.describe( `Reader`, () => {
 
+    test.use( { app_state: `reader` } )
+
     test.beforeEach( async ( { page } ) => {
-        await clear_storage( page )
-        await setup_api_key( page )
         await mock_openrouter( page )
-        await upload_demo_book( page )
     } )
 
     test( `renders chapter content with sentences`, async ( { page } ) => {
 
-        await open_reader( page )
+        await open_seeded_reader( page )
 
         // Should have sentence spans
         const sentences = page.locator( `span[data-sentence-id]` )
@@ -23,7 +22,7 @@ test.describe( `Reader`, () => {
 
     test( `navigates to the next chapter via button`, async ( { page } ) => {
 
-        await open_reader( page )
+        await open_seeded_reader( page )
 
         const first_sentence = page.locator( `span[data-sentence-id]` ).first()
         const first_text = await first_sentence.textContent()
@@ -38,7 +37,7 @@ test.describe( `Reader`, () => {
 
     test( `navigates chapters via keyboard arrows`, async ( { page } ) => {
 
-        await open_reader( page )
+        await open_seeded_reader( page )
 
         // Get the first sentence ID to track position
         const first_sentence = page.locator( `span[data-sentence-id]` ).first()
@@ -56,7 +55,7 @@ test.describe( `Reader`, () => {
 
     test( `shows a progress indicator`, async ( { page } ) => {
 
-        await open_reader( page )
+        await open_seeded_reader( page )
 
         // Should see progress text like "1 / X · Y%"
         const progress = page.locator( `text=/\\d+ \\/ \\d+ · \\d+%/` )
@@ -66,7 +65,7 @@ test.describe( `Reader`, () => {
 
     test( `back button returns to the library`, async ( { page } ) => {
 
-        await open_reader( page )
+        await open_seeded_reader( page )
 
         await page.getByRole( `button`, { name: `Back to library` } ).click()
         await page.waitForURL( `**/library`, { timeout: 5000 } )
@@ -76,7 +75,7 @@ test.describe( `Reader`, () => {
 
     test( `Escape key returns to the library`, async ( { page } ) => {
 
-        await open_reader( page )
+        await open_seeded_reader( page )
 
         await page.keyboard.press( `Escape` )
         await page.waitForURL( `**/library`, { timeout: 5000 } )
@@ -86,7 +85,7 @@ test.describe( `Reader`, () => {
 
     test( `TOC dropdown changes chapter`, async ( { page } ) => {
 
-        await open_reader( page )
+        await open_seeded_reader( page )
 
         const select = page.locator( `select` )
         const first_sentence = page.locator( `span[data-sentence-id]` ).first()
@@ -103,7 +102,7 @@ test.describe( `Reader`, () => {
 
     test( `swipe left navigates to next chapter`, async ( { page } ) => {
 
-        await open_reader( page )
+        await open_seeded_reader( page )
 
         const first_sentence = page.locator( `span[data-sentence-id]` ).first()
         const first_id = await first_sentence.getAttribute( `data-sentence-id` )
@@ -139,7 +138,7 @@ test.describe( `Reader`, () => {
 
     test( `tap-edge navigation advances chapter when clicking empty area`, async ( { page } ) => {
 
-        await open_reader( page )
+        await open_seeded_reader( page )
 
         const first_sentence = page.locator( `span[data-sentence-id]` ).first()
         const first_id = await first_sentence.getAttribute( `data-sentence-id` )
@@ -168,7 +167,7 @@ test.describe( `Reader`, () => {
 
     test( `restores reading progress for returning reader`, async ( { page } ) => {
 
-        await open_reader( page )
+        await open_seeded_reader( page )
 
         // Navigate to chapter 3
         const first_sentence = page.locator( `span[data-sentence-id]` ).first()
@@ -186,7 +185,7 @@ test.describe( `Reader`, () => {
         await page.waitForURL( `**/library` )
 
         // Re-open the book
-        await open_reader( page )
+        await open_seeded_reader( page )
 
         // Should NOT show language modal (returning reader)
         await expect( page.getByText( `Choose Your Language` ) ).not.toBeVisible()

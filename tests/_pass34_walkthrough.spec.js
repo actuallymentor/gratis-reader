@@ -56,6 +56,8 @@ test.describe( `Pass 34 — Walkthrough`, () => {
             } )
         } )
         await expect.poll( read_cache_count, { timeout: 15_000 } ).toBeGreaterThan( 0 )
+        await expect( page.getByText( `Translating...`, { exact: true } ) )
+            .not.toBeVisible( { timeout: 30_000 } )
         const cache_count = await read_cache_count()
         expect( cache_count ).toBeGreaterThan( 0 )
 
@@ -117,7 +119,9 @@ test.describe( `Pass 34 — Walkthrough`, () => {
 
         // Hold responses until the loading state proves the slow request is in flight.
         let release_responses
-        const response_gate = new Promise( resolve => { release_responses = resolve } )
+        const response_gate = new Promise( resolve => {
+            release_responses = resolve
+        } )
         await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
             await response_gate
             const body = JSON.parse( route.request().postData() )
@@ -166,8 +170,8 @@ test.describe( `Pass 34 — Walkthrough`, () => {
 
         // Chapter indices in IDs should differ
         if( ch0_ids.length > 0 && ch1_ids.length > 0 ) {
-            const ch0_chapter = ch0_ids[0].split( `:` )[1]
-            const ch1_chapter = ch1_ids[0].split( `:` )[1]
+            const [ , ch0_chapter ] = ch0_ids[0].split( `:` )
+            const [ , ch1_chapter ] = ch1_ids[0].split( `:` )
             expect( ch0_chapter ).not.toBe( ch1_chapter )
         }
     } )
@@ -251,7 +255,9 @@ test.describe( `Pass 34 — Walkthrough`, () => {
 
         // Hold error responses until the in-flight loading state is observable.
         let release_errors
-        const error_gate = new Promise( resolve => { release_errors = resolve } )
+        const error_gate = new Promise( resolve => {
+            release_errors = resolve
+        } )
         await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
             await error_gate
             await route.fulfill( {
@@ -265,7 +271,8 @@ test.describe( `Pass 34 — Walkthrough`, () => {
         await open_reader( page )
         await expect( page.getByText( `Translating...` ) ).toBeVisible()
         release_errors()
-        await expect( page.getByText( `Translating...` ) ).not.toBeVisible()
+        await expect( page.getByText( `Translating...`, { exact: true } ) )
+            .not.toBeVisible( { timeout: 30_000 } )
 
         // App should not crash — sentences should be visible (untranslated)
         const sentences = await page.locator( `span[data-sentence-id]` ).count()

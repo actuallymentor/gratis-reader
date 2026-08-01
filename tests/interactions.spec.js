@@ -1,11 +1,5 @@
-import { test, expect } from '@playwright/test'
-import {
-    setup_api_key,
-    upload_demo_book,
-    open_reader,
-    mock_openrouter,
-    clear_storage
-} from './helpers/setup.js'
+import { test, expect, open_seeded_reader } from './helpers/app_fixture.js'
+import { mock_openrouter } from './helpers/setup.js'
 
 const CHAT_URL = `**/openrouter.ai/api/v1/chat/completions`
 const INFO_SHEET = `[data-translation-info-sheet]`
@@ -14,7 +8,7 @@ const READER_WORD_TOOLTIP = `[data-reader-word-tooltip]`
 
 const enter_reader_with_translations = async ( page ) => {
     await mock_openrouter( page )
-    await open_reader( page )
+    await open_seeded_reader( page )
     await expect( page.locator( READER_WORD ).first() ).toBeVisible( { timeout: 15_000 } )
 }
 
@@ -33,11 +27,7 @@ const open_explanation = async ( page ) => {
 
 test.describe( `Sentence Interactions`, () => {
 
-    test.beforeEach( async ( { page } ) => {
-        await clear_storage( page )
-        await setup_api_key( page )
-        await upload_demo_book( page )
-    } )
+    test.use( { app_state: `reader` } )
 
     test( `click on a translated word opens its contextual tooltip and the simplified-fragment sheet`, async ( { page } ) => {
 
@@ -89,7 +79,7 @@ test.describe( `Sentence Interactions`, () => {
             } )
         } )
 
-        await open_reader( page )
+        await open_seeded_reader( page )
 
         const word = page.locator( READER_WORD ).first()
         await expect( word ).toBeVisible( { timeout: 15_000 } )
@@ -128,7 +118,7 @@ test.describe( `Sentence Interactions`, () => {
             } )
         } )
 
-        await open_reader( page )
+        await open_seeded_reader( page )
 
         const first_word = page.locator( READER_WORD ).first()
         await expect( first_word ).toBeVisible( { timeout: 15_000 } )
@@ -137,7 +127,7 @@ test.describe( `Sentence Interactions`, () => {
 
         await page.getByLabel( `Back to library` ).click()
         await page.waitForURL( /\/library/ )
-        await open_reader( page )
+        await open_seeded_reader( page )
 
         await page.locator( READER_WORD ).first().click()
         await expect( page.locator( INFO_SHEET ) ).toContainText( `Readable unaligned meaning.` )
@@ -158,7 +148,9 @@ test.describe( `Sentence Interactions`, () => {
         await expect( sheet ).toBeVisible()
         await expect( page.locator( READER_WORD_TOOLTIP ) ).toHaveText( `[WORD] definition of the word` )
         const first_word_box = await first_word.boundingBox()
-        await sheet.evaluate( element => { window.__desktop_translation_sheet = element } )
+        await sheet.evaluate( element => {
+            window.__desktop_translation_sheet = element
+        } )
 
         await second_word.click()
 
@@ -220,7 +212,7 @@ test.describe( `Sentence Interactions`, () => {
             } )
         } )
 
-        await open_reader( page )
+        await open_seeded_reader( page )
 
         const sentence = page.locator( `span[data-sentence-id]` ).first()
         const word = sentence.locator( `[data-translation-word="alpha"]` )
@@ -267,7 +259,7 @@ test.describe( `Sentence Interactions`, () => {
             } )
         } )
 
-        await open_reader( page )
+        await open_seeded_reader( page )
 
         await page.setViewportSize( { width: 1280, height: 500 } )
         await expect( page.getByText( /alpha alpha beta/ ).first() ).toBeVisible( { timeout: 15_000 } )
@@ -346,7 +338,7 @@ test.describe( `Sentence Interactions`, () => {
             } )
         } )
 
-        await open_reader( page )
+        await open_seeded_reader( page )
 
         const sentence = page.locator( `span[data-sentence-id]` ).first()
         const original_sentence = await sentence.textContent()
@@ -440,7 +432,7 @@ test.describe( `Sentence Interactions`, () => {
             } )
         } )
 
-        await open_reader( page )
+        await open_seeded_reader( page )
 
         const sentence = page.locator( `span[data-sentence-id]` ).first()
         await expect( sentence ).toContainText( `[TRANSLATED:1]`, { timeout: 15_000 } )

@@ -293,7 +293,8 @@ test.describe( `Pass 38 — Edge cases`, () => {
         await expect(
             page.locator( `span[data-sentence-id] [data-translation-word-index]` ).first()
         ).toBeVisible( { timeout: 15_000 } )
-        await expect( page.getByText( `Translating...` ) ).not.toBeVisible()
+        await expect( page.getByText( `Translating...`, { exact: true } ) )
+            .not.toBeVisible( { timeout: 30_000 } )
 
         expect( errors ).toEqual( [] )
     } )

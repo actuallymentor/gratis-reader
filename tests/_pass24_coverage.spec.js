@@ -80,7 +80,9 @@ test.describe( `Pass 24 — Coverage Gaps`, () => {
     test( `P24-03 explanation popover shows loading state before content`, async ( { page } ) => {
 
         let release_explanation
-        const explanation_gate = new Promise( resolve => { release_explanation = resolve } )
+        const explanation_gate = new Promise( resolve => {
+            release_explanation = resolve
+        } )
 
         await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
             const body = JSON.parse( route.request().postData() )
@@ -201,8 +203,12 @@ test.describe( `Pass 24 — Coverage Gaps`, () => {
 
         let error_occurred = false
         let release_translations
-        const translation_gate = new Promise( resolve => { release_translations = resolve } )
-        page.on( `pageerror`, () => { error_occurred = true } )
+        const translation_gate = new Promise( resolve => {
+            release_translations = resolve
+        } )
+        page.on( `pageerror`, () => {
+            error_occurred = true
+        } )
 
         await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
             await translation_gate
@@ -355,11 +361,11 @@ test.describe( `Pass 24 — Coverage Gaps`, () => {
         await page.getByRole( `button`, { name: `Close` } ).click()
         await expect( page.getByText( `FONT SIZE` ) ).not.toBeVisible()
 
-        // Check font size increased
+        // Heading sentences scale the setting with `em`, so compare computed
+        // sizes instead of assuming the slider value is a pixel value.
         const sentence = page.locator( `span[data-sentence-id]` ).first()
-        await expect( sentence ).toHaveCSS( `font-size`, `${ max }px` )
         const new_size = parseFloat( await sentence.evaluate( el => getComputedStyle( el ).fontSize ) )
-        expect( new_size ).toBeGreaterThanOrEqual( initial_size )
+        expect( new_size ).toBeGreaterThan( initial_size )
     } )
 
     // ── System prompt specifies level behavior (Spec §5) ──

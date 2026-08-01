@@ -41,7 +41,7 @@ const setup_key = async ( page ) => {
     await page.goto( `/` )
     await page.evaluate( () => {
         const store = JSON.parse( localStorage.getItem( `settings-storage` ) || `{}` )
-        store.state = { ...( store.state || {} ), api_key: `sk-or-test-fake-key` }
+        store.state = { ... store.state || {} , api_key: `sk-or-test-fake-key` }
         localStorage.setItem( `settings-storage`, JSON.stringify( store ) )
     } )
 }
@@ -91,7 +91,7 @@ const accept_confirmation = async ( page, expected_message, action ) => {
                 expect( dialog.message() ).toBe( expected_message )
                 await dialog.accept()
                 resolve()
-            } catch( error ) {
+            } catch ( error ) {
                 reject( error )
             }
         } )
@@ -644,7 +644,7 @@ test.describe( `Browser Walkthrough`, () => {
 
     // ── BUG FIX REGRESSION TESTS ─────────────────────────────
 
-    test( `BW50 explanation popover closes on chapter navigation`, async ( { page } ) => {
+    test( `BW50 programmatic chapter change clears an open explanation popover`, async ( { page } ) => {
         await setup_key( page )
         await upload_book( page )
         await enter_reader( page )
@@ -664,10 +664,11 @@ test.describe( `Browser Walkthrough`, () => {
         await page.locator( `[data-translation-info-sheet]` ).getByRole( `button`, { name: `Explain` } ).click()
         await expect( page.getByText( `Translation Explanation` ) ).toBeVisible( { timeout: 5000 } )
 
-        // Navigate via Next button — popover should auto-close on chapter change
+        // No user control can change chapters through the modal overlay. Dispatch
+        // the production button event to isolate the chapter-change cleanup path.
         const first_sentence = page.locator( `span[data-sentence-id]` ).first()
         const chapter_id = await first_sentence.getAttribute( `data-sentence-id` )
-        await page.getByRole( `button`, { name: /Next/ } ).click( { force: true } )
+        await page.getByRole( `button`, { name: /Next/ } ).dispatchEvent( `click` )
         await expect( first_sentence ).not.toHaveAttribute( `data-sentence-id`, chapter_id )
         await expect( page.getByText( `Translation Explanation` ) ).not.toBeVisible()
     } )
@@ -782,10 +783,7 @@ test.describe( `Browser Walkthrough`, () => {
         await upload_book( page )
         await enter_reader( page )
 
-        // The demo book should have heading elements (h1-h6)
-        const headings = page.locator( `h1, h2, h3, h4, h5, h6` ).filter( { hasNotText: /Smart work/ } )
-        // We're in the reader, check for any heading in the reading area
-        // At minimum, the main content area should exist
+        // The reader should retain its parsed content container.
         const main = page.locator( `main` )
         await expect( main ).toBeVisible()
     } )
