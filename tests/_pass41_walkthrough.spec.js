@@ -7,7 +7,7 @@
  *   3. Reader (language modal, sentence rendering, footer, nav)
  *   4. Token display (accumulation, persistence via IDB)
  *   5. Settings drawer (theme, font, API key masking)
- *   6. Interactions (sentence double-click, right-click explanation, Escape)
+ *   6. Interactions (word selection, explicit explanation, Escape)
  *   7. Edge cases (first/last chapter boundaries, rapid navigation, console errors)
  */
 
@@ -590,7 +590,7 @@ test.describe( `Gratis Reader — Full Walkthrough`, () => {
         await expect( first_sentence ).toContainText( `[TR]` )
     } )
 
-    test( `6B: Right-click sentence — shows explanation popover`, async ( { page } ) => {
+    test( `6B: Sheet Explain — shows explanation popover`, async ( { page } ) => {
         await clear_storage( page )
         await setup_api_key( page )
         await mock_openrouter( page )
@@ -608,8 +608,9 @@ test.describe( `Gratis Reader — Full Walkthrough`, () => {
         // Wait for translation to load first (explanation requires translated text)
         await expect( first_sentence ).toContainText( `[TR]`, { timeout: 30_000 } )
 
-        // Right-click the sentence
-        await first_sentence.click( { button: `right` } )
+        // Select a word and use the explicit Explain action.
+        await first_sentence.locator( `[data-translation-word-index]` ).first().click()
+        await page.locator( `[data-translation-info-sheet]` ).getByRole( `button`, { name: `Explain` } ).click()
 
         // Explanation popover should appear
         await expect( page.getByText( `Translation Explanation` ) ).toBeVisible( { timeout: 5000 } )

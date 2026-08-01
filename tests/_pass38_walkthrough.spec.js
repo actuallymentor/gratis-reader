@@ -3,7 +3,7 @@
  * Fresh eyes: cover every user flow end-to-end
  */
 import { test, expect } from '@playwright/test'
-import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth, clear_storage, long_press } from './helpers/setup.js'
+import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth, clear_storage } from './helpers/setup.js'
 
 test.describe( `Pass 38 — Onboarding`, () => {
 
@@ -119,18 +119,16 @@ test.describe( `Pass 38 — Reader core flows`, () => {
         expect( text.length ).toBeGreaterThan( 0 )
     } )
 
-    test( `BW175 long-press toggles sentence to original with highlight`, async ( { page } ) => {
+    test( `BW175 selecting a word opens the simplified fragment with underline`, async ( { page } ) => {
         await upload_demo_book( page )
         await open_reader( page )
         await page.waitForTimeout( 2000 )
 
-        const sentence = page.locator( `span[data-sentence-id]` ).first()
-        await long_press( page, sentence )
+        const word = page.locator( `span[data-sentence-id] [data-translation-word-index]` ).first()
+        await word.click()
 
-        // Should have highlight (accent-light background)
-        const bg = await sentence.evaluate( el => getComputedStyle( el ).backgroundColor )
-        // After toggle, background should not be transparent/white
-        expect( bg ).not.toBe( `rgba(0, 0, 0, 0)` )
+        await expect( word ).toHaveCSS( `text-decoration-line`, `underline` )
+        await expect( page.locator( `[data-translation-info-sheet]` ) ).toBeVisible()
     } )
 
     test( `BW176 keyboard arrows navigate chapters`, async ( { page } ) => {

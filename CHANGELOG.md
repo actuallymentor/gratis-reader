@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.17.0] - 2026-08-01
+
+### Added
+- Add persistent word sheet with aligned simplified fragments (uncommitted)
+
+### Changed
+- Replace tap/hold gestures with word selection and explicit Explain (uncommitted)
+
 ## [1.16.2] - 2026-06-22
 
 ### Fixed

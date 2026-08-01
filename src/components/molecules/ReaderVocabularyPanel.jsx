@@ -47,7 +47,7 @@ const ToggleButton = styled.button`
 
     @media (max-width: 520px) {
         top: auto;
-        bottom: calc(8.5rem + env(safe-area-inset-bottom));
+        bottom: calc(var(--reader-dock-height, 7.5rem) + var(--space-m));
         transform: none;
     }
 `
@@ -56,7 +56,7 @@ const Panel = styled.aside`
     position: fixed;
     top: calc(48px + var(--space-m));
     right: 0;
-    bottom: calc(7.5rem + var(--space-m) + env(safe-area-inset-bottom));
+    bottom: calc(var(--reader-dock-height, 7.5rem) + var(--space-m));
     z-index: 69;
     width: ${ PANEL_WIDTH };
     padding: var(--space-m);
@@ -71,7 +71,7 @@ const Panel = styled.aside`
 
     @media (max-width: 520px) {
         top: calc(48px + var(--space-s));
-        bottom: calc(8.5rem + env(safe-area-inset-bottom));
+        bottom: calc(var(--reader-dock-height, 7.5rem) + var(--space-m));
     }
 `
 

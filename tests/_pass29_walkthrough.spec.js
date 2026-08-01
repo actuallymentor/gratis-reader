@@ -1,6 +1,6 @@
 /**
  * Pass 29 — Standalone Playwright walkthrough
- * Tests: persistent word tooltips, long sentence fallback, table content extraction,
+ * Tests: persistent word information, long sentence fallback, table content extraction,
  * NFC normalization, connection caching, manifest start_url, general app health.
  *
  * Run: npx playwright test tests/_pass29_walkthrough.mjs
@@ -33,9 +33,9 @@ test.describe( `Pass 29 — Walkthrough`, () => {
         expect( sentences.length ).toBeGreaterThan( 0 )
     } )
 
-    // ── 2. Word tooltip persistence ──
+    // ── 2. Word information persistence ──
 
-    test( `BW67 word touch tooltip appears and stays stable`, async ( { page } ) => {
+    test( `BW67 word information sheet appears and stays stable`, async ( { page } ) => {
 
         // Override mock to handle word lookups
         await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
@@ -62,11 +62,10 @@ test.describe( `Pass 29 — Walkthrough`, () => {
         await page.waitForTimeout( 2000 )
 
         // Find a clickable word span
-        const word = page.locator( `span[data-sentence-id] [data-word-tooltip-word]` ).first()
+        const word = page.locator( `span[data-sentence-id] [data-translation-word-index]` ).first()
         if( await word.isVisible() ) {
-            // Trigger click to test word lookup
             await word.click()
-            await page.waitForTimeout( 1000 )
+            await expect( page.locator( `[data-translation-info-sheet]` ) ).toBeVisible()
         }
 
         // No page errors expected
@@ -167,7 +166,7 @@ test.describe( `Pass 29 — Walkthrough`, () => {
         await expect( page.locator( `label` ).filter( { hasText: /cache/i } ) ).toBeVisible()
 
         // Close button works
-        await page.getByRole( `button`, { name: `Close` } ).click()
+        await page.getByRole( `button`, { name: `Close`, exact: true } ).click()
         await expect( page.getByText( `FONT SIZE` ) ).not.toBeVisible( { timeout: 3000 } )
     } )
 
@@ -195,9 +194,9 @@ test.describe( `Pass 29 — Walkthrough`, () => {
         expect( id_restored ).toBe( id_before )
     } )
 
-    // ── 8. Explanation popover opens on right-click ──
+    // ── 8. Explanation popover opens from the sheet ──
 
-    test( `BW73 right-click opens explanation popover`, async ( { page } ) => {
+    test( `BW73 sheet Explain opens explanation popover`, async ( { page } ) => {
 
         await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
             const body = JSON.parse( route.request().postData() )
@@ -221,14 +220,15 @@ test.describe( `Pass 29 — Walkthrough`, () => {
         await open_reader( page )
         await page.waitForTimeout( 2000 )
 
-        // Right-click a sentence
-        await page.locator( `span[data-sentence-id]` ).first().click( { button: `right` } )
+        // Select a word and use the explicit Explain action.
+        await page.locator( `span[data-sentence-id] [data-translation-word-index]` ).first().click()
+        await page.locator( `[data-translation-info-sheet]` ).getByRole( `button`, { name: `Explain` } ).click()
 
         // Explanation popover should appear
         await expect( page.getByText( /translation explanation/i ) ).toBeVisible( { timeout: 5000 } )
 
-        // Close it
-        await page.getByRole( `button`, { name: `Close` } ).click()
+        // Close the modal, leaving the persistent translation sheet alone.
+        await page.getByRole( `button`, { name: `Close`, exact: true } ).click()
         await page.waitForTimeout( 500 )
     } )
 

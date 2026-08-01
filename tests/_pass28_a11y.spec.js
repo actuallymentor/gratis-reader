@@ -19,7 +19,7 @@ test.describe( `Pass 28 — Accessibility`, () => {
         await expect( page.getByText( /font size/i ) ).toBeVisible( { timeout: 3000 } )
 
         // Close button should be findable by aria-label
-        const close_btn = page.getByRole( `button`, { name: `Close` } )
+        const close_btn = page.getByRole( `button`, { name: `Close`, exact: true } )
         await expect( close_btn ).toBeVisible()
         await close_btn.click()
         await expect( page.getByText( /font size/i ) ).not.toBeVisible( { timeout: 3000 } )
@@ -49,12 +49,13 @@ test.describe( `Pass 28 — Accessibility`, () => {
         await open_reader( page )
         await page.waitForTimeout( 3000 )
 
-        // Right-click to open explanation
-        await page.locator( `span[data-sentence-id]` ).first().click( { button: `right` } )
+        // Open the explanation through the selected word's sheet.
+        await page.locator( `span[data-sentence-id] [data-translation-word-index]` ).first().click()
+        await page.locator( `[data-translation-info-sheet]` ).getByRole( `button`, { name: `Explain` } ).click()
         await expect( page.getByText( /translation explanation/i ) ).toBeVisible( { timeout: 5000 } )
 
-        // Close button should be findable by aria-label
-        const close_btn = page.getByRole( `button`, { name: `Close` } )
+        // Target the modal close exactly; the persistent sheet has its own close control.
+        const close_btn = page.getByRole( `button`, { name: `Close`, exact: true } )
         await expect( close_btn ).toBeVisible()
     } )
 

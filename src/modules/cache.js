@@ -41,7 +41,7 @@ export const open_db = () => {
                 db.createObjectStore( `translations`, { keyPath: `key` } )
             }
 
-            // Back-translated meanings shown when a sentence is long-pressed
+            // Back-translated meanings shown in the translation information sheet
             if( !db.objectStoreNames.contains( `meanings` ) ) {
                 db.createObjectStore( `meanings`, { keyPath: `key` } )
             }
@@ -205,8 +205,18 @@ export const delete_translation = async ( cache_key ) => {
 }
 
 /**
- * Saves a source-language meaning for an adapted translated sentence.
- * @param {Object} entry - { key, translated, meaning, source_language, target_language, level, created_at }
+ * Saves a source-language meaning and its target-word alignment metadata.
+ * @param {Object} entry - Meaning cache record
+ * @param {string} entry.key
+ * @param {string} entry.translated
+ * @param {string} entry.meaning
+ * @param {Array} entry.alignment_segments
+ * @param {number} entry.alignment_version
+ * @param {string} entry.source_language
+ * @param {string} entry.target_language
+ * @param {string} entry.level
+ * @param {string} entry.created_at
+ * @returns {Promise<void>}
  */
 export const save_sentence_meaning = async ( entry ) => {
     const db = await open_db()
@@ -219,16 +229,16 @@ export const save_sentence_meaning = async ( entry ) => {
 }
 
 /**
- * Gets a cached source-language meaning by key.
+ * Gets a cached source-language meaning record by key.
  * @param {string} cache_key
- * @returns {Promise<string|null>} The source-language meaning or null
+ * @returns {Promise<Object|null>} The complete meaning/alignment record or null
  */
 export const get_sentence_meaning = async ( cache_key ) => {
     const db = await open_db()
     return new Promise( ( resolve, reject ) => {
         const tx = db.transaction( `meanings`, `readonly` )
         const request = tx.objectStore( `meanings` ).get( cache_key )
-        request.onsuccess = () => resolve( request.result?.meaning || null )
+        request.onsuccess = () => resolve( request.result || null )
         request.onerror = () => reject( request.error )
     } )
 }

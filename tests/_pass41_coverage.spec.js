@@ -146,8 +146,9 @@ test.describe( `Pass 41 — Coverage Gaps`, () => {
         const first_sentence = page.locator( `span[data-sentence-id]` ).first()
         await expect( first_sentence ).toContainText( `[TRANSLATED]`, { timeout: 30_000 } )
 
-        // Right-click to open explanation
-        await first_sentence.click( { button: `right` } )
+        // Open the explanation from the selected word's sheet.
+        await first_sentence.locator( `[data-translation-word-index]` ).first().click()
+        await page.locator( `[data-translation-info-sheet]` ).getByRole( `button`, { name: `Explain` } ).click()
 
         // Should show the explanation popover with [EXPLANATION] content from our mock
         await expect( page.getByText( `Translation Explanation` ) ).toBeVisible( { timeout: 10_000 } )

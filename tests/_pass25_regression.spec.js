@@ -1,6 +1,6 @@
 /**
  * Pass 25 — Regression tests for bug fixes and coverage gaps
- * Tests CJK sentence splitting, tooltip overflow, nested lists,
+ * Tests CJK sentence splitting, information-sheet overflow, nested lists,
  * OpenRouter timeout/JSON safety, and additional edge cases.
  */
 import { test, expect } from '@playwright/test'
@@ -162,9 +162,9 @@ test.describe( `Pass 25 — Regression & Coverage`, () => {
         expect( await page.locator( `span[data-sentence-id]` ).count() ).toBeGreaterThan( 0 )
     } )
 
-    // --- Tooltip overflow protection ---
+    // --- Information-sheet overflow protection ---
 
-    test( `P25-08 tooltip does not overflow with long words`, async ( { page } ) => {
+    test( `P25-08 information sheet does not overflow with long content`, async ( { page } ) => {
         await upload_and_read( page )
 
         // Mock word lookup with a very long response
@@ -174,7 +174,7 @@ test.describe( `Pass 25 — Regression & Coverage`, () => {
             if( user_msg.includes( `Word:` ) || user_msg.includes( `word or phrase` ) || user_msg.includes( `Explain` ) ) {
                 await route.fulfill( {
                     contentType: `application/json`,
-                    body: JSON.stringify( { choices: [ { message: { content: `A very long explanation that goes on and on and should be truncated by the tooltip` } } ] } )
+                    body: JSON.stringify( { choices: [ { message: { content: `A very long explanation that goes on and on and should stay bounded by the sheet` } } ] } )
                 } )
             } else {
                 await route.fulfill( {
@@ -185,11 +185,12 @@ test.describe( `Pass 25 — Regression & Coverage`, () => {
         } )
 
         // Tap a word span
-        const word = page.locator( `span[data-sentence-id] [data-word-tooltip-word]` ).first()
+        const word = page.locator( `span[data-sentence-id] [data-translation-word-index]` ).first()
         if( await word.count() > 0 ) {
             await word.click()
             await page.waitForTimeout( 500 )
-            // App should not crash — tooltip should render with overflow hidden
+            await expect( page.locator( `[data-translation-info-sheet]` ) ).toBeVisible()
+            // App should not crash — the sheet should keep long content bounded.
             expect( await page.locator( `span[data-sentence-id]` ).count() ).toBeGreaterThan( 0 )
         }
     } )

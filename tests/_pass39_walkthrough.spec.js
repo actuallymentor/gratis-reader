@@ -3,7 +3,7 @@
  * Tests multi-step interaction flows that could expose state bugs
  */
 import { test, expect } from '@playwright/test'
-import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth, clear_storage, long_press } from './helpers/setup.js'
+import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth, clear_storage } from './helpers/setup.js'
 
 test.describe( `Pass 39 — Multi-step state transitions`, () => {
 
@@ -27,7 +27,7 @@ test.describe( `Pass 39 — Multi-step state transitions`, () => {
         await page.waitForTimeout( 200 )
 
         // Go back to library
-        await page.keyboard.press( `Escape` )
+        await page.getByRole( `button`, { name: `Close`, exact: true } ).click()
         await page.waitForTimeout( 300 )
         await page.keyboard.press( `Escape` )
         await page.waitForURL( /\/library/, { timeout: 5000 } )
@@ -69,15 +69,14 @@ test.describe( `Pass 39 — Multi-step state transitions`, () => {
 
     // ── 3. Inspect sentence then navigate — no stale state ──
 
-    test( `BW192 long-pressed sentence resets after chapter change`, async ( { page } ) => {
+    test( `BW192 selected translation sheet resets after chapter change`, async ( { page } ) => {
         await upload_demo_book( page )
         await open_reader( page )
         await page.waitForTimeout( 2000 )
 
-        // Long-press sentence to reveal the original
-        const sentence = page.locator( `span[data-sentence-id]` ).first()
-        await long_press( page, sentence )
-        await expect( sentence.getByRole( `button`, { name: `Explain` } ) ).toBeVisible()
+        // Select a translated word and show its information.
+        await page.locator( `span[data-sentence-id] [data-translation-word-index]` ).first().click()
+        await expect( page.locator( `[data-translation-info-sheet]` ) ).toBeVisible()
 
         // Navigate to next chapter
         await page.keyboard.press( `ArrowRight` )
@@ -87,9 +86,10 @@ test.describe( `Pass 39 — Multi-step state transitions`, () => {
         await page.keyboard.press( `ArrowLeft` )
         await page.waitForTimeout( 2000 )
 
-        // Sentences should be in normal state (not toggled)
+        // Returning to the chapter must not restore stale selection state.
         const first_sentence = page.locator( `span[data-sentence-id]` ).first()
         await expect( first_sentence ).toBeVisible()
+        await expect( page.locator( `[data-translation-info-sheet]` ) ).not.toBeVisible()
     } )
 
     // ── 4. Settings drawer blocks keyboard nav ──
@@ -263,16 +263,17 @@ test.describe( `Pass 39 — Multi-step state transitions`, () => {
         await open_reader( page )
         await page.waitForTimeout( 2000 )
 
-        // Right-click to trigger explanation
+        // Open the explanation from the selected word's sheet.
         const sentence = page.locator( `span[data-sentence-id]` ).first()
-        await sentence.click( { button: `right` } )
+        await sentence.locator( `[data-translation-word-index]` ).first().click()
+        await page.locator( `[data-translation-info-sheet]` ).getByRole( `button`, { name: `Explain` } ).click()
         await page.waitForTimeout( 500 )
 
         // Popover should appear with "Translation Explanation" title
         await expect( page.getByText( `Translation Explanation` ) ).toBeVisible( { timeout: 3000 } )
 
-        // Close it
-        await page.keyboard.press( `Escape` )
+        // Close the modal explicitly, leaving the persistent translation sheet alone.
+        await page.getByRole( `button`, { name: `Close`, exact: true } ).click()
         await page.waitForTimeout( 500 )
 
         // Should be gone

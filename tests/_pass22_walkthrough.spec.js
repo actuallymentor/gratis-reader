@@ -106,9 +106,10 @@ test.describe( `Pass 22 — Bug Fixes & Edge Cases`, () => {
 
         const progress_before = await page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` ).first().textContent()
 
-        // Right-click a sentence to open explanation popover
+        // Select a word, then use the sheet's explicit Explain action.
         const sentence = page.locator( `span[data-sentence-id]` ).first()
-        await sentence.click( { button: `right` } )
+        await sentence.locator( `[data-translation-word-index]` ).first().click()
+        await page.locator( `[data-translation-info-sheet]` ).getByRole( `button`, { name: `Explain` } ).click()
         await expect( page.getByText( `Translation Explanation` ) ).toBeVisible( { timeout: 5000 } )
 
         // Press arrow right — should NOT navigate
@@ -143,30 +144,31 @@ test.describe( `Pass 22 — Bug Fixes & Edge Cases`, () => {
 
     // ── BUG FIX: Explanation popover clears on language/level change ──
 
-    test( `P22-04 explanation popover closes when level changes in settings`, async ( { page } ) => {
+    test( `P22-04 Escape closes explanation without clearing the selected word`, async ( { page } ) => {
         await setup_key( page )
         await upload_book( page )
         await enter_reader( page )
         await expect( page.getByText( /\[TRANSLATED\]/ ).first() ).toBeVisible( { timeout: 15_000 } )
 
-        // Open explanation popover via right-click
+        // Open the explanation from the selected word's information sheet.
         const sentence = page.locator( `span[data-sentence-id]` ).first()
-        await sentence.click( { button: `right` } )
+        await sentence.locator( `[data-translation-word-index]` ).first().click()
+        const explain = page.locator( `[data-translation-info-sheet]` ).getByRole( `button`, { name: `Explain` } )
+        await explain.click()
         await expect( page.getByText( `Translation Explanation` ) ).toBeVisible( { timeout: 5000 } )
 
-        // Close popover first (so we can open settings)
+        // Escape closes only the topmost modal. The selected word remains available.
         await page.keyboard.press( `Escape` )
         await page.waitForTimeout( 300 )
+        await expect( page.getByText( `Translation Explanation` ) ).not.toBeVisible()
+        await expect( page.locator( `[data-translation-info-sheet]` ) ).toBeVisible()
 
-        // Open explanation again
-        await sentence.click( { button: `right` } )
+        // The selection persists after closing the modal, so Explain remains available.
+        await explain.click()
         await expect( page.getByText( `Translation Explanation` ) ).toBeVisible( { timeout: 5000 } )
 
-        // Now open settings and change level — popover should close
-        // We can't open settings while popover is open (arrow keys blocked),
-        // so let's verify the state-based clearing by checking the useEffect behavior
-        // Instead: verify that the explanation popover was closed by the Escape, which is the settings close handler
-        await page.keyboard.press( `Escape` )
+        // The modal's explicit close action has the same retained-sheet behavior.
+        await page.getByRole( `button`, { name: `Close`, exact: true } ).click()
         await page.waitForTimeout( 300 )
         await expect( page.getByText( `Translation Explanation` ) ).not.toBeVisible()
     } )
@@ -326,17 +328,18 @@ test.describe( `Pass 22 — Bug Fixes & Edge Cases`, () => {
         await expect( sentence ).toContainText( `[TRANSLATED]` )
     } )
 
-    // ── REGRESSION: Right-click explanation ──────────────────────
+    // ── REGRESSION: Explicit explanation action ──────────────────
 
-    test( `P22-13 right-click opens explanation popover`, async ( { page } ) => {
+    test( `P22-13 sheet Explain opens explanation popover`, async ( { page } ) => {
         await setup_key( page )
         await upload_book( page )
         await enter_reader( page )
         await expect( page.getByText( /\[TRANSLATED\]/ ).first() ).toBeVisible( { timeout: 15_000 } )
 
-        // Right-click a sentence that is actually translated
+        // Select a word in a sentence that is actually translated.
         const translated_sentence = page.locator( `span[data-sentence-id]` ).filter( { hasText: `[TRANSLATED]` } ).first()
-        await translated_sentence.click( { button: `right` } )
+        await translated_sentence.locator( `[data-translation-word-index]` ).first().click()
+        await page.locator( `[data-translation-info-sheet]` ).getByRole( `button`, { name: `Explain` } ).click()
 
         await expect( page.getByText( `Translation Explanation` ) ).toBeVisible( { timeout: 5000 } )
         await expect( page.getByText( `Original` ) ).toBeVisible()

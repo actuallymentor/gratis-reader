@@ -5,7 +5,7 @@
  * offline banner, cover extraction, MOBI rejection, PWA config.
  */
 import { test, expect } from '@playwright/test'
-import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth, clear_storage, long_press } from './helpers/setup.js'
+import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth, clear_storage } from './helpers/setup.js'
 
 // Helper to open settings from reader
 const open_settings = async ( page ) => {
@@ -235,8 +235,9 @@ test.describe( `Pass 27 — Coverage Expansion`, () => {
         await open_reader( page )
         await page.waitForTimeout( 3000 )
 
-        // Right-click first sentence to open explanation
-        await page.locator( `span[data-sentence-id]` ).first().click( { button: `right` } )
+        // Select a word and open its explanation.
+        await page.locator( `span[data-sentence-id] [data-translation-word-index]` ).first().click()
+        await page.locator( `[data-translation-info-sheet]` ).getByRole( `button`, { name: `Explain` } ).click()
         await page.waitForTimeout( 3000 )
 
         // Explanation title should be visible
@@ -442,30 +443,19 @@ test.describe( `Pass 27 — Coverage Expansion`, () => {
         expect( captured_system.toLowerCase() ).toMatch( /only.*translat|no explanat|no quote|no additional/i )
     } )
 
-    // ── Spec §7b: Visual cue on toggled sentence ──
+    // ── Spec §7b: Visual cue on selected word ──
 
-    test( `P27-15 long-pressed sentence has visible background highlight`, async ( { page } ) => {
+    test( `P27-15 selected translated word has visible underline`, async ( { page } ) => {
         await upload_demo_book( page )
         await open_reader( page )
         await page.waitForTimeout( 3000 )
 
-        const sentence = page.locator( `span[data-sentence-id]` ).first()
+        const word = page.locator( `span[data-sentence-id] [data-translation-word-index]` ).first()
+        await word.click()
 
-        // Get background before toggle
-        const bg_before = await sentence.evaluate( el => getComputedStyle( el ).backgroundColor )
-
-        await long_press( page, sentence )
-
-        // Background should change (highlight) — accent-light color
-        const bg_after = await sentence.evaluate( el => getComputedStyle( el ).backgroundColor )
-        expect( bg_after ).not.toBe( bg_before )
-
-        await long_press( page, sentence )
-
-        // After toggling back, the sentence may keep a subtle different bg
-        // but it should NOT be the highlight color anymore
-        const bg_restored = await sentence.evaluate( el => getComputedStyle( el ).backgroundColor )
-        expect( bg_restored ).not.toBe( bg_after )
+        await expect( word ).toHaveCSS( `text-decoration-line`, `underline` )
+        await page.getByRole( `button`, { name: `Close translation information` } ).click()
+        await expect( word ).toHaveCSS( `text-decoration-line`, `none` )
     } )
 
     // ── Spec §8: Settings drawer opens from config icon (top-right) ──

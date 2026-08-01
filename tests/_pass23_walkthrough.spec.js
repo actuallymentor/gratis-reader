@@ -286,45 +286,35 @@ test.describe( `Pass 23 — Edge Cases & Error States`, () => {
         expect( translated ).toBeGreaterThan( 1 )
     } )
 
-    test( `P23-13 long-pressing sentence shows visual highlight`, async ( { page } ) => {
+    test( `P23-13 selecting a translated word shows an underline`, async ( { page } ) => {
         await setup_key( page )
         await upload_book( page )
         await enter_reader( page )
         await expect( page.getByText( /\[TRANSLATED\]/ ).first() ).toBeVisible( { timeout: 15_000 } )
 
-        const sentence = page.locator( `span[data-sentence-id]` ).first()
+        const word = page.locator( `span[data-sentence-id] [data-translation-word-index]` ).first()
+        await word.click()
 
-        const box = await sentence.boundingBox()
-        await page.mouse.move( box.x + box.width / 2, box.y + box.height / 2 )
-        await page.mouse.down()
-        await page.waitForTimeout( 700 )
-        await page.mouse.up()
-
-        // Should have highlighted background (accent-light)
-        const bg = await sentence.evaluate( el => getComputedStyle( el ).backgroundColor )
-        // Should not be transparent — some color applied
-        expect( bg ).not.toBe( `rgba(0, 0, 0, 0)` )
+        await expect( word ).toHaveCSS( `text-decoration-line`, `underline` )
+        await expect( page.locator( `[data-translation-info-sheet]` ) ).toBeVisible()
     } )
 
     // ── WORD CLICK ──────────────────────────────────────────────
 
-    test( `P23-14 clicking translated word shows tooltip or loading`, async ( { page } ) => {
+    test( `P23-14 clicking translated word shows information sheet`, async ( { page } ) => {
         await setup_key( page )
         await upload_book( page )
         await enter_reader( page )
         await expect( page.getByText( /\[TRANSLATED\]/ ).first() ).toBeVisible( { timeout: 15_000 } )
 
         // Find a word span inside a translated sentence
-        const words = page.locator( `span[data-sentence-id] [data-word-tooltip-word]` )
+        const words = page.locator( `span[data-sentence-id] [data-translation-word-index]` )
         const word_count = await words.count()
 
         if( word_count > 0 ) {
             // Tap a word
             await words.first().click()
-            await page.waitForTimeout( 1000 )
-
-            // Should not crash — page still functional
-            expect( await page.locator( `span[data-sentence-id]` ).count() ).toBeGreaterThan( 0 )
+            await expect( page.locator( `[data-translation-info-sheet]` ) ).toBeVisible()
         }
     } )
 

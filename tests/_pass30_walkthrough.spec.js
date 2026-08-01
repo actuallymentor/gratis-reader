@@ -1,6 +1,6 @@
 /**
  * Pass 30 — Browser walkthrough + regression tests
- * Targets: translation error logging, tooltip mobile overflow, general app health,
+ * Targets: translation error logging, sheet mobile overflow, general app health,
  * edge cases not covered in previous passes.
  */
 import { test, expect } from '@playwright/test'
@@ -56,9 +56,9 @@ test.describe( `Pass 30 — Walkthrough`, () => {
         expect( sentences.length ).toBeGreaterThan( 0 )
     } )
 
-    // ── 2. Tooltip works on mobile viewport ──
+    // ── 2. Information sheet works on mobile viewport ──
 
-    test( `BW82 tooltip does not overflow on narrow mobile viewport`, async ( { page } ) => {
+    test( `BW82 information sheet does not overflow on narrow mobile viewport`, async ( { page } ) => {
 
         // Set mobile viewport
         await page.setViewportSize( { width: 320, height: 568 } )
@@ -84,11 +84,11 @@ test.describe( `Pass 30 — Walkthrough`, () => {
         await open_reader( page )
         await page.waitForTimeout( 2000 )
 
-        // Tap a word to trigger tooltip
-        const word = page.locator( `span[data-sentence-id] [data-word-tooltip-word]` ).first()
+        // Tap a word to open the information sheet.
+        const word = page.locator( `span[data-sentence-id] [data-translation-word-index]` ).first()
         if( await word.isVisible() ) {
             await word.click()
-            await page.waitForTimeout( 1000 )
+            await expect( page.locator( `[data-translation-info-sheet]` ) ).toBeVisible()
         }
 
         // No errors expected

@@ -1,4 +1,5 @@
 import { expect } from '@playwright/test'
+import { segment_translation_text } from '../../src/modules/translation_alignment.js'
 
 /**
  * Injects API key into localStorage so the app thinks we're authenticated.
@@ -61,23 +62,6 @@ export const open_reader = async ( page ) => {
 }
 
 /**
- * Holds the center of an element long enough for reader long-press actions.
- */
-export const long_press = async ( page, locator, duration_ms = 700 ) => {
-
-    const box = await locator.boundingBox()
-    if( !box ) throw new Error( `Cannot hold an element without a bounding box` )
-
-    // Prefer the lower-left text area so floating controls attached to the sentence
-    // do not accidentally receive repeated long-presses.
-    await page.mouse.move( box.x + Math.min( 24, box.width / 2 ), box.y + box.height - 4 )
-    await page.mouse.down()
-    await page.waitForTimeout( duration_ms )
-    await page.mouse.up()
-
-}
-
-/**
  * Mock the OpenRouter API to return deterministic translations.
  */
 export const mock_openrouter = async ( page ) => {
@@ -98,9 +82,17 @@ export const mock_openrouter = async ( page ) => {
         } else if( is_word_lookup ) {
             content = `[WORD] definition of the word`
         } else if( is_sentence_meaning ) {
-            const sentence_match = user_msg.match( /Adapted translation:\n(.+?)\n\nTranslate the meaning/s )
+            const sentence_match = user_msg.match( /Adapted translation:\n(.+?)\n\nTarget word tokens/s )
             const sentence = sentence_match ? sentence_match[1].trim() : `unknown`
-            content = `[MEANING] ${ sentence.replace( /^\[TRANSLATED\]\s*/, `` ) }`
+            const aligned_words = segment_translation_text( sentence )
+                .filter( segment => segment.is_word )
+
+            content = JSON.stringify( {
+                segments: aligned_words.map( ( word, index ) => ( {
+                    text: `${ index === 0 ? `[MEANING] ` : `` }${ word.text }${ index < aligned_words.length - 1 ? ` ` : `` }`,
+                    target_token_indexes: [ index ]
+                } ) )
+            } )
         } else {
             // Translation — extract the sentence from prompt
             const sentence_match = user_msg.match( /Translate this sentence:\n(.+)/s )

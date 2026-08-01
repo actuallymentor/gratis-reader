@@ -8,6 +8,7 @@ import { save_progress, get_progress } from '../../modules/cache.js'
 import { DEFAULT_LEVEL, LEVELS } from '../../modules/prompts.js'
 import Sentence from '../molecules/Sentence.jsx'
 import ExplanationPopover from '../molecules/ExplanationPopover.jsx'
+import TranslationInfoSheet from '../molecules/TranslationInfoSheet.jsx'
 import SettingsDrawer from '../molecules/SettingsDrawer.jsx'
 import ReaderVocabularyPanel from '../molecules/ReaderVocabularyPanel.jsx'
 import LanguagePicker from '../molecules/LanguagePicker.jsx'
@@ -85,6 +86,7 @@ const ReadingArea = styled.main`
     width: 100%;
     margin: 0 auto;
     padding: var(--space-xl) var(--space-l);
+    padding-bottom: calc(var(--space-xl) + var(--reader-dock-height, 0px));
     font-size: ${ p => p.$font_size }px;
     font-family: ${ p => p.$font_family }, system-ui, sans-serif;
     line-height: 1.8;
@@ -127,13 +129,17 @@ const Blockquote = styled.blockquote`
     font-style: italic;
 `
 
-const BottomBar = styled.footer`
-    border-top: 1px solid var(--border);
-    padding: var(--space-m) var(--space-l);
-    background: var(--bg-surface);
+const ReaderDock = styled.div`
     position: sticky;
     bottom: 0;
-    z-index: 5;
+    z-index: 80;
+    width: 100%;
+`
+
+const BottomBar = styled.footer`
+    border-top: 1px solid var(--border);
+    padding: var(--space-m) var(--space-l) calc(var(--space-m) + env(safe-area-inset-bottom));
+    background: var(--bg-surface);
 `
 
 const NavRow = styled.div`
@@ -297,9 +303,11 @@ export default function ReaderPage() {
     const [ show_language_modal, set_show_language_modal ] = useState( false )
     const [ language_chosen, set_language_chosen ] = useState( false )
     const [ explanation_data, set_explanation_data ] = useState( null )
+    const [ translation_selection, set_translation_selection ] = useState( null )
     const [ is_offline, set_is_offline ] = useState( !navigator.onLine )
     const reading_area_ref = useRef( null )
-    const suppress_swipe_ref = useRef( false )
+    const reader_dock_ref = useRef( null )
+    const selected_word_element_ref = useRef( null )
 
     // Check if user has already chosen a language for this book
     useEffect( () => {
@@ -362,6 +370,8 @@ export default function ReaderPage() {
     const {
         translations,
         meanings,
+        meaning_alignments,
+        meaning_loading,
         meaning_errors,
         request_sentence_meaning,
         retranslate_sentence,
@@ -422,9 +432,16 @@ export default function ReaderPage() {
     useEffect( () => {
         const handle_key = ( e ) => {
 
-            // Don't navigate when an overlay is open
+            // Let the active overlay own Escape. Clearing the underlying word
+            // selection here would make one key press dismiss two UI layers.
             const overlay_open = settings_open || explanation_data || show_language_modal
 
+            if( e.key === `Escape` && translation_selection && !overlay_open ) {
+                set_translation_selection( null )
+                return
+            }
+
+            // Don't navigate when an overlay is open
             if( e.key === `ArrowLeft` && !overlay_open ) prev_chapter()
             if( e.key === `ArrowRight` && !overlay_open ) next_chapter()
             if( e.key === `Escape` && !overlay_open ) navigate( `/library` )
@@ -432,18 +449,25 @@ export default function ReaderPage() {
         }
         window.addEventListener( `keydown`, handle_key )
         return () => window.removeEventListener( `keydown`, handle_key )
-    }, [ prev_chapter, next_chapter, navigate, settings_open, explanation_data, show_language_modal ] )
+    }, [
+        prev_chapter,
+        next_chapter,
+        navigate,
+        settings_open,
+        explanation_data,
+        show_language_modal,
+        translation_selection
+    ] )
 
-    // Long-press callback — suppresses the next swipe to avoid accidental chapter nav
-    const handle_long_press = useCallback( ( data ) => {
-        suppress_swipe_ref.current = true
-        set_explanation_data( data )
+    const select_translation_word = useCallback( ( { sentence_id, word_index, element } ) => {
+        selected_word_element_ref.current = element
+        set_translation_selection( { sentence_id, word_index } )
     }, [] )
 
-    const handle_reveal_sentence_meaning = useCallback( ( data ) => {
-        suppress_swipe_ref.current = true
-        request_sentence_meaning( data )
-    }, [ request_sentence_meaning ] )
+    const close_translation_sheet = useCallback( () => {
+        selected_word_element_ref.current = null
+        set_translation_selection( null )
+    }, [] )
 
     const handle_retranslate_sentence = useCallback( async ( { sentence_id } ) => {
         const result = await retranslate_sentence( { sentence_id } )
@@ -465,19 +489,11 @@ export default function ReaderPage() {
     const touch_start_ref = useRef( null )
 
     const handle_touch_start = useCallback( ( e ) => {
-        suppress_swipe_ref.current = false
         touch_start_ref.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
     }, [] )
 
     const handle_touch_end = useCallback( ( e ) => {
         if( !touch_start_ref.current ) return
-
-        // If a long-press just fired, skip swipe to avoid accidental chapter nav
-        if( suppress_swipe_ref.current ) {
-            suppress_swipe_ref.current = false
-            touch_start_ref.current = null
-            return
-        }
 
         const dx = e.changedTouches[0].clientX - touch_start_ref.current.x
         const dy = e.changedTouches[0].clientY - touch_start_ref.current.y
@@ -506,19 +522,96 @@ export default function ReaderPage() {
 
     }, [ prev_chapter, next_chapter ] )
 
-    // Scroll to top and close popover on chapter change
+    // Keep fixed reader utilities above the complete reader dock as it changes height.
+    useEffect( () => {
+        const dock = reader_dock_ref.current
+        if( !dock ) return
+
+        const root = document.documentElement
+        const update_dock_height = () => {
+            root.style.setProperty( `--reader-dock-height`, `${ dock.offsetHeight }px` )
+        }
+
+        update_dock_height()
+
+        const observer = typeof ResizeObserver === `undefined`
+            ? null
+            : new ResizeObserver( update_dock_height )
+
+        observer?.observe( dock )
+        window.addEventListener( `resize`, update_dock_height )
+
+        return () => {
+            observer?.disconnect()
+            window.removeEventListener( `resize`, update_dock_height )
+            root.style.removeProperty( `--reader-dock-height` )
+        }
+    }, [ loading, show_language_modal ] )
+
+    // Keep the selected word visible after the sheet changes the dock height.
+    useEffect( () => {
+        if( !translation_selection || !selected_word_element_ref.current ) return
+
+        let second_frame = null
+        const first_frame = requestAnimationFrame( () => {
+            second_frame = requestAnimationFrame( () => {
+                selected_word_element_ref.current?.scrollIntoView( {
+                    block: `nearest`,
+                    inline: `nearest`
+                } )
+            } )
+        } )
+
+        return () => {
+            cancelAnimationFrame( first_frame )
+            if( second_frame ) cancelAnimationFrame( second_frame )
+        }
+    }, [ translation_selection ] )
+
+    const selected_sentence = useMemo(
+        () => current_chapter_sentences.find(
+            sentence => sentence.id === translation_selection?.sentence_id
+        ) || null,
+        [ current_chapter_sentences, translation_selection ]
+    )
+    const selected_translation = selected_sentence
+        ? translations[selected_sentence.id]
+        : null
+
+    useEffect( () => {
+        if( !selected_sentence || !selected_translation ) return
+
+        request_sentence_meaning( {
+            sentence_id: selected_sentence.id,
+            translated: selected_translation
+        } )
+    }, [ selected_sentence, selected_translation, request_sentence_meaning ] )
+
+    const explain_selected_translation = useCallback( () => {
+        if( !selected_sentence || !selected_translation ) return
+
+        set_explanation_data( {
+            sentence_id: selected_sentence.id,
+            original: selected_sentence.text,
+            translated: selected_translation
+        } )
+    }, [ selected_sentence, selected_translation ] )
+
+    // Scroll to top and close fragment-specific UI on chapter change
     useEffect( () => {
         if( reading_area_ref.current ) {
             reading_area_ref.current.scrollTo( 0, 0 )
         }
         window.scrollTo( 0, 0 )
         set_explanation_data( null )
-    }, [ current_chapter ] )
+        close_translation_sheet()
+    }, [ current_chapter, close_translation_sheet ] )
 
-    // Close explanation popover when language or level changes (stale content)
+    // Close fragment-specific UI when language or level changes (stale content)
     useEffect( () => {
         set_explanation_data( null )
-    }, [ last_language, last_level ] )
+        close_translation_sheet()
+    }, [ last_language, last_level, close_translation_sheet ] )
 
     // Get level info for badge
     const level_info = LEVELS.find( l => l.code === last_level ) || DEFAULT_LEVEL
@@ -537,12 +630,10 @@ export default function ReaderPage() {
             sentence_id={ sentence.id }
             original={ sentence.text }
             translated={ translations[sentence.id] }
-            meaning={ meanings[sentence.id] }
-            meaning_error={ !!meaning_errors[sentence.id] }
-            source_language={ source_language }
-            target_language={ last_language }
-            on_reveal_meaning={ handle_reveal_sentence_meaning }
-            on_long_press={ handle_long_press }
+            selected_word_index={ translation_selection?.sentence_id === sentence.id
+                ? translation_selection.word_index
+                : null }
+            on_select_word={ select_translation_word }
         />
     </Fragment>
 
@@ -709,26 +800,38 @@ export default function ReaderPage() {
             target_language={ last_language }
         /> }
 
-        <BottomBar>
-            <StatusRow>
-                <LevelBadge cefr={ level_info.cefr } label={ level_info.label } />
-                { is_translating && <TranslatingIndicator>Translating...</TranslatingIndicator> }
-                { ( token_usage.prompt_tokens > 0 || token_usage.completion_tokens > 0 ) && <TokenStats>
-                    { format_tokens( token_usage.prompt_tokens + token_usage.completion_tokens ) } tokens
-                    · { format_cost( estimate_cost( token_usage.prompt_tokens, token_usage.completion_tokens, model ) ) }
-                </TokenStats> }
-            </StatusRow>
-            <ProgressBar percent={ progress } />
-            <NavRow>
-                <NavBtn onClick={ prev_chapter } disabled={ current_chapter === 0 }>
-                    ← Prev
-                </NavBtn>
-                <ProgressText>{ current_chapter + 1 } / { spine.length } · { progress }%</ProgressText>
-                <NavBtn onClick={ next_chapter } disabled={ current_chapter >= spine.length - 1 }>
-                    Next →
-                </NavBtn>
-            </NavRow>
-        </BottomBar>
+        <ReaderDock ref={ reader_dock_ref } data-reader-dock>
+            { translation_selection && selected_sentence && <TranslationInfoSheet
+                selected_word_index={ translation_selection.word_index }
+                meaning={ meanings[selected_sentence.id] }
+                alignment_segments={ meaning_alignments[selected_sentence.id] }
+                loading={ !!meaning_loading[selected_sentence.id] }
+                error={ !!meaning_errors[selected_sentence.id] }
+                on_close={ close_translation_sheet }
+                on_explain={ explain_selected_translation }
+            /> }
+
+            <BottomBar>
+                <StatusRow>
+                    <LevelBadge cefr={ level_info.cefr } label={ level_info.label } />
+                    { is_translating && <TranslatingIndicator>Translating...</TranslatingIndicator> }
+                    { ( token_usage.prompt_tokens > 0 || token_usage.completion_tokens > 0 ) && <TokenStats>
+                        { format_tokens( token_usage.prompt_tokens + token_usage.completion_tokens ) } tokens
+                        · { format_cost( estimate_cost( token_usage.prompt_tokens, token_usage.completion_tokens, model ) ) }
+                    </TokenStats> }
+                </StatusRow>
+                <ProgressBar percent={ progress } />
+                <NavRow>
+                    <NavBtn onClick={ prev_chapter } disabled={ current_chapter === 0 }>
+                        ← Prev
+                    </NavBtn>
+                    <ProgressText>{ current_chapter + 1 } / { spine.length } · { progress }%</ProgressText>
+                    <NavBtn onClick={ next_chapter } disabled={ current_chapter >= spine.length - 1 }>
+                        Next →
+                    </NavBtn>
+                </NavRow>
+            </BottomBar>
+        </ReaderDock>
 
         { /* Settings Drawer */ }
         <SettingsDrawer

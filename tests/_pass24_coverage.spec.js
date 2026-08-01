@@ -93,9 +93,10 @@ test.describe( `Pass 24 — Coverage Gaps`, () => {
         await open_reader( page )
         await page.waitForTimeout( 2000 )
 
-        // Right-click to open explanation
+        // Open the explanation through the selected word's sheet.
         const sentence = page.locator( `span[data-sentence-id]` ).first()
-        await sentence.click( { button: `right` } )
+        await sentence.locator( `[data-translation-word-index]` ).first().click()
+        await page.locator( `[data-translation-info-sheet]` ).getByRole( `button`, { name: `Explain` } ).click()
 
         // Popover should appear
         await expect( page.locator( `text=Translation Explanation` ) ).toBeVisible( { timeout: 3000 } )

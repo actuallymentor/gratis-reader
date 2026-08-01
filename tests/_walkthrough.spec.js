@@ -226,29 +226,29 @@ test.describe( `Browser Walkthrough`, () => {
         await expect( s ).toContainText( `[TRANSLATED]` )
     } )
 
-    test( `BW19 long-press → Explain tooltip`, async ( { page } ) => {
+    test( `BW19 word tap → information sheet → Explain modal`, async ( { page } ) => {
         await setup_key( page )
         await upload_book( page )
         await enter_reader( page )
         await expect( page.getByText( /\[TRANSLATED\]/ ).first() ).toBeVisible( { timeout: 15_000 } )
-        const s = page.locator( `span[data-sentence-id]` ).first()
-        const box = await s.boundingBox()
-        await page.mouse.move( box.x + box.width / 2, box.y + box.height / 2 )
-        await page.mouse.down()
-        await page.waitForTimeout( 700 )
-        await page.mouse.up()
-        await expect( s.getByRole( `button`, { name: `Explain` } ) ).toBeVisible()
-        await s.getByRole( `button`, { name: `Explain` } ).click()
+        await page.locator( `span[data-sentence-id] [data-translation-word-index]` ).first().click()
+        const sheet = page.locator( `[data-translation-info-sheet]` )
+        await expect( sheet ).toBeVisible()
+        await sheet.getByRole( `button`, { name: `Explain` } ).click()
         await expect( page.getByText( `Translation Explanation` ) ).toBeVisible( { timeout: 5000 } )
     } )
 
-    test( `BW20 right-click → explanation popover`, async ( { page } ) => {
+    test( `BW20 right-click does not bypass explicit Explain action`, async ( { page } ) => {
         await setup_key( page )
         await upload_book( page )
         await enter_reader( page )
         await expect( page.getByText( /\[TRANSLATED\]/ ).first() ).toBeVisible( { timeout: 15_000 } )
-        await page.locator( `span[data-sentence-id]` ).first().click( { button: `right` } )
-        await expect( page.getByText( `Translation Explanation` ) ).toBeVisible( { timeout: 5000 } )
+        const sentence = page.locator( `span[data-sentence-id]` ).first()
+        await sentence.click( { button: `right` } )
+        await expect( page.getByText( `Translation Explanation` ) ).not.toBeVisible()
+        await sentence.locator( `[data-translation-word-index]` ).first().click()
+        await page.locator( `[data-translation-info-sheet]` ).getByRole( `button`, { name: `Explain` } ).click()
+        await expect( page.getByText( `Translation Explanation` ) ).toBeVisible()
     } )
 
     // ── SETTINGS ────────────────────────────────────────────────
@@ -553,9 +553,10 @@ test.describe( `Browser Walkthrough`, () => {
             } )
         } )
 
-        // Right-click a translated sentence to open explanation popover
-        const translated = page.getByText( /\[TRANSLATED\]/ ).first()
-        await translated.click( { button: `right` } )
+        // Select a translated word and explicitly open its explanation.
+        const translated = page.locator( `span[data-sentence-id]` ).filter( { hasText: `[TRANSLATED]` } ).first()
+        await translated.locator( `[data-translation-word-index]` ).first().click()
+        await page.locator( `[data-translation-info-sheet]` ).getByRole( `button`, { name: `Explain` } ).click()
 
         // Popover should show with title and original label
         await expect( page.getByText( `Translation Explanation` ) ).toBeVisible( { timeout: 5000 } )
@@ -618,8 +619,10 @@ test.describe( `Browser Walkthrough`, () => {
         await enter_reader( page )
         await expect( page.getByText( /\[TRANSLATED\]/ ).first() ).toBeVisible( { timeout: 15_000 } )
 
-        // Open explanation popover
-        await page.locator( `span[data-sentence-id]` ).first().click( { button: `right` } )
+        // Open explanation popover from the selected word's sheet.
+        const word = page.locator( `span[data-sentence-id] [data-translation-word-index]` ).first()
+        await word.click()
+        await page.locator( `[data-translation-info-sheet]` ).getByRole( `button`, { name: `Explain` } ).click()
         await expect( page.getByText( `Translation Explanation` ) ).toBeVisible( { timeout: 5000 } )
 
         // Close popover first (click overlay), then navigate
@@ -627,8 +630,8 @@ test.describe( `Browser Walkthrough`, () => {
         await page.waitForTimeout( 500 )
         await expect( page.getByText( `Translation Explanation` ) ).not.toBeVisible()
 
-        // Open popover again, then navigate via button (arrow keys are now blocked during overlays)
-        await page.locator( `span[data-sentence-id]` ).first().click( { button: `right` } )
+        // Open the popover again, then navigate via button.
+        await page.locator( `[data-translation-info-sheet]` ).getByRole( `button`, { name: `Explain` } ).click()
         await expect( page.getByText( `Translation Explanation` ) ).toBeVisible( { timeout: 5000 } )
 
         // Navigate via Next button — popover should auto-close on chapter change
@@ -703,7 +706,7 @@ test.describe( `Browser Walkthrough`, () => {
         await expect( page.locator( `span[data-sentence-id]` ).first() ).toContainText( /\[TRANSLATED\]/, { timeout: 15_000 } )
 
         // Rapidly click multiple translated words — should not crash
-        const words = page.locator( `span[data-sentence-id] [data-word-tooltip-word]` )
+        const words = page.locator( `span[data-sentence-id] [data-translation-word-index]` )
         const count = await words.count()
         for( let i = 0; i < Math.min( count, 8 ); i++ ) {
             await words.nth( i ).click( { force: true } )
@@ -842,7 +845,7 @@ test.describe( `Browser Walkthrough`, () => {
         await expect( error_text ).toHaveCount( 0 )
     } )
 
-    test( `BW62 long-press Explain flow does not change chapter`, async ( { page } ) => {
+    test( `BW62 sheet Explain flow does not change chapter`, async ( { page } ) => {
         await setup_key( page )
         await upload_book( page )
         await enter_reader( page )
@@ -853,15 +856,10 @@ test.describe( `Browser Walkthrough`, () => {
         // Record current progress text
         const progress_before = await page.locator( `text=/\\d+ \\/ \\d+/` ).first().textContent()
 
-        const sentence = page.locator( `span[data-sentence-id]` ).first()
-        const box = await sentence.boundingBox()
-        await page.mouse.move( box.x + box.width / 2, box.y + box.height / 2 )
-        await page.mouse.down()
-        await page.waitForTimeout( 700 )
-        await page.mouse.up()
-
-        await expect( sentence.getByRole( `button`, { name: `Explain` } ) ).toBeVisible()
-        await sentence.getByRole( `button`, { name: `Explain` } ).click()
+        await page.locator( `span[data-sentence-id] [data-translation-word-index]` ).first().click()
+        const sheet = page.locator( `[data-translation-info-sheet]` )
+        await expect( sheet ).toBeVisible()
+        await sheet.getByRole( `button`, { name: `Explain` } ).click()
         await expect( page.getByText( `Translation Explanation` ) ).toBeVisible( { timeout: 5_000 } )
 
         // Progress should remain unchanged (no accidental chapter navigation)
@@ -902,7 +900,7 @@ test.describe( `Browser Walkthrough`, () => {
         expect( accept ).toBe( `.epub` )
     } )
 
-    test( `BW65 word tooltip appears on click`, async ( { page } ) => {
+    test( `BW65 word information sheet appears on click`, async ( { page } ) => {
         await setup_key( page )
         await upload_book( page )
         await enter_reader( page )
@@ -910,14 +908,12 @@ test.describe( `Browser Walkthrough`, () => {
         // Wait for translated content with word-level spans
         await expect( page.locator( `span[data-sentence-id]` ).first() ).toContainText( /\[TRANSLATED\]/, { timeout: 15_000 } )
 
-        // Clicking a word should trigger a lookup and show tooltip
+        // Clicking a word should show the persistent information sheet.
         const sentence = page.locator( `span[data-sentence-id]` ).first()
-        const words = sentence.locator( `[data-word-tooltip-word]` )
+        const words = sentence.locator( `[data-translation-word-index]` )
         if( await words.count() > 0 ) {
-            // Click a word to trigger desktop tooltip
             await words.first().click()
-            await page.waitForTimeout( 1000 )
-            // Word lookup should be triggered (even if tooltip content is loading)
+            await expect( page.locator( `[data-translation-info-sheet]` ) ).toBeVisible()
         }
     } )
 

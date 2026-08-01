@@ -3,7 +3,7 @@
  * Targets angles previous passes may have missed
  */
 import { test, expect } from '@playwright/test'
-import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth, clear_storage, long_press } from './helpers/setup.js'
+import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth, clear_storage } from './helpers/setup.js'
 
 test.describe( `Pass 32 — Walkthrough`, () => {
 
@@ -57,37 +57,28 @@ test.describe( `Pass 32 — Walkthrough`, () => {
         await expect( modal ).toBeVisible( { timeout: 5000 } )
     } )
 
-    // ── 3. Sentence long-press cycle: translated → meaning → translated ──
+    // ── 3. Repeated word-selection cycle ──
 
-    test( `BW103 triple long-press keeps sentence toggle stable`, async ( { page } ) => {
+    test( `BW103 repeated word selections keep one stable information sheet`, async ( { page } ) => {
         await upload_demo_book( page )
         await open_reader( page )
         await page.waitForTimeout( 2000 )
 
         const sentence = page.locator( `span[data-sentence-id]` ).first()
-
-        // Check highlight state toggles correctly via data-sentence-id persistence
+        const words = sentence.locator( `[data-translation-word-index]` )
+        await expect( words.nth( 1 ) ).toBeVisible( { timeout: 15_000 } )
         const id_before = await sentence.getAttribute( `data-sentence-id` )
 
-        await long_press( page, sentence )
-        await page.waitForTimeout( 250 )
-        const highlight_1 = await sentence.evaluate( el => window.getComputedStyle( el ).backgroundColor )
+        await words.nth( 0 ).click()
+        await words.nth( 1 ).click()
+        await words.nth( 0 ).click()
 
-        await long_press( page, sentence )
-        await page.waitForTimeout( 250 )
-        const highlight_2 = await sentence.evaluate( el => window.getComputedStyle( el ).backgroundColor )
-
-        await long_press( page, sentence )
-        await page.waitForTimeout( 250 )
-        const highlight_3 = await sentence.evaluate( el => window.getComputedStyle( el ).backgroundColor )
-
-        // Sentence ID should persist through all long-presses
+        // Sentence identity and one-sheet state persist through selection changes.
         const id_after = await sentence.getAttribute( `data-sentence-id` )
         expect( id_after ).toBe( id_before )
-
-        // Highlights should cycle: state1 == state3, state1 != state2
-        expect( highlight_3 ).toBe( highlight_1 )
-        expect( highlight_2 ).not.toBe( highlight_1 )
+        await expect( page.locator( `[data-translation-info-sheet]` ) ).toHaveCount( 1 )
+        await expect( words.nth( 0 ) ).toHaveAttribute( `aria-pressed`, `true` )
+        await expect( words.nth( 1 ) ).toHaveAttribute( `aria-pressed`, `false` )
     } )
 
     // ── 4. Settings drawer opens and closes cleanly ──

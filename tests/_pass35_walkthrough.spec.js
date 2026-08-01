@@ -2,7 +2,7 @@
  * Pass 35 — Console warnings, network shapes, combined feature interactions
  */
 import { test, expect } from '@playwright/test'
-import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth, long_press } from './helpers/setup.js'
+import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth } from './helpers/setup.js'
 
 test.describe( `Pass 35 — Walkthrough`, () => {
 
@@ -93,7 +93,7 @@ test.describe( `Pass 35 — Walkthrough`, () => {
 
     // ── 4. Settings + theme + translation combined ──
 
-    test( `BW141 change theme then toggle sentence — no visual glitch`, async ( { page } ) => {
+    test( `BW141 change theme then select and close word information — no visual glitch`, async ( { page } ) => {
         const errors = []
         page.on( `pageerror`, e => errors.push( e.message ) )
 
@@ -107,11 +107,9 @@ test.describe( `Pass 35 — Walkthrough`, () => {
         await page.getByRole( `button`, { name: `Close` } ).click()
         await page.waitForTimeout( 300 )
 
-        // Inspect a sentence and then toggle it back.
-        const sentence = page.locator( `span[data-sentence-id]` ).first()
-        await long_press( page, sentence )
-
-        await long_press( page, sentence )
+        // Inspect a word and then close its sheet.
+        await page.locator( `span[data-sentence-id] [data-translation-word-index]` ).first().click()
+        await page.getByRole( `button`, { name: `Close translation information` } ).click()
 
         // Change font size
         await page.getByRole( `button`, { name: `Settings` } ).click()

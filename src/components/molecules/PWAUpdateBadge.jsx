@@ -67,7 +67,7 @@ const BadgeButton = styled.button`
     position: fixed;
     right: calc(var(--space-m) + env(safe-area-inset-right));
     /* Clear the reader footer and bottom-center toast stack. */
-    bottom: calc(var(--space-xl) + 4.5rem + env(safe-area-inset-bottom));
+    bottom: calc(var(--space-xl) + var(--reader-dock-height, 4.5rem));
     z-index: 180;
     max-width: min(28rem, calc(100vw - var(--space-m) * 2));
     padding: var(--space-s) var(--space-m);

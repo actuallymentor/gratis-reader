@@ -3,7 +3,7 @@
  * Targets angles that 32 previous passes haven't deeply covered
  */
 import { test, expect } from '@playwright/test'
-import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth, clear_storage, long_press } from './helpers/setup.js'
+import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth, clear_storage } from './helpers/setup.js'
 
 test.describe( `Pass 33 — Walkthrough`, () => {
 
@@ -24,18 +24,12 @@ test.describe( `Pass 33 — Walkthrough`, () => {
         const count = await sentences.count()
         if( count < 2 ) return
 
-        // Get initial background of second sentence
-        const bg_before = await sentences.nth( 1 ).evaluate(
-            el => window.getComputedStyle( el ).backgroundColor
-        )
+        const first_word = sentences.first().locator( `[data-translation-word-index]` ).first()
+        const second_word = sentences.nth( 1 ).locator( `[data-translation-word-index]` ).first()
+        await first_word.click()
 
-        await long_press( page, sentences.first() )
-
-        // Second sentence should be unchanged
-        const bg_after = await sentences.nth( 1 ).evaluate(
-            el => window.getComputedStyle( el ).backgroundColor
-        )
-        expect( bg_after ).toBe( bg_before )
+        await expect( first_word ).toHaveAttribute( `aria-pressed`, `true` )
+        await expect( second_word ).toHaveAttribute( `aria-pressed`, `false` )
     } )
 
     // ── 2. Reader handles chapter with headings correctly ──
@@ -103,24 +97,19 @@ test.describe( `Pass 33 — Walkthrough`, () => {
         expect( errors ).toEqual( [] )
     } )
 
-    // ── 5. Word click tooltip shows content on desktop ──
+    // ── 5. Word click shows information sheet on desktop ──
 
-    test( `BW120 clicking a translated word shows tooltip`, async ( { page } ) => {
+    test( `BW120 clicking a translated word shows information sheet`, async ( { page } ) => {
         await upload_demo_book( page )
         await open_reader( page )
         await page.waitForTimeout( 2000 )
 
         // Find a word span inside a translated sentence
-        const word = page.locator( `span[data-sentence-id] [data-word-tooltip-word]` ).first()
+        const word = page.locator( `span[data-sentence-id] [data-translation-word-index]` ).first()
 
         if( await word.count() > 0 ) {
             await word.click()
-            await page.waitForTimeout( 500 )
-
-            // Tooltip should appear (look for tooltip-like elements near the word)
-            // The tooltip content is "..." while loading or the translated word
-            const tooltips = page.locator( `[style*="pointer-events: none"], div[class*="Tooltip"]` )
-            // Even if tooltip doesn't render visually in test, no error should occur
+            await expect( page.locator( `[data-translation-info-sheet]` ) ).toBeVisible()
         }
 
         // Main check: no errors from clicking
