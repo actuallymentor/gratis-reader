@@ -65,6 +65,93 @@ test.describe( `Sentence Interactions`, () => {
 
     } )
 
+    test( `failed meaning requests stop until the user makes a new selection`, async ( { page } ) => {
+
+        let meaning_calls = 0
+
+        await page.route( CHAT_URL, async route => {
+            const body = JSON.parse( route.request().postData() )
+            const user_msg = body.messages?.find( message => message.role === `user` )?.content || ``
+
+            if( user_msg.includes( `Adapted translation:` ) ) {
+                meaning_calls += 1
+                await route.fulfill( { status: 500, body: `Meaning unavailable` } )
+                return
+            }
+
+            const sentence_match = user_msg.match( /Translate this sentence:\n(.+)/s )
+            const sentence = sentence_match ? sentence_match[1].trim() : `unknown`
+            await route.fulfill( {
+                contentType: `application/json`,
+                body: JSON.stringify( { choices: [ { message: { content: `[TRANSLATED] ${ sentence }` } } ] } )
+            } )
+        } )
+
+        await open_reader( page )
+
+        const word = page.locator( READER_WORD ).first()
+        await expect( word ).toBeVisible( { timeout: 15_000 } )
+        await word.click()
+
+        await expect( page.locator( INFO_SHEET ) ).toContainText( `Meaning unavailable`, { timeout: 5000 } )
+        await page.waitForTimeout( 1000 )
+        expect( meaning_calls ).toBe( 1 )
+
+    } )
+
+    test( `cached unaligned meanings stay readable without another API request`, async ( { page } ) => {
+
+        let meaning_calls = 0
+
+        await page.route( CHAT_URL, async route => {
+            const body = JSON.parse( route.request().postData() )
+            const user_msg = body.messages?.find( message => message.role === `user` )?.content || ``
+
+            if( user_msg.includes( `Adapted translation:` ) ) {
+                meaning_calls += 1
+                await route.fulfill( {
+                    contentType: `application/json`,
+                    body: JSON.stringify( {
+                        choices: [ { message: { content: `Readable unaligned meaning.` } } ]
+                    } )
+                } )
+                return
+            }
+
+            const sentence_match = user_msg.match( /Translate this sentence:\n(.+)/s )
+            const sentence = sentence_match ? sentence_match[1].trim() : `unknown`
+            await route.fulfill( {
+                contentType: `application/json`,
+                body: JSON.stringify( { choices: [ { message: { content: `[TRANSLATED] ${ sentence }` } } ] } )
+            } )
+        } )
+
+        await open_reader( page )
+
+        const first_word = page.locator( READER_WORD ).first()
+        await expect( first_word ).toBeVisible( { timeout: 15_000 } )
+        await first_word.click()
+        await expect( page.locator( INFO_SHEET ) ).toContainText( `Readable unaligned meaning.` )
+
+        await expect.poll( () => page.evaluate( () => new Promise( resolve => {
+            const request = indexedDB.open( `gratis_reader` )
+            request.onsuccess = () => {
+                const transaction = request.result.transaction( `meanings`, `readonly` )
+                const meanings_request = transaction.objectStore( `meanings` ).getAll()
+                meanings_request.onsuccess = () => resolve( meanings_request.result[0]?.alignment_version )
+            }
+        } ) ) ).toBe( 0 )
+
+        await page.getByLabel( `Back to library` ).click()
+        await page.waitForURL( /\/library/ )
+        await open_reader( page )
+
+        await page.locator( READER_WORD ).first().click()
+        await expect( page.locator( INFO_SHEET ) ).toContainText( `Readable unaligned meaning.` )
+        expect( meaning_calls ).toBe( 1 )
+
+    } )
+
     test( `same-fragment clicks move the underline without remounting the sheet`, async ( { page } ) => {
 
         await enter_reader_with_translations( page )

@@ -8,6 +8,10 @@
 ### Changed
 - Replace tap/hold gestures with word selection and explicit Explain (uncommitted)
 
+### Fixed
+- Stop failed meaning requests from retrying without user action (uncommitted)
+- Reuse readable cached meanings when alignment is unavailable (uncommitted)
+
 ## [1.16.2] - 2026-06-22
 
 ### Fixed

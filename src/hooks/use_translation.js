@@ -99,6 +99,9 @@ export const use_translation = ( { all_sentences = [], target_language, level, s
     const retry_abort_ref = useRef( null )
     const retry_running_ref = useRef( false )
     const translations_ref = useRef( {} )
+    // Keep request deduplication outside render state so loading/error changes
+    // cannot recreate the callback and start an automatic retry loop.
+    const meanings_ref = useRef( {} )
     const failed_sentences_ref = useRef( {} )
     const translation_requests_ref = useRef( {} )
     const translation_versions_ref = useRef( {} )
@@ -118,7 +121,7 @@ export const use_translation = ( { all_sentences = [], target_language, level, s
 
         if( !sentence_id || !translated || !source_language || !target_language || !level ) return
 
-        if( meanings[sentence_id] || meaning_loading[sentence_id] || meaning_requests_ref.current[sentence_id] ) return
+        if( meanings_ref.current[sentence_id] || meaning_requests_ref.current[sentence_id] ) return
 
         if( !api_key ) {
             set_meaning_errors( prev => ( { ...prev, [sentence_id]: true } ) )
@@ -138,12 +141,17 @@ export const use_translation = ( { all_sentences = [], target_language, level, s
             return next_errors
         } )
 
+        let cached_fallback_meaning = null
+
         try {
             const cached = await get_sentence_meaning( cache_key )
             if( controller.signal.aborted ) return
 
-            const cached_response = cached?.alignment_version === MEANING_ALIGNMENT_VERSION
-                && cached.translated === translated
+            const cached_matches_translation = cached?.translated === translated
+                && typeof cached.meaning === `string`
+                && !!cached.meaning.trim()
+            const cached_response = cached_matches_translation
+                && cached.alignment_version === MEANING_ALIGNMENT_VERSION
                 ? parse_meaning_alignment_response( JSON.stringify( {
                     meaning: cached.meaning,
                     segments: cached.alignment_segments
@@ -151,6 +159,11 @@ export const use_translation = ( { all_sentences = [], target_language, level, s
                 : null
 
             if( cached_response?.aligned ) {
+                meanings_ref.current = {
+                    ...meanings_ref.current,
+                    [sentence_id]: cached_response.meaning
+                }
+
                 if( mounted_ref.current ) {
                     set_meanings( prev => ( { ...prev, [sentence_id]: cached_response.meaning } ) )
                     set_meaning_alignments( prev => ( {
@@ -159,6 +172,23 @@ export const use_translation = ( { all_sentences = [], target_language, level, s
                     } ) )
                 }
                 return
+            }
+
+            if( cached_matches_translation ) {
+                cached_fallback_meaning = cached.meaning
+                meanings_ref.current = {
+                    ...meanings_ref.current,
+                    [sentence_id]: cached_fallback_meaning
+                }
+
+                if( mounted_ref.current ) {
+                    set_meanings( prev => ( { ...prev, [sentence_id]: cached_fallback_meaning } ) )
+                    set_meaning_alignments( prev => ( { ...prev, [sentence_id]: [] } ) )
+                }
+
+                // Version zero means alignment was already attempted. Keep its
+                // readable text instead of paying for the same failed upgrade.
+                if( cached.alignment_version === 0 ) return
             }
 
             const { system, user } = build_back_translation_prompt( source_language, target_language, translated )
@@ -179,6 +209,10 @@ export const use_translation = ( { all_sentences = [], target_language, level, s
                 alignment_segments,
                 aligned
             } = parse_meaning_alignment_response( content, translated )
+
+            if( !meaning.trim() ) throw new Error( `Sentence meaning response was empty` )
+
+            meanings_ref.current = { ...meanings_ref.current, [sentence_id]: meaning }
 
             if( mounted_ref.current ) {
                 set_meanings( prev => ( { ...prev, [sentence_id]: meaning } ) )
@@ -217,7 +251,9 @@ export const use_translation = ( { all_sentences = [], target_language, level, s
             if( controller.signal.aborted || error?.name === `AbortError` ) return
 
             log.warn( `Sentence meaning failed:`, error?.message || error )
-            if( mounted_ref.current ) set_meaning_errors( prev => ( { ...prev, [sentence_id]: true } ) )
+            if( mounted_ref.current && !cached_fallback_meaning ) {
+                set_meaning_errors( prev => ( { ...prev, [sentence_id]: true } ) )
+            }
         } finally {
             const remaining_requests = { ...meaning_requests_ref.current }
             delete remaining_requests[sentence_id]
@@ -235,8 +271,6 @@ export const use_translation = ( { all_sentences = [], target_language, level, s
         }
 
     }, [
-        meanings,
-        meaning_loading,
         source_language,
         target_language,
         level,
@@ -533,6 +567,7 @@ export const use_translation = ( { all_sentences = [], target_language, level, s
         const remaining_meaning_requests = { ...meaning_requests_ref.current }
         delete remaining_meaning_requests[sentence.id]
         meaning_requests_ref.current = remaining_meaning_requests
+        meanings_ref.current = remove_store_key( meanings_ref.current, sentence.id )
 
         set_translations( prev => remove_store_key( prev, sentence.id ) )
         set_meanings( prev => remove_store_key( prev, sentence.id ) )
@@ -580,6 +615,7 @@ export const use_translation = ( { all_sentences = [], target_language, level, s
         set_meaning_loading( {} )
         set_meaning_errors( {} )
         translations_ref.current = {}
+        meanings_ref.current = {}
         failed_sentences_ref.current = {}
         translation_requests_ref.current = {}
         translation_versions_ref.current = {}
