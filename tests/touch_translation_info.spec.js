@@ -14,7 +14,10 @@ const translated_sentence_from = ( prompt ) => {
     return match ? match[1].trim() : `unknown`
 }
 
-const install_translation_mock = async ( page ) => {
+const install_translation_mock = async ( page, {
+    word_lookup_content,
+    translated_content
+} = {} ) => {
     const calls = {
         explanation: 0,
         meaning: 0,
@@ -32,12 +35,13 @@ const install_translation_mock = async ( page ) => {
         } else if( user_msg.includes( `Word:` ) ) {
             calls.word_lookup += 1
             const word_match = user_msg.match( /Word:\s*(.+)$/ )
-            content = `Source ${ word_match ? word_match[1].trim() : `word` }`
+            content = word_lookup_content
+                ?? `Source ${ word_match ? word_match[1].trim() : `word` }`
         } else if( user_msg.includes( `Adapted translation:` ) ) {
             calls.meaning += 1
             content = `Simplified ${ calls.meaning } ${ adapted_translation_from( user_msg ) }`
         } else {
-            content = `Target ${ translated_sentence_from( user_msg ) }`
+            content = translated_content ?? `Target ${ translated_sentence_from( user_msg ) }`
         }
 
         await route.fulfill( {
@@ -246,6 +250,138 @@ test.describe( `Touch translation information`, () => {
         expect( close_box.x + close_box.width ).toBeLessThanOrEqual( 320 )
         expect( explain_box.x + explain_box.width ).toBeLessThanOrEqual( 320 )
         expect( explain_box.y + explain_box.height ).toBeLessThanOrEqual( 568 )
+
+    } )
+
+    test( `tooltip flips below a word near the top edge and hides when its word leaves view`, async ( { page } ) => {
+
+        const long_translation = `A deliberately long contextual translation that needs several lines`
+        await install_translation_mock( page, { word_lookup_content: long_translation } )
+        await open_reader( page )
+
+        const word = page.locator( `[data-translation-word-index]` ).first()
+        const tooltip = page.locator( READER_WORD_TOOLTIP )
+        const top_bar = page.locator( `header` ).first()
+        await expect( word ).toBeVisible( { timeout: 15_000 } )
+
+        await word.tap()
+        await expect( tooltip ).toHaveText( long_translation )
+
+        const top_bar_box = await top_bar.boundingBox()
+        const viewport_height = page.viewportSize().height
+        expect( top_bar_box ).not.toBeNull()
+        await word.evaluate( ( element, visible_top ) => {
+            window.scrollBy( 0, element.getBoundingClientRect().top - visible_top )
+        }, top_bar_box.y + top_bar_box.height + 2 )
+
+        await expect.poll( async () => {
+            const [ word_box, tooltip_box ] = await Promise.all( [
+                word.boundingBox(),
+                tooltip.boundingBox()
+            ] )
+            if( !word_box || !tooltip_box ) return false
+            return tooltip_box.y >= word_box.y + word_box.height
+                && tooltip_box.y + tooltip_box.height <= viewport_height
+        } ).toBe( true )
+
+        await word.evaluate( element => {
+            window.scrollBy( 0, element.getBoundingClientRect().bottom + 100 )
+        } )
+
+        await expect( tooltip ).not.toBeVisible()
+        await expect( page.locator( `[data-translation-info-sheet]` ) ).toBeVisible()
+
+    } )
+
+    test( `dock resize hides an occluded tooltip and reveals it after the dock shrinks`, async ( { page } ) => {
+
+        await install_translation_mock( page )
+        await open_reader( page )
+
+        const word = page.locator( `[data-translation-word-index]` ).first()
+        const tooltip = page.locator( READER_WORD_TOOLTIP )
+        const dock = page.locator( `[data-reader-dock]` )
+        await expect( word ).toBeVisible( { timeout: 15_000 } )
+
+        await word.tap()
+        await expect( tooltip ).toBeVisible()
+
+        await dock.evaluate( element => {
+            element.style.position = `fixed`
+            element.style.inset = `0`
+        } )
+
+        await expect.poll( () => word.evaluate( element => {
+            const rect = element.getBoundingClientRect()
+            const top_element = document.elementFromPoint(
+                rect.left + rect.width / 2,
+                rect.top + rect.height / 2
+            )
+            return !!top_element?.closest( `[data-reader-dock]` )
+        } ) ).toBe( true )
+        await expect( tooltip ).not.toBeVisible()
+
+        await dock.evaluate( element => {
+            element.style.position = ``
+            element.style.inset = ``
+        } )
+
+        await expect( tooltip ).toBeVisible()
+
+    } )
+
+    test( `wrapped hyphenated words keep their tooltip anchored to a visible line`, async ( { page } ) => {
+
+        const wrapped_word = `reader-friendly-context-sensitive-black-and-white-device-translation`
+        await install_translation_mock( page, {
+            translated_content: `Start ${ wrapped_word } finish`
+        } )
+        await open_reader( page )
+
+        const word = page.locator( `[data-translation-word="${ wrapped_word }"]` ).first()
+        const tooltip = page.locator( READER_WORD_TOOLTIP )
+        await expect( word ).toBeVisible( { timeout: 15_000 } )
+        await expect.poll( () => word.evaluate( element => element.getClientRects().length ) ).toBeGreaterThan( 1 )
+
+        const tap_point = await word.evaluate( element => {
+            const rect = element.getClientRects()[0]
+            return {
+                x: rect.left + Math.min( 2, rect.width / 2 ),
+                y: rect.top + rect.height / 2
+            }
+        } )
+        await page.touchscreen.tap( tap_point.x, tap_point.y )
+
+        await expect( tooltip ).toBeVisible()
+        const [ first_word_rect, tooltip_box ] = await Promise.all( [
+            word.evaluate( element => {
+                const rect = element.getClientRects()[0]
+                return { top: rect.top, bottom: rect.bottom }
+            } ),
+            tooltip.boundingBox()
+        ] )
+        expect( tooltip_box ).not.toBeNull()
+        expect(
+            tooltip_box.y + tooltip_box.height <= first_word_rect.top + 1
+            || tooltip_box.y >= first_word_rect.bottom - 1
+        ).toBe( true )
+
+    } )
+
+    test( `empty word lookup responses settle as unavailable`, async ( { page } ) => {
+
+        const calls = await install_translation_mock( page, { word_lookup_content: `   ` } )
+        await open_reader( page )
+
+        const word = page.locator( `[data-translation-word-index]` ).first()
+        const tooltip = page.locator( READER_WORD_TOOLTIP )
+        await expect( word ).toBeVisible( { timeout: 15_000 } )
+
+        await word.tap()
+
+        await expect( tooltip ).toHaveText( `Translation unavailable` )
+        await expect( tooltip ).not.toHaveAttribute( `aria-live` )
+        expect( calls.word_lookup ).toBe( 1 )
 
     } )
 

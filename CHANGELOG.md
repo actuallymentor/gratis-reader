@@ -1,12 +1,18 @@
 # Changelog
 
+## [1.18.1] - 2026-08-01
+
+### Fixed
+- Keep word tooltips in view and hide them behind reader chrome
+- Settle whitespace-only translation responses as unavailable
+
 ## [1.18.0] - 2026-08-01
 
 ### Added
-- Show contextual source-language tooltips above tapped reader words (uncommitted)
+- Show contextual source-language tooltips above tapped reader words
 
 ### Changed
-- Keep the bottom sheet fragment-level without inferred word alignment (uncommitted)
+- Keep the bottom sheet fragment-level without inferred word alignment
 
 ## [1.17.0] - 2026-08-01
 

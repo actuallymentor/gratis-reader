@@ -100,8 +100,14 @@ export const chat_completion = async ( { api_key, model, system_prompt, user_mes
         throw new Error( `OpenRouter returned an empty or malformed response` )
     }
 
+    const content = choices[0].message.content.trim()
+    if( !content ) {
+        log.debug( `OpenRouter response contained only whitespace. Full response data:`, data )
+        throw new Error( `OpenRouter returned an empty or malformed response` )
+    }
+
     return {
-        content: choices[0].message.content.trim(),
+        content,
         usage: {
             prompt_tokens: usage?.prompt_tokens || 0,
             completion_tokens: usage?.completion_tokens || 0,
