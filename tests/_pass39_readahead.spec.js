@@ -33,24 +33,25 @@ test.describe( `Pass 39 — Read-ahead buffer`, () => {
         await upload_demo_book( page )
         await open_reader( page )
 
-        // Wait for translations to complete (current + 2 ahead)
-        await page.waitForTimeout( 8000 )
+        // The translating lifecycle covers the current chapter and both read-ahead chapters.
+        const translating = page.getByText( `Translating...`, { exact: true } )
+        await expect( translating ).toBeVisible( { timeout: 5_000 } )
+        await expect( translating ).not.toBeVisible( { timeout: 30_000 } )
 
         // Should have translated more sentences than just the current chapter
         // (the read-ahead buffer should include next 2 chapters' worth)
-        const count = translated_sentences.size
-        expect( count ).toBeGreaterThan( 0 )
+        const visible_count = await page.locator( `span[data-sentence-id]` ).count()
+        expect( translated_sentences.size ).toBeGreaterThan( visible_count )
 
         // Now navigate to next chapter — translations should already be cached
+        const first_sentence = page.locator( `span[data-sentence-id]` ).first()
+        const first_id = await first_sentence.getAttribute( `data-sentence-id` )
         await page.keyboard.press( `ArrowRight` )
-        await page.waitForTimeout( 3000 )
 
         // The sentences in chapter 2 should render with [TRANSLATED] prefix
         // because they were pre-translated by the read-ahead buffer
-        const sentences = page.locator( `span[data-sentence-id]` )
-        const first_text = await sentences.first().textContent()
-        // Sentence should show translated text (from cache, not waiting for API)
-        expect( first_text.length ).toBeGreaterThan( 0 )
+        await expect( first_sentence ).not.toHaveAttribute( `data-sentence-id`, first_id )
+        await expect( first_sentence ).toContainText( `[TRANSLATED]` )
     } )
 
 } )

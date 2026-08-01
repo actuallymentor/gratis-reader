@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { execSync } from 'node:child_process'
-import { setup_api_key, upload_demo_book, mock_openrouter, clear_storage } from './helpers/setup.js'
+import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, clear_storage } from './helpers/setup.js'
 
 const expected_commit_hash = () => {
 
@@ -62,11 +62,7 @@ test.describe( `Settings`, () => {
         await mock_openrouter( page )
         await upload_demo_book( page )
 
-        // Open book
-        await page.locator( `img[alt]` ).first().click()
-        await page.waitForURL( /\/read\// )
-        await page.getByRole( `button`, { name: `Start Reading` } ).click()
-        await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible( { timeout: 10_000 } )
+        await open_reader( page )
 
         // Get initial font size
         const initial_size = await page.evaluate( () => {
@@ -78,16 +74,11 @@ test.describe( `Settings`, () => {
         await page.getByRole( `button`, { name: `Settings` } ).click()
         const slider = page.locator( `input[type="range"]` )
         await slider.fill( `24` )
-        await page.waitForTimeout( 300 )
 
         // Check new font size
-        const new_size = await page.evaluate( () => {
-            const main = document.querySelector( `main` )
-            return main ? getComputedStyle( main ).fontSize : null
-        } )
-
-        expect( new_size ).not.toBe( initial_size )
-        expect( parseInt( new_size ) ).toBe( 24 )
+        const reader = page.locator( `main` )
+        await expect( reader ).not.toHaveCSS( `font-size`, initial_size )
+        await expect( reader ).toHaveCSS( `font-size`, `24px` )
 
     } )
 
@@ -96,10 +87,7 @@ test.describe( `Settings`, () => {
         await mock_openrouter( page )
         await upload_demo_book( page )
 
-        await page.locator( `img[alt]` ).first().click()
-        await page.waitForURL( /\/read\// )
-        await page.getByRole( `button`, { name: `Start Reading` } ).click()
-        await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible( { timeout: 10_000 } )
+        await open_reader( page )
 
         await page.getByRole( `button`, { name: `Settings` } ).click()
 
@@ -113,10 +101,7 @@ test.describe( `Settings`, () => {
         await mock_openrouter( page )
         await upload_demo_book( page )
 
-        await page.locator( `img[alt]` ).first().click()
-        await page.waitForURL( /\/read\// )
-        await page.getByRole( `button`, { name: `Start Reading` } ).click()
-        await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible( { timeout: 10_000 } )
+        await open_reader( page )
 
         // Open settings and change font family
         await page.getByRole( `button`, { name: `Settings` } ).click()
@@ -124,18 +109,12 @@ test.describe( `Settings`, () => {
         // Find the font family select (not the model select)
         const font_select = page.locator( `select` ).filter( { hasText: /Nunito|Georgia/ } )
         await font_select.selectOption( `Georgia` )
-        await page.waitForTimeout( 300 )
+        await expect( page.locator( `main` ) ).toHaveCSS( `font-family`, /Georgia/ )
 
         // Close settings and verify font applied
         await page.keyboard.press( `Escape` )
-        await page.waitForTimeout( 300 )
-
-        const font = await page.evaluate( () => {
-            const main = document.querySelector( `main` )
-            return main ? getComputedStyle( main ).fontFamily : null
-        } )
-
-        expect( font ).toContain( `Georgia` )
+        await expect( page.locator( `aside` ).filter( { hasText: `Target Language` } ) ).not.toBeVisible()
+        await expect( page.locator( `main` ) ).toHaveCSS( `font-family`, /Georgia/ )
 
     } )
 
@@ -144,11 +123,17 @@ test.describe( `Settings`, () => {
         await page.goto( `/library` )
         await page.getByRole( `button`, { name: `Settings` } ).click()
 
-        // Accept the confirm dialog
-        page.on( `dialog`, dialog => dialog.accept() )
+        // Accept and await the confirmation dialog so the cache operation has
+        // definitely started before checking that settings remains usable.
+        const dialog_handled = new Promise( resolve => {
+            page.once( `dialog`, async dialog => {
+                await dialog.accept()
+                resolve()
+            } )
+        } )
 
         await page.getByRole( `button`, { name: `Clear Translation Cache` } ).click()
-        await page.waitForTimeout( 1000 )
+        await dialog_handled
 
         // Should still be functional after clearing
         await expect( page.getByText( `FONT SIZE` ) ).toBeVisible()
@@ -215,27 +200,20 @@ test.describe( `Settings`, () => {
         await mock_openrouter( page )
         await upload_demo_book( page )
 
-        await page.locator( `img[alt]` ).first().click()
-        await page.waitForURL( /\/read\// )
-        await page.getByRole( `button`, { name: `Start Reading` } ).click()
-        await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible( { timeout: 10_000 } )
+        await open_reader( page )
 
         // Set font size to 22
         await page.getByRole( `button`, { name: `Settings` } ).click()
         await page.locator( `input[type="range"]` ).fill( `22` )
+        await expect( page.locator( `main` ) ).toHaveCSS( `font-size`, `22px` )
         await page.keyboard.press( `Escape` )
-        await page.waitForTimeout( 300 )
+        await expect( page.locator( `aside` ).filter( { hasText: `Target Language` } ) ).not.toBeVisible()
 
         // Reload
         await page.reload( { waitUntil: `networkidle` } )
-        await page.waitForTimeout( 2000 )
 
         // Font size should still be 22px
-        const size = await page.evaluate( () => {
-            const main = document.querySelector( `main` )
-            return main ? getComputedStyle( main ).fontSize : null
-        } )
-        expect( parseInt( size ) ).toBe( 22 )
+        await expect( page.locator( `main` ) ).toHaveCSS( `font-size`, `22px` )
 
     } )
 

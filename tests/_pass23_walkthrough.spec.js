@@ -3,6 +3,7 @@
  * Focuses on error states, rapid interactions, and unusual sequences.
  */
 import { test, expect } from '@playwright/test'
+import { open_reader } from './helpers/setup.js'
 
 const DEMO_BOOK = `./tests/fixtures/book.epub`
 
@@ -53,13 +54,18 @@ const upload_book = async ( page ) => {
     await expect( page.getByRole( `heading`, { name: `Smart work beats hard work` } ) ).toBeVisible( { timeout: 10_000 } )
 }
 
-const enter_reader = async ( page ) => {
-    await page.locator( `img[alt]` ).first().click()
-    await page.waitForURL( /\/read\// )
-    const btn = page.getByRole( `button`, { name: `Start Reading` } )
-    try { await btn.waitFor( { state: `visible`, timeout: 3000 } ); await btn.click() } catch {}
-    await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible( { timeout: 10_000 } )
-}
+const get_first_book_added_at = page => page.evaluate( async () => {
+    return new Promise( resolve => {
+        const request = indexedDB.open( `gratis_reader` )
+        request.onsuccess = () => {
+            const transaction = request.result.transaction( `books`, `readonly` )
+            const book_request = transaction.objectStore( `books` ).getAll()
+            book_request.onsuccess = () => resolve( book_request.result[ 0 ].added_at )
+        }
+    } )
+} )
+
+const enter_reader = open_reader
 
 test.describe( `Pass 23 — Edge Cases & Error States`, () => {
 
@@ -93,16 +99,34 @@ test.describe( `Pass 23 — Edge Cases & Error States`, () => {
         await setup_key( page )
         await upload_book( page )
 
-        // Override mock to return errors
+        let request_count = 0
+
+        // Render some content, then exercise the failed-translation path.
         await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
-            await route.fulfill( { status: 500, body: `Internal Server Error` } )
+            request_count++
+
+            if( request_count > 2 ) {
+                await route.fulfill( { status: 500, body: `Internal Server Error` } )
+                return
+            }
+
+            const body = JSON.parse( route.request().postData() )
+            const user_msg = body.messages?.find( message => message.role === `user` )?.content || ``
+            const sentence = user_msg.match( /Translate this sentence:\n(.+)/s )?.[ 1 ]?.trim() || `unknown`
+            await route.fulfill( {
+                contentType: `application/json`,
+                body: JSON.stringify( { choices: [ { message: { content: `[TRANSLATED] ${ sentence }` } } ] } )
+            } )
         } )
 
+        const failed_response = page.waitForResponse( response =>
+            response.url().includes( `openrouter.ai/api/v1/chat/completions` ) && response.status() === 500
+        )
         await enter_reader( page )
+        await failed_response
 
         // Reader should still show original sentences, not crash
-        await page.waitForTimeout( 3000 )
-        expect( await page.locator( `span[data-sentence-id]` ).count() ).toBeGreaterThan( 0 )
+        await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible()
     } )
 
     test( `P23-04 uploading non-epub file shows error`, async ( { page } ) => {
@@ -118,9 +142,8 @@ test.describe( `Pass 23 — Edge Cases & Error States`, () => {
         } )
 
         // Should show an error, not add a book
-        await page.waitForTimeout( 2000 )
-        const books = await page.getByRole( `heading`, { name: `Smart work beats hard work` } ).count()
-        expect( books ).toBe( 0 )
+        await expect( page.getByText( /only epub files are supported/i ) ).toBeVisible()
+        await expect( page.getByRole( `heading`, { name: `Smart work beats hard work` } ) ).toHaveCount( 0 )
     } )
 
     // ── RAPID INTERACTIONS ──────────────────────────────────────
@@ -133,16 +156,15 @@ test.describe( `Pass 23 — Edge Cases & Error States`, () => {
 
         // Click Next rapidly 5 times
         const next_btn = page.getByRole( `button`, { name: /Next/ } )
+        const progress = page.locator( `text=/\d+\s*\/\s*\d+/` ).first()
+        const progress_before = await progress.textContent()
         for( let i = 0; i < 5; i++ ) {
             await next_btn.click()
-            await page.waitForTimeout( 200 )
         }
 
-        // Wait for state to settle
-        await page.waitForTimeout( 3000 )
-
         // App should still be functional — not crashed, sentences visible
-        expect( await page.locator( `span[data-sentence-id]` ).count() ).toBeGreaterThan( 0 )
+        await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible()
+        await expect( progress ).not.toHaveText( progress_before )
 
         // Progress should show we advanced at least some chapters
         const footer_text = await page.locator( `footer` ).textContent()
@@ -162,11 +184,10 @@ test.describe( `Pass 23 — Edge Cases & Error States`, () => {
         const sentence = page.locator( `span[data-sentence-id]` ).first()
         for( let i = 0; i < 10; i++ ) {
             await sentence.click()
-            await page.waitForTimeout( 100 )
         }
 
         // App should still be functional
-        expect( await page.locator( `span[data-sentence-id]` ).count() ).toBeGreaterThan( 0 )
+        await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible()
     } )
 
     // ── MULTI-BOOK SCENARIOS ────────────────────────────────────
@@ -178,13 +199,14 @@ test.describe( `Pass 23 — Edge Cases & Error States`, () => {
         // Upload the same book twice
         await page.locator( `input[type="file"]` ).setInputFiles( DEMO_BOOK )
         await expect( page.getByRole( `heading`, { name: `Smart work beats hard work` } ) ).toBeVisible( { timeout: 10_000 } )
+        const first_added_at = await get_first_book_added_at( page )
 
+        await page.locator( `input[type="file"]` ).setInputFiles( [] )
         await page.locator( `input[type="file"]` ).setInputFiles( DEMO_BOOK )
-        await page.waitForTimeout( 3000 )
+        await expect.poll( () => get_first_book_added_at( page ) ).not.toBe( first_added_at )
 
         // Should still have exactly 1 book
-        const book_count = await page.getByRole( `heading`, { name: `Smart work beats hard work` } ).count()
-        expect( book_count ).toBe( 1 )
+        await expect( page.getByRole( `heading`, { name: `Smart work beats hard work` } ) ).toHaveCount( 1 )
     } )
 
     // ── SETTINGS PERSISTENCE ────────────────────────────────────
@@ -206,15 +228,14 @@ test.describe( `Pass 23 — Edge Cases & Error States`, () => {
 
         // Close settings
         await page.keyboard.press( `Escape` )
-        await page.waitForTimeout( 500 )
+        await expect( page.getByText( `Font Size` ) ).not.toBeVisible()
 
         // Reload the entire page
         await page.reload( { waitUntil: `networkidle` } )
-        await page.waitForTimeout( 2000 )
+        await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible()
 
         // Check theme persisted
-        const theme = await page.evaluate( () => document.documentElement.getAttribute( `data-theme` ) )
-        expect( theme ).toBe( `dark` )
+        await expect( page.locator( `html` ) ).toHaveAttribute( `data-theme`, `dark` )
 
         // Check font size persisted (reader should show it)
         const stored = await page.evaluate( () => {
@@ -246,10 +267,8 @@ test.describe( `Pass 23 — Edge Cases & Error States`, () => {
         const toc_select = page.locator( `select` ).first()
         const option_count = await toc_select.locator( `option` ).count()
 
-        if( option_count > 1 ) {
-            await toc_select.selectOption( { index: option_count - 1 } )
-            await page.waitForTimeout( 2000 )
-        }
+        expect( option_count ).toBeGreaterThan( 1 )
+        await toc_select.selectOption( { index: option_count - 1 } )
 
         const next_btn = page.getByRole( `button`, { name: /Next/ } )
         await expect( next_btn ).toBeDisabled()
@@ -263,14 +282,12 @@ test.describe( `Pass 23 — Edge Cases & Error States`, () => {
 
         // Select a different chapter via TOC dropdown
         const select = page.locator( `select` ).first()
-        if( await select.count() > 0 ) {
-            await select.selectOption( { index: 3 } )
-            await page.waitForTimeout( 2000 )
+        await expect( select ).toBeVisible()
+        expect( await select.locator( `option` ).count() ).toBeGreaterThan( 3 )
+        await select.selectOption( { index: 3 } )
 
-            // Progress should show chapter 4
-            const progress = await page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` ).first().textContent()
-            expect( progress ).toContain( `4` )
-        }
+        // Progress should show chapter 4
+        await expect( page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` ).first() ).toContainText( `4` )
     } )
 
     // ── TRANSLATION FEATURES ────────────────────────────────────
@@ -309,13 +326,11 @@ test.describe( `Pass 23 — Edge Cases & Error States`, () => {
 
         // Find a word span inside a translated sentence
         const words = page.locator( `span[data-sentence-id] [data-translation-word-index]` )
-        const word_count = await words.count()
+        await expect( words.first() ).toBeVisible()
 
-        if( word_count > 0 ) {
-            // Tap a word
-            await words.first().click()
-            await expect( page.locator( `[data-translation-info-sheet]` ) ).toBeVisible()
-        }
+        // Tap a word
+        await words.first().click()
+        await expect( page.locator( `[data-translation-info-sheet]` ) ).toBeVisible()
     } )
 
     // ── LEVEL BADGE ─────────────────────────────────────────────
@@ -342,7 +357,6 @@ test.describe( `Pass 23 — Edge Cases & Error States`, () => {
         await page.evaluate( () => {
             window.dispatchEvent( new Event( `offline` ) )
         } )
-        await page.waitForTimeout( 500 )
 
         await expect( page.getByText( /offline/i ) ).toBeVisible()
 
@@ -350,7 +364,6 @@ test.describe( `Pass 23 — Edge Cases & Error States`, () => {
         await page.evaluate( () => {
             window.dispatchEvent( new Event( `online` ) )
         } )
-        await page.waitForTimeout( 500 )
 
         await expect( page.getByText( /offline/i ) ).not.toBeVisible()
     } )
@@ -364,12 +377,15 @@ test.describe( `Pass 23 — Edge Cases & Error States`, () => {
         await expect( page.getByText( /\[TRANSLATED\]/ ).first() ).toBeVisible( { timeout: 15_000 } )
 
         // Navigate to chapter 3
+        const progress = page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` ).first()
+        const first_progress = await progress.textContent()
         await page.getByRole( `button`, { name: /Next/ } ).click()
-        await page.waitForTimeout( 1000 )
+        await expect( progress ).not.toHaveText( first_progress )
+        const second_progress = await progress.textContent()
         await page.getByRole( `button`, { name: /Next/ } ).click()
-        await page.waitForTimeout( 1000 )
+        await expect( progress ).not.toHaveText( second_progress )
 
-        const progress_before = await page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` ).first().textContent()
+        const progress_before = await progress.textContent()
 
         // Go back to library
         await page.getByLabel( `Back to library` ).click()
@@ -403,9 +419,12 @@ test.describe( `Pass 23 — Edge Cases & Error States`, () => {
         await setup_key( page )
         await upload_book( page )
 
-        // Slow down API responses to catch the indicator
+        let release_translations
+        const translation_gate = new Promise( resolve => { release_translations = resolve } )
+
+        // Hold API responses until the loading indicator has been observed.
         await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
-            await new Promise( r => setTimeout( r, 500 ) )
+            await translation_gate
             const body = JSON.parse( route.request().postData() )
             const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
             const match = user_msg.match( /Translate this sentence:\n(.+)/s )
@@ -419,14 +438,10 @@ test.describe( `Pass 23 — Edge Cases & Error States`, () => {
         await enter_reader( page )
 
         // The "Translating..." indicator should appear while translations load
-        // (may flash quickly — use a short timeout)
-        try {
-            await expect( page.getByText( `Translating...` ) ).toBeVisible( { timeout: 5000 } )
-        } catch {
-            // If translations are cached or too fast, that's OK — the indicator just didn't appear
-        }
+        await expect( page.getByText( `Translating...` ) ).toBeVisible( { timeout: 5000 } )
 
         // Eventually translations should complete
+        release_translations()
         await expect( page.getByText( /\[TRANSLATED\]/ ).first() ).toBeVisible( { timeout: 20_000 } )
     } )
 
@@ -434,9 +449,8 @@ test.describe( `Pass 23 — Edge Cases & Error States`, () => {
 
     test( `P23-20 cannot bypass onboarding without API key`, async ( { page } ) => {
         await page.goto( `/library` )
-        await page.waitForTimeout( 1000 )
         // Should redirect to onboarding
-        expect( page.url() ).toContain( `/` )
+        await expect( page ).toHaveURL( `/` )
         await expect( page.locator( `input[type="password"]` ) ).toBeVisible()
     } )
 

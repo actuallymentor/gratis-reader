@@ -10,7 +10,7 @@ test.describe( `Library`, () => {
 
     test( `shows empty state when no books are uploaded`, async ( { page } ) => {
         await page.goto( `/library` )
-        await expect( page.getByText( `Your library is empty` ) ).toBeVisible()
+        await expect( page.getByText( `Your library is empty` ) ).toBeVisible( { timeout: 15_000 } )
     } )
 
     test( `uploads an EPUB file via file input`, async ( { page } ) => {
@@ -71,7 +71,6 @@ test.describe( `Library`, () => {
 
         // Click Remove
         await page.getByRole( `button`, { name: `Remove` } ).click()
-        await page.waitForTimeout( 1000 )
 
         // Book should be gone, empty state visible
         await expect( page.getByText( `Your library is empty` ) ).toBeVisible()

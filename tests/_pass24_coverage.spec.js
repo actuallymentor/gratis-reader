@@ -1,5 +1,12 @@
 import { test, expect } from '@playwright/test'
-import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth } from './helpers/setup.js'
+import {
+    setup_api_key,
+    upload_demo_book,
+    open_reader,
+    mock_openrouter,
+    mock_auth,
+    get_current_translation_entries
+} from './helpers/setup.js'
 
 /**
  * Pass 24 — Coverage gap tests
@@ -42,11 +49,8 @@ test.describe( `Pass 24 — Coverage Gaps`, () => {
 
     test( `P24-02 translation API request includes paragraph context`, async ( { page } ) => {
 
-        let captured_body = null
-
         await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
             const body = JSON.parse( route.request().postData() )
-            if( !captured_body ) captured_body = body
             const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
             const sentence_match = user_msg.match( /Translate this sentence:\n(.+)/s )
             const sentence = sentence_match ? sentence_match[1].trim() : `unknown`
@@ -56,10 +60,13 @@ test.describe( `Pass 24 — Coverage Gaps`, () => {
             } )
         } )
 
+        const translation_request = page.waitForRequest( request =>
+            request.url().includes( `openrouter.ai/api/v1/chat/completions` ) &&
+            request.postData()?.includes( `Translate this sentence` )
+        )
         await open_reader( page )
-        await page.waitForTimeout( 3000 )
+        const captured_body = ( await translation_request ).postDataJSON()
 
-        expect( captured_body ).toBeTruthy()
         const user_msg = captured_body.messages?.find( m => m.role === `user` )?.content || ``
         expect( user_msg ).toContain( `Context` )
         expect( user_msg ).toContain( `Translate this sentence` )
@@ -72,12 +79,15 @@ test.describe( `Pass 24 — Coverage Gaps`, () => {
 
     test( `P24-03 explanation popover shows loading state before content`, async ( { page } ) => {
 
+        let release_explanation
+        const explanation_gate = new Promise( resolve => { release_explanation = resolve } )
+
         await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
             const body = JSON.parse( route.request().postData() )
             const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
 
             if( user_msg.includes( `Explain this translation` ) ) {
-                await new Promise( r => setTimeout( r, 2000 ) )
+                await explanation_gate
                 await route.fulfill( { contentType: `application/json`, body: JSON.stringify( {
                     choices: [ { message: { content: `Explanation content here.` } } ]
                 } ) } )
@@ -91,26 +101,28 @@ test.describe( `Pass 24 — Coverage Gaps`, () => {
         } )
 
         await open_reader( page )
-        await page.waitForTimeout( 2000 )
 
         // Open the explanation through the selected word's sheet.
         const sentence = page.locator( `span[data-sentence-id]` ).first()
-        await sentence.locator( `[data-translation-word-index]` ).first().click()
+        const word = sentence.locator( `[data-translation-word-index]` ).first()
+        await expect( word ).toBeVisible()
+        await word.click()
         await page.locator( `[data-translation-info-sheet]` ).getByRole( `button`, { name: `Explain` } ).click()
 
         // Popover should appear
         await expect( page.locator( `text=Translation Explanation` ) ).toBeVisible( { timeout: 3000 } )
 
         // Within the first 500ms, the actual explanation text should NOT be present (still loading)
-        const early_text = await page.locator( `body` ).textContent()
-        expect( early_text ).not.toContain( `Explanation content here` )
+        await expect( page.getByText( `Explanation content here.` ) ).not.toBeVisible()
+
+        release_explanation()
+        await expect( page.getByText( `Explanation content here.` ) ).toBeVisible()
     } )
 
     // ── Cover image display (Spec §2) ──
 
     test( `P24-04 book card displays cover image from EPUB metadata`, async ( { page } ) => {
         await page.goto( `/library` )
-        await page.waitForTimeout( 1000 )
 
         const img = page.locator( `img[alt]` ).first()
         await expect( img ).toBeVisible()
@@ -132,10 +144,10 @@ test.describe( `Pass 24 — Coverage Gaps`, () => {
         // Focus the language input to open the dropdown
         const lang_input = page.locator( `input[placeholder*="earch"]` ).first()
         await lang_input.click()
-        await page.waitForTimeout( 500 )
 
         // The dropdown should now show common languages — look for li items
         const options = page.locator( `li` )
+        await expect( options.first() ).toBeVisible()
         const option_texts = await options.allTextContents()
         const common = [ `Spanish`, `French`, `German`, `Italian`, `Portuguese` ]
         const found = common.filter( l => option_texts.some( t => t.includes( l ) ) )
@@ -188,10 +200,12 @@ test.describe( `Pass 24 — Coverage Gaps`, () => {
     test( `P24-09 navigating quickly does not cause translation errors`, async ( { page } ) => {
 
         let error_occurred = false
+        let release_translations
+        const translation_gate = new Promise( resolve => { release_translations = resolve } )
         page.on( `pageerror`, () => { error_occurred = true } )
 
         await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
-            await new Promise( r => setTimeout( r, 500 ) )
+            await translation_gate
             const body = JSON.parse( route.request().postData() )
             const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
             const sentence_match = user_msg.match( /Translate this sentence:\n(.+)/s )
@@ -202,37 +216,31 @@ test.describe( `Pass 24 — Coverage Gaps`, () => {
         } )
 
         await open_reader( page )
-        await page.waitForTimeout( 500 )
 
         // Rapidly navigate chapters
         await page.getByRole( `button`, { name: /next/i } ).click()
-        await page.waitForTimeout( 200 )
         await page.getByRole( `button`, { name: /next/i } ).click()
-        await page.waitForTimeout( 200 )
         await page.getByRole( `button`, { name: /prev/i } ).click()
-        await page.waitForTimeout( 2000 )
+
+        release_translations()
+        await expect( page.getByText( /\[TR\]/ ).first() ).toBeVisible()
 
         expect( error_occurred ).toBe( false )
-        const sentences = await page.$$( `span[data-sentence-id]` )
-        expect( sentences.length ).toBeGreaterThan( 0 )
+        await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible()
     } )
 
     // ── Heading preservation (Spec §7) ──
 
     test( `P24-10 reader renders sentence content from chapter`, async ( { page } ) => {
         await open_reader( page )
-        await page.waitForTimeout( 2000 )
 
         // Reading area should have content — headings and/or sentences
-        const sentences = await page.$$( `span[data-sentence-id]` )
-        expect( sentences.length ).toBeGreaterThan( 0 )
+        await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible()
 
         // TOC dropdown should be functional
         const toc = page.locator( `select` ).first()
-        if( await toc.isVisible() ) {
-            const options = await toc.locator( `option` ).count()
-            expect( options ).toBeGreaterThan( 0 )
-        }
+        await expect( toc ).toBeVisible()
+        expect( await toc.locator( `option` ).count() ).toBeGreaterThan( 0 )
     } )
 
     // ── Cache-first verification (Spec §6) ──
@@ -240,6 +248,7 @@ test.describe( `Pass 24 — Coverage Gaps`, () => {
     test( `P24-11 cached translations are served without API calls`, async ( { page } ) => {
 
         let api_call_count = 0
+        let response_prefix = `TR`
 
         await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
             api_call_count++
@@ -248,37 +257,42 @@ test.describe( `Pass 24 — Coverage Gaps`, () => {
             const sentence_match = user_msg.match( /Translate this sentence:\n(.+)/s )
             const sentence = sentence_match ? sentence_match[1].trim() : `unknown`
             await route.fulfill( { contentType: `application/json`, body: JSON.stringify( {
-                choices: [ { message: { content: `[TR] ${ sentence }` } } ]
+                choices: [ { message: { content: `[${ response_prefix }] ${ sentence }` } } ]
             } ) } )
         } )
 
         await open_reader( page )
-        await page.waitForTimeout( 4000 )
+        await expect( page.getByText( /\[TR\]/ ).first() ).toBeVisible()
+        await expect.poll( () => api_call_count ).toBeGreaterThan( 0 )
+        await expect( page.getByText( `Translating...`, { exact: true } ) )
+            .not.toBeVisible( { timeout: 30_000 } )
         const first_load_calls = api_call_count
+        const cached_entries = await get_current_translation_entries( page )
+        expect( cached_entries.length ).toBeGreaterThan( 0 )
 
         // Navigate away and come back — cache should serve translations
         await page.keyboard.press( `Escape` )
         await page.waitForURL( /library/ )
-        await page.waitForTimeout( 500 )
+        await page.clock.install()
 
         api_call_count = 0
-        await page.locator( `img[alt]` ).first().click()
-        await page.waitForURL( /\/read\// )
+        response_prefix = `SECOND`
+        await open_reader( page )
 
-        try {
-            const start_btn = page.getByRole( `button`, { name: /start reading/i } )
-            await start_btn.waitFor( { state: `visible`, timeout: 2000 } )
-            await start_btn.click()
-        } catch { /* no modal */ }
+        // Let the returning reader's debounced cache pass run to completion so
+        // the negative API assertion covers the whole current-chapter cycle.
+        await page.clock.runFor( 300 )
+        const translating = page.getByText( `Translating...`, { exact: true } )
+        await expect( translating ).toBeVisible()
+        await expect( translating ).not.toBeVisible()
 
-        await page.waitForSelector( `span[data-sentence-id]`, { timeout: 10000 } )
-        await page.waitForTimeout( 3000 )
-
-        // Second load may still make API calls (read-ahead fetches new chapters)
-        // but the current chapter's translations should come from cache
-        // so total API calls should be fewer or equal (read-ahead may overlap)
-        // The key assertion: app works and sentences are visible (no crash from caching)
-        expect( await page.locator( `span[data-sentence-id]` ).count() ).toBeGreaterThan( 0 )
+        // The current chapter should retain its first-load translation even if
+        // read-ahead makes fresh calls for uncached chapters.
+        const first_sentence = page.locator( `span[data-sentence-id]` ).first()
+        await expect( first_sentence ).toContainText( `[TR]` )
+        await expect( first_sentence ).not.toContainText( `[SECOND]` )
+        expect( await get_current_translation_entries( page ) ).toEqual( cached_entries )
+        expect( first_load_calls ).toBeGreaterThan( 0 )
     } )
 
     // ── Clear cache with confirmation (Spec §8) ──
@@ -293,17 +307,15 @@ test.describe( `Pass 24 — Coverage Gaps`, () => {
         await expect( cache_btn ).toBeVisible()
 
         // Click — dismiss the confirmation
-        let dialog_appeared = false
-        page.on( `dialog`, async d => {
-            dialog_appeared = true
-            await d.dismiss()
+        const dialog_message = page.waitForEvent( `dialog` ).then( async dialog => {
+            const message = dialog.message()
+            await dialog.dismiss()
+            return message
         } )
-
         await cache_btn.click()
-        await page.waitForTimeout( 500 )
 
         // Confirmation dialog should have appeared
-        expect( dialog_appeared ).toBe( true )
+        expect( await dialog_message ).toMatch( /clear/i )
     } )
 
     // ── API key remove from settings (Spec §1) ──
@@ -337,16 +349,16 @@ test.describe( `Pass 24 — Coverage Gaps`, () => {
         // Set to maximum
         const max = await slider.getAttribute( `max` ) || `32`
         await slider.fill( max )
-        await page.waitForTimeout( 300 )
+        await expect( slider ).toHaveValue( max )
 
         // Close settings
         await page.getByRole( `button`, { name: `Close` } ).click()
-        await page.waitForTimeout( 500 )
+        await expect( page.getByText( `FONT SIZE` ) ).not.toBeVisible()
 
         // Check font size increased
-        const new_size = await page.locator( `span[data-sentence-id]` ).first().evaluate( el =>
-            parseFloat( getComputedStyle( el ).fontSize )
-        )
+        const sentence = page.locator( `span[data-sentence-id]` ).first()
+        await expect( sentence ).toHaveCSS( `font-size`, `${ max }px` )
+        const new_size = parseFloat( await sentence.evaluate( el => getComputedStyle( el ).fontSize ) )
         expect( new_size ).toBeGreaterThanOrEqual( initial_size )
     } )
 
@@ -354,12 +366,8 @@ test.describe( `Pass 24 — Coverage Gaps`, () => {
 
     test( `P24-15 system prompt includes level-specific behavior rules`, async ( { page } ) => {
 
-        let system_message = ``
-
         await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
             const body = JSON.parse( route.request().postData() )
-            const sys = body.messages?.find( m => m.role === `system` )?.content || ``
-            if( sys && !system_message ) system_message = sys
             const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
             const sentence_match = user_msg.match( /Translate this sentence:\n(.+)/s )
             const sentence = sentence_match ? sentence_match[1].trim() : `unknown`
@@ -368,10 +376,14 @@ test.describe( `Pass 24 — Coverage Gaps`, () => {
             } ) } )
         } )
 
+        const translation_request = page.waitForRequest( request =>
+            request.url().includes( `openrouter.ai/api/v1/chat/completions` ) &&
+            request.postData()?.includes( `Translate this sentence` )
+        )
         await open_reader( page )
-        await page.waitForTimeout( 3000 )
+        const body = ( await translation_request ).postDataJSON()
+        const system_message = body.messages?.find( m => m.role === `system` )?.content || ``
 
-        expect( system_message ).toBeTruthy()
         // Should contain the active level-specific rules
         expect( system_message ).toContain( `A2` )
         expect( system_message ).toContain( `Primary Schooler` )

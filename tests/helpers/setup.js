@@ -48,17 +48,52 @@ export const open_reader = async ( page ) => {
     await page.locator( `img[alt]` ).first().click()
     await page.waitForURL( /\/read\// )
 
-    // Handle language modal if shown
+    // ReaderPage resolves first-open state from IndexedDB asynchronously. Query
+    // the same persisted state before choosing which UI to await; sentence text
+    // can render briefly before the first-open modal decision completes.
+    const book_id = new URL( page.url() ).pathname.split( `/` ).pop()
+    const has_saved_progress = await page.evaluate( async id => {
+        const { get_progress } = await import( `/src/modules/cache.js` )
+        const progress = await get_progress( id )
+        return progress?.chapter_index !== undefined
+    }, book_id )
+
     const start_btn = page.getByRole( `button`, { name: `Start Reading` } )
-    try {
-        await start_btn.waitFor( { state: `visible`, timeout: 3000 } )
+    const first_sentence = page.locator( `span[data-sentence-id]` ).first()
+
+    if( !has_saved_progress ) {
+        await expect( start_btn ).toBeVisible( { timeout: 10_000 } )
         await start_btn.click()
-    } catch { /* modal not shown — returning reader */ }
+    }
 
     // Wait for content to load
-    await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible( { timeout: 10_000 } )
+    await expect( first_sentence ).toBeVisible( { timeout: 10_000 } )
 
 }
+
+/**
+ * Returns the persisted translation records for sentences in the visible chapter.
+ * Exact cache keys avoid confusing repeated sentence text in read-ahead chapters.
+ */
+export const get_current_translation_entries = page => page.evaluate( async () => {
+    const sentence_ids = [ ...document.querySelectorAll( `span[data-sentence-id]` ) ]
+        .map( sentence => sentence.dataset.sentenceId )
+    const database = await new Promise( ( resolve, reject ) => {
+        const request = indexedDB.open( `gratis_reader` )
+        request.onsuccess = () => resolve( request.result )
+        request.onerror = () => reject( request.error )
+    } )
+    const entries = await new Promise( ( resolve, reject ) => {
+        const transaction = database.transaction( `translations`, `readonly` )
+        const request = transaction.objectStore( `translations` ).getAll()
+        request.onsuccess = () => resolve( request.result )
+        request.onerror = () => reject( request.error )
+    } )
+
+    return entries
+        .filter( entry => sentence_ids.some( id => entry.key.startsWith( `${ id }:` ) ) )
+        .sort( ( first, second ) => first.key.localeCompare( second.key ) )
+} )
 
 /**
  * Mock the OpenRouter API to return deterministic translations.

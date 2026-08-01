@@ -1,6 +1,12 @@
 import { test, expect } from '@playwright/test'
 import { clear_storage, mock_auth } from './helpers/setup.js'
 
+const deferred = () => {
+    let release
+    const promise = new Promise( resolve => { release = resolve } )
+    return { promise, release }
+}
+
 test.describe( `Onboarding`, () => {
 
     test.beforeEach( async ( { page } ) => {
@@ -23,18 +29,22 @@ test.describe( `Onboarding`, () => {
 
         await page.goto( `/` )
         await page.locator( `input` ).fill( `invalid-key` )
+        const rejection = page.waitForResponse( `**/openrouter.ai/api/v1/auth/key` )
         await page.getByRole( `button`, { name: `Connect` } ).click()
+        await rejection
 
         // Should stay on onboarding
-        await page.waitForTimeout( 2000 )
-        expect( page.url() ).not.toContain( `/library` )
+        await expect( page.getByText( `Invalid API key — please check and try again` ) ).toBeVisible()
+        await expect( page ).not.toHaveURL( /\/library/ )
+        await expect( page.locator( `input[type="password"]` ) ).toBeVisible()
 
     } )
 
     test( `shows loading while validating an entered API key`, async ( { page } ) => {
 
+        const validation = deferred()
         await page.route( `**/openrouter.ai/api/v1/auth/key`, async route => {
-            await new Promise( resolve => setTimeout( resolve, 500 ) )
+            await validation.promise
             await route.fulfill( {
                 contentType: `application/json`,
                 body: JSON.stringify( { data: { label: `test-key` } } )
@@ -46,6 +56,7 @@ test.describe( `Onboarding`, () => {
         await page.getByRole( `button`, { name: `Connect` } ).click()
 
         await expect( page.getByText( `Checking OpenRouter API key...` ) ).toBeVisible()
+        validation.release()
         await page.waitForURL( `**/library`, { timeout: 10_000 } )
 
     } )
@@ -65,10 +76,11 @@ test.describe( `Onboarding`, () => {
     test( `validates API key from URL fragment and stores it`, async ( { page } ) => {
 
         let authorization_header
+        const validation = deferred()
 
         await page.route( `**/openrouter.ai/api/v1/auth/key`, async route => {
             authorization_header = route.request().headers().authorization
-            await new Promise( resolve => setTimeout( resolve, 500 ) )
+            await validation.promise
             await route.fulfill( {
                 contentType: `application/json`,
                 body: JSON.stringify( { data: { label: `test-key` } } )
@@ -79,6 +91,7 @@ test.describe( `Onboarding`, () => {
 
         await expect( page.getByText( `Checking OpenRouter API key...` ) ).toBeVisible()
         await expect( page.locator( `input[type="password"]` ) ).toBeHidden()
+        validation.release()
         await page.waitForURL( `**/library`, { timeout: 10_000 } )
 
         expect( page.url() ).not.toContain( `openrouter_api_key` )
@@ -95,14 +108,16 @@ test.describe( `Onboarding`, () => {
 
     test( `rejects invalid API key from URL fragment`, async ( { page } ) => {
 
+        const validation = deferred()
         await page.route( `**/openrouter.ai/api/v1/auth/key`, async route => {
-            await new Promise( resolve => setTimeout( resolve, 500 ) )
+            await validation.promise
             await route.fulfill( { status: 401, body: `Unauthorized` } )
         } )
 
         await page.goto( `/library#openrouter_api_key=sk-or-bad-fragment-key` )
 
         await expect( page.getByText( `Checking OpenRouter API key...` ) ).toBeVisible()
+        validation.release()
         await expect( page.locator( `input[type="password"]` ) ).toBeVisible( { timeout: 10_000 } )
 
         expect( page.url() ).not.toContain( `openrouter_api_key` )

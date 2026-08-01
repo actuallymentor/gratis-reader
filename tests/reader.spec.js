@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { setup_api_key, upload_demo_book, mock_openrouter, clear_storage } from './helpers/setup.js'
+import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, clear_storage } from './helpers/setup.js'
 
 test.describe( `Reader`, () => {
 
@@ -10,27 +10,9 @@ test.describe( `Reader`, () => {
         await upload_demo_book( page )
     } )
 
-    const open_book = async ( page ) => {
-
-        // Click the book cover
-        await page.locator( `img[alt]` ).first().click()
-        await page.waitForURL( /\/read\// )
-
-        // Dismiss the language modal if it appears
-        const start_btn = page.getByRole( `button`, { name: `Start Reading` } )
-        try {
-            await start_btn.waitFor( { state: `visible`, timeout: 3000 } )
-            await start_btn.click()
-        } catch { /* modal not shown — returning reader */ }
-
-        // Wait for sentence content
-        await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible( { timeout: 10_000 } )
-
-    }
-
     test( `renders chapter content with sentences`, async ( { page } ) => {
 
-        await open_book( page )
+        await open_reader( page )
 
         // Should have sentence spans
         const sentences = page.locator( `span[data-sentence-id]` )
@@ -41,46 +23,40 @@ test.describe( `Reader`, () => {
 
     test( `navigates to the next chapter via button`, async ( { page } ) => {
 
-        await open_book( page )
+        await open_reader( page )
 
-        const first_sentence = await page.locator( `span[data-sentence-id]` ).first().textContent()
+        const first_sentence = page.locator( `span[data-sentence-id]` ).first()
+        const first_text = await first_sentence.textContent()
 
         // Click Next
         await page.getByRole( `button`, { name: /Next/ } ).click()
-        await page.waitForTimeout( 2000 )
 
         // Content should change
-        const new_sentence = await page.locator( `span[data-sentence-id]` ).first().textContent()
-        expect( new_sentence ).not.toBe( first_sentence )
+        await expect( first_sentence ).not.toHaveText( first_text )
 
     } )
 
     test( `navigates chapters via keyboard arrows`, async ( { page } ) => {
 
-        await open_book( page )
+        await open_reader( page )
 
         // Get the first sentence ID to track position
-        const first_id = await page.locator( `span[data-sentence-id]` ).first().getAttribute( `data-sentence-id` )
+        const first_sentence = page.locator( `span[data-sentence-id]` ).first()
+        const first_id = await first_sentence.getAttribute( `data-sentence-id` )
 
         // Press ArrowRight to go to next chapter
         await page.keyboard.press( `ArrowRight` )
-        await page.waitForTimeout( 2000 )
-
-        const new_id = await page.locator( `span[data-sentence-id]` ).first().getAttribute( `data-sentence-id` )
-        expect( new_id ).not.toBe( first_id )
+        await expect( first_sentence ).not.toHaveAttribute( `data-sentence-id`, first_id )
 
         // Press ArrowLeft to go back
         await page.keyboard.press( `ArrowLeft` )
-        await page.waitForTimeout( 2000 )
-
-        const back_id = await page.locator( `span[data-sentence-id]` ).first().getAttribute( `data-sentence-id` )
-        expect( back_id ).toBe( first_id )
+        await expect( first_sentence ).toHaveAttribute( `data-sentence-id`, first_id )
 
     } )
 
     test( `shows a progress indicator`, async ( { page } ) => {
 
-        await open_book( page )
+        await open_reader( page )
 
         // Should see progress text like "1 / X · Y%"
         const progress = page.locator( `text=/\\d+ \\/ \\d+ · \\d+%/` )
@@ -90,7 +66,7 @@ test.describe( `Reader`, () => {
 
     test( `back button returns to the library`, async ( { page } ) => {
 
-        await open_book( page )
+        await open_reader( page )
 
         await page.getByRole( `button`, { name: `Back to library` } ).click()
         await page.waitForURL( `**/library`, { timeout: 5000 } )
@@ -100,7 +76,7 @@ test.describe( `Reader`, () => {
 
     test( `Escape key returns to the library`, async ( { page } ) => {
 
-        await open_book( page )
+        await open_reader( page )
 
         await page.keyboard.press( `Escape` )
         await page.waitForURL( `**/library`, { timeout: 5000 } )
@@ -110,29 +86,27 @@ test.describe( `Reader`, () => {
 
     test( `TOC dropdown changes chapter`, async ( { page } ) => {
 
-        await open_book( page )
+        await open_reader( page )
 
         const select = page.locator( `select` )
-        if( await select.isVisible().catch( () => false ) ) {
+        const first_sentence = page.locator( `span[data-sentence-id]` ).first()
+        const first_id = await first_sentence.getAttribute( `data-sentence-id` )
 
-            const first_text = await page.locator( `span[data-sentence-id]` ).first().textContent()
+        await expect( select ).toBeVisible()
+        await expect.poll( () => select.locator( `option` ).count() ).toBeGreaterThan( 3 )
 
-            // Select a later chapter
-            await select.selectOption( { index: 3 } )
-            await page.waitForTimeout( 2000 )
-
-            const new_text = await page.locator( `span[data-sentence-id]` ).first().textContent()
-            expect( new_text ).not.toBe( first_text )
-
-        }
+        // Select a later chapter
+        await select.selectOption( { index: 3 } )
+        await expect( first_sentence ).not.toHaveAttribute( `data-sentence-id`, first_id )
 
     } )
 
     test( `swipe left navigates to next chapter`, async ( { page } ) => {
 
-        await open_book( page )
+        await open_reader( page )
 
-        const first_id = await page.locator( `span[data-sentence-id]` ).first().getAttribute( `data-sentence-id` )
+        const first_sentence = page.locator( `span[data-sentence-id]` ).first()
+        const first_id = await first_sentence.getAttribute( `data-sentence-id` )
 
         // Simulate swipe left via dispatching touch events directly in the browser
         const main = page.locator( `main` )
@@ -158,20 +132,17 @@ test.describe( `Reader`, () => {
             } ) )
         }, { bx: box.x, bw: box.width, by: box.y, bh: box.height } )
 
-        await page.waitForTimeout( 2000 )
-
-        const new_id = await page.locator( `span[data-sentence-id]` ).first().getAttribute( `data-sentence-id` )
-
         // Swipe should navigate to next chapter — content changes
-        expect( new_id ).not.toBe( first_id )
+        await expect( first_sentence ).not.toHaveAttribute( `data-sentence-id`, first_id )
 
     } )
 
     test( `tap-edge navigation advances chapter when clicking empty area`, async ( { page } ) => {
 
-        await open_book( page )
+        await open_reader( page )
 
-        const first_id = await page.locator( `span[data-sentence-id]` ).first().getAttribute( `data-sentence-id` )
+        const first_sentence = page.locator( `span[data-sentence-id]` ).first()
+        const first_id = await first_sentence.getAttribute( `data-sentence-id` )
 
         // Dispatch a click on the right edge of main, bypassing child element targeting.
         // In real usage, this fires when a user clicks in the padding zone outside text content.
@@ -191,40 +162,38 @@ test.describe( `Reader`, () => {
             main.dispatchEvent( event )
         }, { bx: box.x, bw: box.width, by: box.y, bh: box.height } )
 
-        await page.waitForTimeout( 2000 )
-
-        const new_id = await page.locator( `span[data-sentence-id]` ).first().getAttribute( `data-sentence-id` )
-        expect( new_id ).not.toBe( first_id )
+        await expect( first_sentence ).not.toHaveAttribute( `data-sentence-id`, first_id )
 
     } )
 
     test( `restores reading progress for returning reader`, async ( { page } ) => {
 
-        await open_book( page )
+        await open_reader( page )
 
         // Navigate to chapter 3
+        const first_sentence = page.locator( `span[data-sentence-id]` ).first()
+        const first_id = await first_sentence.getAttribute( `data-sentence-id` )
         await page.getByRole( `button`, { name: /Next/ } ).click()
-        await page.waitForTimeout( 1500 )
+        await expect( first_sentence ).not.toHaveAttribute( `data-sentence-id`, first_id )
+        const second_id = await first_sentence.getAttribute( `data-sentence-id` )
         await page.getByRole( `button`, { name: /Next/ } ).click()
-        await page.waitForTimeout( 1500 )
+        await expect( first_sentence ).not.toHaveAttribute( `data-sentence-id`, second_id )
 
-        const ch3_text = await page.locator( `span[data-sentence-id]` ).first().textContent()
+        const ch3_id = await first_sentence.getAttribute( `data-sentence-id` )
 
         // Go back to library
         await page.getByRole( `button`, { name: `Back to library` } ).click()
         await page.waitForURL( `**/library` )
 
         // Re-open the book
-        await page.locator( `img[alt]` ).first().click()
-        await page.waitForURL( /\/read\// )
-        await page.waitForTimeout( 3000 )
+        await open_reader( page )
 
         // Should NOT show language modal (returning reader)
         await expect( page.getByText( `Choose Your Language` ) ).not.toBeVisible()
 
         // Should be on chapter 3
-        const restored_text = await page.locator( `span[data-sentence-id]` ).first().textContent()
-        expect( restored_text ).toBe( ch3_text )
+        await expect( page.locator( `span[data-sentence-id]` ).first() )
+            .toHaveAttribute( `data-sentence-id`, ch3_id )
 
     } )
 

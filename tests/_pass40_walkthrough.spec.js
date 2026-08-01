@@ -4,6 +4,14 @@
 import { test, expect } from '@playwright/test'
 import { setup_api_key, upload_demo_book, open_reader, mock_auth } from './helpers/setup.js'
 
+const wait_for_translations = async ( page ) => {
+
+    const translating = page.getByText( `Translating...`, { exact: true } )
+    await expect( translating ).toBeVisible( { timeout: 5_000 } )
+    await expect( translating ).not.toBeVisible( { timeout: 30_000 } )
+
+}
+
 test.describe( `Pass 40 — Read-ahead buffer`, () => {
 
     test( `BW201 read-ahead translates sentences from next chapters`, async ( { page } ) => {
@@ -30,8 +38,7 @@ test.describe( `Pass 40 — Read-ahead buffer`, () => {
         await upload_demo_book( page )
         await open_reader( page )
 
-        // Wait enough time for read-ahead to complete
-        await page.waitForTimeout( 10000 )
+        await wait_for_translations( page )
 
         // Total unique sentences translated should be > sentences on screen
         // because read-ahead pre-translates next 2 chapters
@@ -40,8 +47,6 @@ test.describe( `Pass 40 — Read-ahead buffer`, () => {
     } )
 
     test( `BW202 navigating forward shows pre-cached translations instantly`, async ( { page } ) => {
-        let api_calls_after_nav = 0
-
         await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
             const body = JSON.parse( route.request().postData() )
             const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
@@ -60,32 +65,18 @@ test.describe( `Pass 40 — Read-ahead buffer`, () => {
         await upload_demo_book( page )
         await open_reader( page )
 
-        // Wait for read-ahead to pre-translate next 2 chapters
-        await page.waitForTimeout( 10000 )
+        await wait_for_translations( page )
 
-        // Start counting API calls from this point
-        let counting = true
-        await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
-            if( counting ) api_calls_after_nav++
-            const body = JSON.parse( route.request().postData() )
-            const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
-            const sentence = user_msg.match( /Translate this sentence:\n(.+)/s )?.[1]?.trim() || ``
-
-            await route.fulfill( {
-                contentType: `application/json`,
-                body: JSON.stringify( {
-                    choices: [ { message: { content: `[TR] ${ sentence }` } } ]
-                } )
-            } )
-        } )
-
-        // Navigate forward
+        // Block successful API responses after read-ahead so chapter 2 can only use its cache.
+        await page.unroute( `**/openrouter.ai/api/v1/chat/completions` )
+        await page.route( `**/openrouter.ai/api/v1/chat/completions`, route => route.abort( `connectionrefused` ) )
+        const first_sentence = page.locator( `span[data-sentence-id]` ).first()
+        const first_id = await first_sentence.getAttribute( `data-sentence-id` )
         await page.keyboard.press( `ArrowRight` )
-        await page.waitForTimeout( 2000 )
 
         // Sentences in chapter 2 should appear (from read-ahead cache)
-        const sentences = await page.locator( `span[data-sentence-id]` ).count()
-        expect( sentences ).toBeGreaterThan( 0 )
+        await expect( first_sentence ).not.toHaveAttribute( `data-sentence-id`, first_id )
+        await expect( first_sentence ).toContainText( `[TR]` )
     } )
 
     test( `BW203 rapid navigation does not crash with read-ahead`, async ( { page } ) => {
@@ -109,16 +100,15 @@ test.describe( `Pass 40 — Read-ahead buffer`, () => {
         await setup_api_key( page )
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 2000 )
 
         // Rapidly navigate through 6 chapters
         for( let i = 0; i < 6; i++ ) {
             await page.keyboard.press( `ArrowRight` )
-            await page.waitForTimeout( 100 )
         }
 
-        // Wait for everything to settle
-        await page.waitForTimeout( 3000 )
+        // The final TOC value proves every rapid key event was processed.
+        await expect( page.locator( `select` ).first() ).toHaveValue( `6` )
+        await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible()
 
         // No crashes
         expect( errors ).toEqual( [] )
@@ -148,18 +138,21 @@ test.describe( `Pass 40 — Read-ahead buffer`, () => {
         await setup_api_key( page )
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 2000 )
 
         // Jump to last chapter using TOC
         const toc_select = page.locator( `select` ).first()
         const options = await toc_select.locator( `option` ).all()
         const last_index = options.length - 1
+        const first_sentence = page.locator( `span[data-sentence-id]` ).first()
+        const first_id = await first_sentence.getAttribute( `data-sentence-id` )
         await toc_select.selectOption( { index: last_index } )
-        await page.waitForTimeout( 3000 )
+        await expect( toc_select ).toHaveValue( `${ last_index }` )
+        await expect( first_sentence ).not.toHaveAttribute( `data-sentence-id`, first_id )
 
         // No errors on last chapter (read-ahead has nothing to pre-fetch)
         expect( errors ).toEqual( [] )
-        await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible( { timeout: 5000 } )
+        await expect( first_sentence ).toBeVisible( { timeout: 5000 } )
+        await expect( page.getByRole( `button`, { name: /Next/ } ) ).toBeDisabled()
     } )
 
     test( `BW205 language change re-triggers read-ahead translations`, async ( { page } ) => {
@@ -184,8 +177,7 @@ test.describe( `Pass 40 — Read-ahead buffer`, () => {
         await upload_demo_book( page )
         await open_reader( page )
 
-        // Wait for initial translations
-        await page.waitForTimeout( 8000 )
+        await wait_for_translations( page )
         const count_after_load = translation_count
 
         // Change language directly via zustand store to ensure state change
@@ -204,10 +196,11 @@ test.describe( `Pass 40 — Read-ahead buffer`, () => {
 
         // Reload reader to pick up language change
         await page.reload()
-        await page.waitForTimeout( 10000 )
+        await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible( { timeout: 10_000 } )
 
         // More translations should have been triggered
-        expect( translation_count ).toBeGreaterThan( count_after_load )
+        await expect.poll( () => translation_count, { timeout: 30_000 } ).toBeGreaterThan( count_after_load )
+        await expect( page.getByText( `Translating...`, { exact: true } ) ).not.toBeVisible( { timeout: 30_000 } )
     } )
 
     test( `BW206 token usage and cost displayed in footer`, async ( { page } ) => {
@@ -231,12 +224,9 @@ test.describe( `Pass 40 — Read-ahead buffer`, () => {
         await upload_demo_book( page )
         await open_reader( page )
 
-        // Wait for translations to complete
-        await page.waitForTimeout( 8000 )
-
         // Token stats should appear in the footer
         const token_text = page.locator( `footer` ).getByText( /tokens/ )
-        await expect( token_text ).toBeVisible( { timeout: 5000 } )
+        await expect( token_text ).toBeVisible( { timeout: 30_000 } )
 
         // Should contain a cost estimate
         const footer_text = await page.locator( `footer` ).textContent()
@@ -263,15 +253,16 @@ test.describe( `Pass 40 — Read-ahead buffer`, () => {
         await setup_api_key( page )
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 6000 )
 
         // Get initial token display
         const token_el = page.locator( `footer` ).getByText( /tokens/ )
-        await expect( token_el ).toBeVisible( { timeout: 5000 } )
+        await expect( token_el ).toBeVisible( { timeout: 30_000 } )
 
         // Navigate to next chapter
+        const first_sentence = page.locator( `span[data-sentence-id]` ).first()
+        const first_id = await first_sentence.getAttribute( `data-sentence-id` )
         await page.keyboard.press( `ArrowRight` )
-        await page.waitForTimeout( 6000 )
+        await expect( first_sentence ).not.toHaveAttribute( `data-sentence-id`, first_id )
 
         // Token count should still be visible (and potentially higher)
         await expect( page.locator( `footer` ).getByText( /tokens/ ) ).toBeVisible( { timeout: 5000 } )

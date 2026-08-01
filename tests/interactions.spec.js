@@ -68,6 +68,7 @@ test.describe( `Sentence Interactions`, () => {
 
     test( `failed meaning requests stop until the user makes a new selection`, async ( { page } ) => {
 
+        await page.clock.install()
         let meaning_calls = 0
 
         await page.route( CHAT_URL, async route => {
@@ -95,7 +96,7 @@ test.describe( `Sentence Interactions`, () => {
         await word.click()
 
         await expect( page.locator( INFO_SHEET ) ).toContainText( `Meaning unavailable`, { timeout: 5000 } )
-        await page.waitForTimeout( 1000 )
+        await page.clock.runFor( 1000 )
         expect( meaning_calls ).toBe( 1 )
 
     } )
@@ -453,13 +454,16 @@ test.describe( `Sentence Interactions`, () => {
 
         const retranslate_button = dialog.getByRole( `button`, { name: `Re-translate sentence` } )
 
-        page.once( `dialog`, async confirm_dialog => {
-            expect( confirm_dialog.message() ).toBe( `Do you want to re-translate this sentence?` )
-            await confirm_dialog.dismiss()
+        const dismissal = new Promise( resolve => {
+            page.once( `dialog`, async confirm_dialog => {
+                expect( confirm_dialog.message() ).toBe( `Do you want to re-translate this sentence?` )
+                await confirm_dialog.dismiss()
+                resolve()
+            } )
         } )
 
         await retranslate_button.click()
-        await page.waitForTimeout( 500 )
+        await dismissal
 
         await expect( sentence ).toContainText( `[TRANSLATED:1]` )
         await expect( sentence ).not.toContainText( `[TRANSLATED:2]` )
@@ -489,6 +493,7 @@ test.describe( `Sentence Interactions`, () => {
 
     test( `hovering a reader word does not trigger dictionary lookup`, async ( { page } ) => {
 
+        await page.clock.install()
         await enter_reader_with_translations( page )
 
         let word_lookup_calls = 0
@@ -500,7 +505,7 @@ test.describe( `Sentence Interactions`, () => {
         } )
 
         await page.locator( READER_WORD ).first().hover()
-        await page.waitForTimeout( 500 )
+        await page.clock.runFor( 500 )
 
         expect( word_lookup_calls ).toBe( 0 )
         await expect( page.locator( INFO_SHEET ) ).not.toBeVisible()

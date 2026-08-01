@@ -106,6 +106,23 @@ const open_reader = async ( page ) => {
     await page.waitForURL( /\/read\//, { timeout: 10_000 } )
 }
 
+/** Read the persisted token total so navigation assertions follow the real cache state */
+const get_token_total = async ( page ) => page.evaluate( async () => {
+    return new Promise( resolve => {
+        const req = indexedDB.open( `gratis_reader` )
+        req.onsuccess = () => {
+            const tx = req.result.transaction( `token_usage`, `readonly` )
+            const get_all = tx.objectStore( `token_usage` ).getAll()
+            get_all.onsuccess = () => resolve( get_all.result.reduce(
+                ( total, usage ) => total + usage.prompt_tokens + usage.completion_tokens,
+                0
+            ) )
+            get_all.onerror = () => resolve( 0 )
+        }
+        req.onerror = () => resolve( 0 )
+    } )
+} )
+
 // ─── Test ─────────────────────────────────────────────────────────────────────
 
 test.describe( `Gratis Reader — Full Walkthrough`, () => {
@@ -335,15 +352,14 @@ test.describe( `Gratis Reader — Full Walkthrough`, () => {
         await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible( { timeout: 10_000 } )
 
         // Get current progress text
-        const progress_before = await page.locator( `footer` ).textContent()
+        const progress = page.locator( `footer` ).locator( `text=/\\d+ \\/ \\d+ · \\d+%/` )
+        const progress_before = await progress.textContent()
 
         // Navigate forward
         await page.keyboard.press( `ArrowRight` )
-        await page.waitForTimeout( 1000 )
 
         // Progress should change (chapter number should increment)
-        const progress_after = await page.locator( `footer` ).textContent()
-        // At minimum we verify no crash happened and content is still rendered
+        await expect( progress ).not.toHaveText( progress_before )
         await expect( page.locator( `footer` ) ).toBeVisible()
     } )
 
@@ -362,9 +378,9 @@ test.describe( `Gratis Reader — Full Walkthrough`, () => {
 
         // Navigate forward first, then back
         await page.keyboard.press( `ArrowRight` )
-        await page.waitForTimeout( 500 )
+        await expect( page.locator( `footer` ) ).toContainText( `2 /` )
         await page.keyboard.press( `ArrowLeft` )
-        await page.waitForTimeout( 500 )
+        await expect( page.locator( `footer` ) ).toContainText( `1 /` )
 
         // Should be back at first chapter (footer shows "1 / X")
         const footer_text = await page.locator( `footer` ).textContent()
@@ -391,11 +407,10 @@ test.describe( `Gratis Reader — Full Walkthrough`, () => {
         if( option_count > 2 ) {
             // Jump to the third option
             await toc_select.selectOption( { index: 2 } )
-            await page.waitForTimeout( 1000 )
+            await expect( toc_select ).toHaveValue( `2` )
 
             // Footer should show "3 / X"
-            const footer_text = await page.locator( `footer` ).textContent()
-            expect( footer_text ).toContain( `3 /` )
+            await expect( page.locator( `footer` ) ).toContainText( `3 /` )
         }
     } )
 
@@ -418,16 +433,18 @@ test.describe( `Gratis Reader — Full Walkthrough`, () => {
         // Wait for initial translations + token display
         await expect( page.locator( `text=/tokens/` ) ).toBeVisible( { timeout: 30_000 } )
 
-        // Parse initial token count
-        const token_text_1 = await page.locator( `text=/tokens/` ).textContent()
-        const token_match_1 = token_text_1.match( /([\d.]+[KM]?)\s*tokens/ )
-        const initial_token_str = token_match_1 ? token_match_1[1] : `0`
+        // Finish the initial read-ahead batch before taking the persisted baseline.
+        await expect( page.getByText( `Translating...`, { exact: true } ) ).not.toBeVisible( { timeout: 30_000 } )
+        const initial_token_total = await get_token_total( page )
 
         // Navigate to next chapter
         await page.keyboard.press( `ArrowRight` )
 
-        // Wait for new translations to complete
-        await page.waitForTimeout( 3000 )
+        // Navigation adds another read-ahead chapter, which must persist more usage.
+        await expect.poll(
+            () => get_token_total( page ),
+            { timeout: 30_000 }
+        ).toBeGreaterThan( initial_token_total )
 
         // Check if token count is still visible (may have increased)
         await expect( page.locator( `text=/tokens/` ) ).toBeVisible( { timeout: 15_000 } )
@@ -579,14 +596,10 @@ test.describe( `Gratis Reader — Full Walkthrough`, () => {
 
         // Double-click no longer toggles sentence state.
         await first_sentence.dblclick()
-        await page.waitForTimeout( 500 )
-
         await expect( first_sentence ).toContainText( `[TR]` )
 
         // A second double-click should be just as inert.
         await first_sentence.dblclick()
-        await page.waitForTimeout( 500 )
-
         await expect( first_sentence ).toContainText( `[TR]` )
     } )
 
@@ -683,7 +696,7 @@ test.describe( `Gratis Reader — Full Walkthrough`, () => {
             // Use TOC dropdown to jump to last chapter
             const toc_select = page.locator( `select` ).first()
             await toc_select.selectOption( { index: total_chapters - 1 } )
-            await page.waitForTimeout( 1000 )
+            await expect( toc_select ).toHaveValue( `${ total_chapters - 1 }` )
 
             // Next button should be disabled at last chapter
             const next_btn = page.getByRole( `button`, { name: /next/i } )
@@ -707,11 +720,14 @@ test.describe( `Gratis Reader — Full Walkthrough`, () => {
         // Rapid-fire 10 ArrowRight presses
         for( let i = 0; i < 10; i++ ) {
             await page.keyboard.press( `ArrowRight` )
-            await page.waitForTimeout( 100 )
         }
 
-        // Wait for things to settle
-        await page.waitForTimeout( 2000 )
+        // The TOC value is the loop-completion barrier for all ten key presses.
+        const toc_select = page.locator( `select` ).first()
+        const total_chapters = await toc_select.locator( `option` ).count()
+        const expected_index = Math.min( 10, total_chapters - 1 )
+        await expect( toc_select ).toHaveValue( `${ expected_index }` )
+        await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible()
 
         // Footer should still be visible — page didn't crash
         await expect( page.locator( `footer` ) ).toBeVisible()
@@ -743,16 +759,18 @@ test.describe( `Gratis Reader — Full Walkthrough`, () => {
         await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible( { timeout: 10_000 } )
 
         // Navigate around
+        const first_sentence = page.locator( `span[data-sentence-id]` ).first()
+        const first_id = await first_sentence.getAttribute( `data-sentence-id` )
         await page.keyboard.press( `ArrowRight` )
-        await page.waitForTimeout( 500 )
+        await expect( first_sentence ).not.toHaveAttribute( `data-sentence-id`, first_id )
         await page.keyboard.press( `ArrowLeft` )
-        await page.waitForTimeout( 500 )
+        await expect( first_sentence ).toHaveAttribute( `data-sentence-id`, first_id )
 
         // Open settings
         await page.getByRole( `button`, { name: /settings/i } ).click()
-        await page.waitForTimeout( 500 )
+        await expect( page.getByRole( `heading`, { name: `Settings` } ) ).toBeVisible()
         await page.keyboard.press( `Escape` )
-        await page.waitForTimeout( 500 )
+        await expect( page.getByRole( `heading`, { name: `Settings` } ) ).not.toBeVisible()
 
         // Back to library
         await page.keyboard.press( `Escape` )

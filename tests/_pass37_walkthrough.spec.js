@@ -74,14 +74,14 @@ test.describe( `Pass 37 — Settings key update resilience`, () => {
     test( `BW158 settings key update shows toast on whitespace-only input`, async ( { page } ) => {
         await page.goto( `/library` )
         await page.getByRole( `button`, { name: `Settings` } ).click()
-        await page.waitForTimeout( 300 )
+        await expect( page.getByText( `FONT SIZE` ) ).toBeVisible()
 
         // Click Update Key to enter edit mode
         await page.getByRole( `button`, { name: `Update Key` } ).click()
-        await page.waitForTimeout( 200 )
 
         // Type spaces and click Save
         const input = page.locator( `input[placeholder="sk-or-..."]` )
+        await expect( input ).toBeVisible()
         await input.fill( `   ` )
         await page.getByRole( `button`, { name: `Save` } ).click()
 
@@ -92,15 +92,15 @@ test.describe( `Pass 37 — Settings key update resilience`, () => {
     test( `BW159 settings key update shows network error on failure`, async ( { page } ) => {
         await page.goto( `/library` )
         await page.getByRole( `button`, { name: `Settings` } ).click()
-        await page.waitForTimeout( 300 )
+        await expect( page.getByText( `FONT SIZE` ) ).toBeVisible()
 
         await page.getByRole( `button`, { name: `Update Key` } ).click()
-        await page.waitForTimeout( 200 )
 
         // Now route auth to fail BEFORE typing the key
         await page.route( `**/openrouter.ai/api/v1/auth/key`, route => route.abort( `connectionrefused` ) )
 
         const input = page.locator( `input[placeholder="sk-or-..."]` )
+        await expect( input ).toBeVisible()
         await input.fill( `sk-or-new-key-123` )
         await page.getByRole( `button`, { name: `Save` } ).click()
 
@@ -111,10 +111,9 @@ test.describe( `Pass 37 — Settings key update resilience`, () => {
     test( `BW160 settings key update shows invalid key on 401`, async ( { page } ) => {
         await page.goto( `/library` )
         await page.getByRole( `button`, { name: `Settings` } ).click()
-        await page.waitForTimeout( 300 )
+        await expect( page.getByText( `FONT SIZE` ) ).toBeVisible()
 
         await page.getByRole( `button`, { name: `Update Key` } ).click()
-        await page.waitForTimeout( 200 )
 
         // Route auth to return 401
         await page.route( `**/openrouter.ai/api/v1/auth/key`, async route => {
@@ -122,6 +121,7 @@ test.describe( `Pass 37 — Settings key update resilience`, () => {
         } )
 
         const input = page.locator( `input[placeholder="sk-or-..."]` )
+        await expect( input ).toBeVisible()
         await input.fill( `sk-or-bad-key` )
         await page.getByRole( `button`, { name: `Save` } ).click()
 
@@ -132,12 +132,12 @@ test.describe( `Pass 37 — Settings key update resilience`, () => {
     test( `BW161 settings key update succeeds with valid key`, async ( { page } ) => {
         await page.goto( `/library` )
         await page.getByRole( `button`, { name: `Settings` } ).click()
-        await page.waitForTimeout( 300 )
+        await expect( page.getByText( `FONT SIZE` ) ).toBeVisible()
 
         await page.getByRole( `button`, { name: `Update Key` } ).click()
-        await page.waitForTimeout( 200 )
 
         const input = page.locator( `input[placeholder="sk-or-..."]` )
+        await expect( input ).toBeVisible()
         await input.fill( `sk-or-brand-new-key` )
         await page.getByRole( `button`, { name: `Save` } ).click()
 
@@ -159,12 +159,17 @@ test.describe( `Pass 37 — Reader resilience`, () => {
         await upload_demo_book( page )
 
         // Make translation calls fail AFTER book upload
-        await page.route( `**/openrouter.ai/api/v1/chat/completions`, route =>
-            route.fulfill( { status: 500, body: `Internal Server Error` } )
-        )
+        let release_errors
+        const error_gate = new Promise( resolve => { release_errors = resolve } )
+        await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
+            await error_gate
+            await route.fulfill( { status: 500, body: `Internal Server Error` } )
+        } )
 
         await open_reader( page )
-        await page.waitForTimeout( 2000 )
+        await expect( page.getByText( `Translating...` ) ).toBeVisible()
+        release_errors()
+        await expect( page.getByText( `Translating...` ) ).not.toBeVisible()
 
         // Page should still render original text (no crash)
         const sentences = await page.locator( `span[data-sentence-id]` ).count()
@@ -174,7 +179,6 @@ test.describe( `Pass 37 — Reader resilience`, () => {
     test( `BW163 reader shows original text when going offline`, async ( { page } ) => {
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 1500 )
 
         // Count sentences before going offline
         const sentence_count = await page.locator( `span[data-sentence-id]` ).count()
@@ -182,7 +186,7 @@ test.describe( `Pass 37 — Reader resilience`, () => {
 
         // Go offline
         await page.context().setOffline( true )
-        await page.waitForTimeout( 500 )
+        await expect( page.getByText( `Offline — showing cached translations` ) ).toBeVisible()
 
         // Sentences should still be visible (no crash)
         const after_offline = await page.locator( `span[data-sentence-id]` ).count()
@@ -197,15 +201,22 @@ test.describe( `Pass 37 — Reader resilience`, () => {
 
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 2000 )
+        await expect(
+            page.locator( `span[data-sentence-id] [data-translation-word-index]` ).first()
+        ).toBeVisible( { timeout: 15_000 } )
+        await expect( page.getByText( `Translating...` ) ).not.toBeVisible()
 
         // Tap a sentence
         await page.locator( `span[data-sentence-id]` ).first().click()
-        await page.waitForTimeout( 1000 )
 
         // Navigate to next chapter
+        const current_sentence_id = await page.locator( `span[data-sentence-id]` ).first()
+            .getAttribute( `data-sentence-id` )
         await page.keyboard.press( `ArrowRight` )
-        await page.waitForTimeout( 2000 )
+        await expect( page.locator( `span[data-sentence-id]` ).first() ).not.toHaveAttribute(
+            `data-sentence-id`,
+            current_sentence_id
+        )
 
         expect( errors ).toEqual( [] )
     } )
@@ -213,7 +224,6 @@ test.describe( `Pass 37 — Reader resilience`, () => {
     test( `BW165 progress bar visible and reasonable`, async ( { page } ) => {
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 1500 )
 
         // Progress text should show chapter position
         const progress = page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` )

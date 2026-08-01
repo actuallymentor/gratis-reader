@@ -47,18 +47,24 @@ test.describe( `Pass 30 — Walkthrough`, () => {
         let page_errors = []
         page.on( `pageerror`, e => page_errors.push( e.message ) )
 
+        const failed_response = page.waitForResponse( response =>
+            response.url().includes( `openrouter.ai/api/v1/chat/completions` ) && response.status() === 500
+        )
         await open_reader( page )
-        await page.waitForTimeout( 4000 )
+        await failed_response
+        await expect( page.getByText( /\[TR\]/ ).first() ).toBeVisible()
 
         // App should not crash — some sentences should still be translated
         expect( page_errors ).toEqual( [] )
-        const sentences = await page.$$( `span[data-sentence-id]` )
-        expect( sentences.length ).toBeGreaterThan( 0 )
+        await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible()
     } )
 
     // ── 2. Information sheet works on mobile viewport ──
 
     test( `BW82 information sheet does not overflow on narrow mobile viewport`, async ( { page } ) => {
+
+        const errors = []
+        page.on( `pageerror`, error => errors.push( error.message ) )
 
         // Set mobile viewport
         await page.setViewportSize( { width: 320, height: 568 } )
@@ -82,20 +88,15 @@ test.describe( `Pass 30 — Walkthrough`, () => {
         } )
 
         await open_reader( page )
-        await page.waitForTimeout( 2000 )
 
         // Tap a word to open the information sheet.
         const word = page.locator( `span[data-sentence-id] [data-translation-word-index]` ).first()
-        if( await word.isVisible() ) {
-            await word.click()
-            await expect( page.locator( `[data-translation-info-sheet]` ) ).toBeVisible()
-        }
+        await expect( word ).toBeVisible()
+        await word.click()
+        await expect( page.locator( `[data-translation-info-sheet]` ) ).toBeVisible()
 
         // No errors expected
-        let error_count = 0
-        page.on( `pageerror`, () => error_count++ )
-        await page.waitForTimeout( 500 )
-        expect( error_count ).toBe( 0 )
+        expect( errors ).toEqual( [] )
     } )
 
     // ── 3. Multiple rapid chapter changes don't crash ──
@@ -105,45 +106,38 @@ test.describe( `Pass 30 — Walkthrough`, () => {
         page.on( `pageerror`, e => errors.push( e.message ) )
 
         await open_reader( page )
-        await page.waitForTimeout( 500 )
+        const progress = page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` ).first()
+        const progress_before = await progress.textContent()
 
         // Rapidly navigate chapters
-        const next_btn = page.getByRole( `button`, { name: /next/i } )
         for( let i = 0; i < 5; i++ ) {
-            if( await next_btn.isVisible() ) {
-                await next_btn.click()
-                await page.waitForTimeout( 100 )
-            }
+            await page.keyboard.press( `ArrowRight` )
         }
 
-        await page.waitForTimeout( 2000 )
+        await expect( progress ).not.toHaveText( progress_before )
         expect( errors ).toEqual( [] )
 
         // Should still have content
-        const sentences = await page.$$( `span[data-sentence-id]` )
-        expect( sentences.length ).toBeGreaterThan( 0 )
+        await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible()
     } )
 
     // ── 4. Book with many chapters — TOC dropdown works ──
 
     test( `BW84 TOC dropdown navigates to correct chapter`, async ( { page } ) => {
         await open_reader( page )
-        await page.waitForTimeout( 1000 )
 
         const toc = page.locator( `select` ).first()
-        if( await toc.isVisible() ) {
-            const options = await toc.locator( `option` ).count()
-            if( options > 1 ) {
-                // Select the last chapter
-                const last_option = await toc.locator( `option` ).last().getAttribute( `value` )
-                await toc.selectOption( last_option )
-                await page.waitForTimeout( 1500 )
+        await expect( toc ).toBeVisible()
+        expect( await toc.locator( `option` ).count() ).toBeGreaterThan( 1 )
 
-                // Content should have changed
-                const sentences = await page.$$( `span[data-sentence-id]` )
-                expect( sentences.length ).toBeGreaterThanOrEqual( 0 )
-            }
-        }
+        const progress = page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` ).first()
+        const progress_before = await progress.textContent()
+
+        // Select the last chapter
+        const last_option = await toc.locator( `option` ).last().getAttribute( `value` )
+        await toc.selectOption( last_option )
+        await expect( progress ).not.toHaveText( progress_before )
+        await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible()
     } )
 
     // ── 5. Language picker is searchable ──
@@ -153,14 +147,11 @@ test.describe( `Pass 30 — Walkthrough`, () => {
         await open_settings( page )
 
         const lang_input = page.locator( `input[placeholder*="earch"]` ).first()
-        if( await lang_input.isVisible() ) {
-            await lang_input.fill( `Jap` )
-            await page.waitForTimeout( 300 )
+        await expect( lang_input ).toBeVisible()
+        await lang_input.fill( `Jap` )
 
-            // Should show Japanese in results
-            const body_text = await page.locator( `body` ).textContent()
-            expect( body_text ).toMatch( /Japanese/i )
-        }
+        // Should show Japanese in results
+        await expect( page.getByText( `Japanese`, { exact: true } ) ).toBeVisible()
     } )
 
     // ── 6. Settings persist across page reload ──
@@ -172,25 +163,22 @@ test.describe( `Pass 30 — Walkthrough`, () => {
         // Change font size
         const slider = page.locator( `input[type="range"]` ).first()
         await slider.fill( `24` )
-        await page.waitForTimeout( 300 )
+        await expect( slider ).toHaveValue( `24` )
 
         // Change theme to dark
         await page.getByRole( `button`, { name: `Dark` } ).click()
-        await page.waitForTimeout( 300 )
+        await expect( page.locator( `html` ) ).toHaveAttribute( `data-theme`, `dark` )
 
         // Close settings
         await page.getByRole( `button`, { name: `Close` } ).click()
-        await page.waitForTimeout( 300 )
+        await expect( page.getByText( `FONT SIZE` ) ).not.toBeVisible()
 
         // Reload the page
         await page.reload()
-        await page.waitForTimeout( 2000 )
+        await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible()
 
         // Verify dark theme persisted
-        const theme = await page.evaluate( () =>
-            document.documentElement.getAttribute( `data-theme` )
-        )
-        expect( theme ).toBe( `dark` )
+        await expect( page.locator( `html` ) ).toHaveAttribute( `data-theme`, `dark` )
 
         // Verify font size persisted
         const saved = await page.evaluate( () => {
@@ -204,78 +192,62 @@ test.describe( `Pass 30 — Walkthrough`, () => {
 
     test( `BW87 reading progress restored on return`, async ( { page } ) => {
         await open_reader( page )
-        await page.waitForTimeout( 1000 )
 
         // Navigate to chapter 2
         const next_btn = page.getByRole( `button`, { name: /next/i } )
-        if( await next_btn.isVisible() ) {
-            await next_btn.click()
-            await page.waitForTimeout( 1500 )
-        }
+        const progress = page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` ).first()
+        const initial_progress = await progress.textContent()
+        await expect( next_btn ).toBeEnabled()
+        await next_btn.click()
+        await expect( progress ).not.toHaveText( initial_progress )
+        const saved_progress = await progress.textContent()
 
         // Go back to library
         await page.keyboard.press( `Escape` )
         await page.waitForURL( /library/ )
-        await page.waitForTimeout( 500 )
 
         // Re-open the same book
         await page.locator( `img[alt]` ).first().click()
         await page.waitForURL( /\/read\// )
-        await page.waitForTimeout( 2000 )
 
         // Should NOT show the language modal (returning reader)
         const modal = page.getByRole( `button`, { name: /start reading/i } )
-        const modal_visible = await modal.isVisible().catch( () => false )
-
-        // If modal appeared, we didn't restore progress
-        // If no modal, progress was restored — either outcome is valid
-        // but we should have content
-        if( !modal_visible ) {
-            await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible( { timeout: 10000 } )
-        }
+        await expect( modal ).not.toBeVisible()
+        await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible( { timeout: 10000 } )
+        await expect( progress ).toHaveText( saved_progress )
     } )
 
     // ── 8. Keyboard shortcuts don't work during overlay ──
 
     test( `BW88 arrow keys blocked when settings drawer is open`, async ( { page } ) => {
         await open_reader( page )
-        await page.waitForTimeout( 1000 )
 
         // Get current chapter indicator
-        const progress_before = await page.locator( `body` ).textContent()
+        const progress = page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` ).first()
+        const progress_before = await progress.textContent()
 
         // Open settings
         await open_settings( page )
 
         // Press arrow keys — should NOT navigate chapters
         await page.keyboard.press( `ArrowRight` )
-        await page.waitForTimeout( 500 )
         await page.keyboard.press( `ArrowLeft` )
-        await page.waitForTimeout( 500 )
 
         // Close settings
         await page.getByRole( `button`, { name: `Close` } ).click()
-        await page.waitForTimeout( 500 )
+        await expect( page.getByText( `FONT SIZE` ) ).not.toBeVisible()
 
         // Should still be on the same chapter
-        const progress_after = await page.locator( `body` ).textContent()
-        // The progress text (X / Y) should be the same
-        const match_before = progress_before.match( /(\d+)\s*\/\s*(\d+)/ )
-        const match_after = progress_after.match( /(\d+)\s*\/\s*(\d+)/ )
-        if( match_before && match_after ) {
-            expect( match_after[1] ).toBe( match_before[1] )
-        }
+        await expect( progress ).toHaveText( progress_before )
     } )
 
     // ── 9. Unknown routes redirect ──
 
     test( `BW89 unknown route redirects to home`, async ( { page } ) => {
         await page.goto( `/totally-fake-route` )
-        await page.waitForTimeout( 2000 )
 
-        // Should redirect to onboarding or library
-        const url = page.url()
-        expect( url ).toMatch( /(library|\/)$/ )
+        // The configured API key redirects unknown routes to the library.
+        await expect( page ).toHaveURL( /\/library\/?$/ )
     } )
 
     // ── 10. Level picker shows all proficiency levels ──
@@ -300,10 +272,11 @@ test.describe( `Pass 30 — Walkthrough`, () => {
         // Open book — language modal should appear
         await page.locator( `img[alt]` ).first().click()
         await page.waitForURL( /\/read\// )
-        await page.waitForTimeout( 2000 )
 
         // Check all levels are shown
-        const body = await page.locator( `body` ).textContent()
+        const dialog = page.getByRole( `dialog` )
+        await expect( dialog ).toBeVisible()
+        const body = await dialog.textContent()
         expect( body ).toContain( `A0` )
         expect( body ).toContain( `A1` )
         expect( body ).toContain( `A2` )
@@ -319,7 +292,6 @@ test.describe( `Pass 30 — Walkthrough`, () => {
 
     test( `BW91 cannot upload while another upload is in progress`, async ( { page } ) => {
         await page.goto( `/library` )
-        await page.waitForTimeout( 500 )
 
         // The file input should be present
         const file_input = page.locator( `input[type="file"]` )
@@ -330,7 +302,6 @@ test.describe( `Pass 30 — Walkthrough`, () => {
 
     test( `BW92 library shows book metadata`, async ( { page } ) => {
         await page.goto( `/library` )
-        await page.waitForTimeout( 1000 )
 
         // Book title should be visible
         await expect( page.getByRole( `heading`, { name: /smart work/i } ) ).toBeVisible()

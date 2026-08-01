@@ -3,6 +3,7 @@
  * Prefixed with _ so it's easy to exclude from the main suite later.
  */
 import { test, expect } from '@playwright/test'
+import { open_reader } from './helpers/setup.js'
 
 const DEMO_BOOK = `./tests/fixtures/book.epub`
 
@@ -53,12 +54,52 @@ const upload_book = async ( page ) => {
     await expect( page.getByRole( `heading`, { name: `Smart work beats hard work` } ) ).toBeVisible( { timeout: 10_000 } )
 }
 
-const enter_reader = async ( page ) => {
-    await page.locator( `img[alt]` ).first().click()
-    await page.waitForURL( /\/read\// )
-    const btn = page.getByRole( `button`, { name: `Start Reading` } )
-    try { await btn.waitFor( { state: `visible`, timeout: 3000 } ); await btn.click() } catch {}
-    await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible( { timeout: 10_000 } )
+const enter_reader = open_reader
+
+const get_store_count = async ( page, store_name ) => page.evaluate( async name => {
+    return new Promise( resolve => {
+        const req = indexedDB.open( `gratis_reader` )
+        req.onsuccess = () => {
+            const tx = req.result.transaction( name, `readonly` )
+            const count_req = tx.objectStore( name ).count()
+            count_req.onsuccess = () => resolve( count_req.result )
+            count_req.onerror = () => resolve( -1 )
+        }
+        req.onerror = () => resolve( -1 )
+    } )
+}, store_name )
+
+const get_saved_chapter_index = async page => page.evaluate( async () => {
+    return new Promise( resolve => {
+        const req = indexedDB.open( `gratis_reader` )
+        req.onsuccess = () => {
+            const tx = req.result.transaction( `progress`, `readonly` )
+            const get_all = tx.objectStore( `progress` ).getAll()
+            get_all.onsuccess = () => resolve( get_all.result[ 0 ]?.chapter_index ?? -1 )
+            get_all.onerror = () => resolve( -1 )
+        }
+        req.onerror = () => resolve( -1 )
+    } )
+} )
+
+const accept_confirmation = async ( page, expected_message, action ) => {
+
+    const handled = new Promise( ( resolve, reject ) => {
+        page.once( `dialog`, async dialog => {
+            try {
+                expect( dialog.type() ).toBe( `confirm` )
+                expect( dialog.message() ).toBe( expected_message )
+                await dialog.accept()
+                resolve()
+            } catch( error ) {
+                reject( error )
+            }
+        } )
+    } )
+
+    await action()
+    await handled
+
 }
 
 test.describe( `Browser Walkthrough`, () => {
@@ -94,8 +135,9 @@ test.describe( `Browser Walkthrough`, () => {
         await page.goto( `/` )
         await page.locator( `input[type="password"]` ).fill( `bad` )
         await page.getByRole( `button`, { name: /connect/i } ).click()
-        await page.waitForTimeout( 2000 )
-        expect( page.url() ).not.toContain( `/library` )
+        await expect( page.getByText( `Invalid API key — please check and try again` ) ).toBeVisible()
+        await expect( page.locator( `input[type="password"]` ) ).toBeVisible()
+        await expect( page ).not.toHaveURL( /\/library/ )
     } )
 
     test( `BW05 Enter key submits API key`, async ( { page } ) => {
@@ -124,10 +166,13 @@ test.describe( `Browser Walkthrough`, () => {
     test( `BW08 delete book → empty state`, async ( { page } ) => {
         await setup_key( page )
         await upload_book( page )
-        page.on( `dialog`, d => d.accept() )
-        await page.getByRole( `button`, { name: /remove/i } ).click()
-        await page.waitForTimeout( 1000 )
+        await accept_confirmation(
+            page,
+            `Remove "Smart work beats hard work" from your library?`,
+            () => page.getByRole( `button`, { name: /remove/i } ).click()
+        )
         await expect( page.getByText( /library is empty/i ) ).toBeVisible()
+        await expect( page.getByRole( `heading`, { name: `Smart work beats hard work` } ) ).not.toBeVisible()
     } )
 
     test( `BW09 book persists after reload`, async ( { page } ) => {
@@ -164,10 +209,10 @@ test.describe( `Browser Walkthrough`, () => {
         await setup_key( page )
         await upload_book( page )
         await enter_reader( page )
-        const first = await page.locator( `span[data-sentence-id]` ).first().textContent()
+        const first_sentence = page.locator( `span[data-sentence-id]` ).first()
+        const first_id = await first_sentence.getAttribute( `data-sentence-id` )
         await page.getByRole( `button`, { name: /Next/ } ).click()
-        await page.waitForTimeout( 2000 )
-        expect( await page.locator( `span[data-sentence-id]` ).first().textContent() ).not.toBe( first )
+        await expect( first_sentence ).not.toHaveAttribute( `data-sentence-id`, first_id )
     } )
 
     test( `BW14 keyboard nav (arrows)`, async ( { page } ) => {
@@ -176,8 +221,7 @@ test.describe( `Browser Walkthrough`, () => {
         await enter_reader( page )
         const id1 = await page.locator( `span[data-sentence-id]` ).first().getAttribute( `data-sentence-id` )
         await page.keyboard.press( `ArrowRight` )
-        await page.waitForTimeout( 2000 )
-        expect( await page.locator( `span[data-sentence-id]` ).first().getAttribute( `data-sentence-id` ) ).not.toBe( id1 )
+        await expect( page.locator( `span[data-sentence-id]` ).first() ).not.toHaveAttribute( `data-sentence-id`, id1 )
     } )
 
     test( `BW15 Escape → library`, async ( { page } ) => {
@@ -209,8 +253,7 @@ test.describe( `Browser Walkthrough`, () => {
             el.dispatchEvent( new TouchEvent( `touchmove`, { bubbles: true, touches: [ new Touch( { identifier: 0, target: el, clientX: ex, clientY: y } ) ] } ) )
             el.dispatchEvent( new TouchEvent( `touchend`, { bubbles: true, changedTouches: [ new Touch( { identifier: 0, target: el, clientX: ex, clientY: y } ) ] } ) )
         }, { bx: box.x, bw: box.width, by: box.y, bh: box.height } )
-        await page.waitForTimeout( 2000 )
-        expect( await page.locator( `span[data-sentence-id]` ).first().getAttribute( `data-sentence-id` ) ).not.toBe( id1 )
+        await expect( page.locator( `span[data-sentence-id]` ).first() ).not.toHaveAttribute( `data-sentence-id`, id1 )
     } )
 
     // ── INTERACTIONS ────────────────────────────────────────────
@@ -222,7 +265,6 @@ test.describe( `Browser Walkthrough`, () => {
         await expect( page.getByText( /\[TRANSLATED\]/ ).first() ).toBeVisible( { timeout: 15_000 } )
         const s = page.locator( `span[data-sentence-id]` ).first()
         await s.dblclick()
-        await page.waitForTimeout( 500 )
         await expect( s ).toContainText( `[TRANSLATED]` )
     } )
 
@@ -282,8 +324,9 @@ test.describe( `Browser Walkthrough`, () => {
         await enter_reader( page )
         await page.getByRole( `button`, { name: `Settings` } ).click()
         await page.locator( `input[type="range"]` ).fill( `24` )
-        await page.waitForTimeout( 300 )
-        expect( parseInt( await page.evaluate( () => getComputedStyle( document.querySelector( `main` ) ).fontSize ) ) ).toBe( 24 )
+        await expect.poll( () => page.evaluate( () =>
+            parseInt( getComputedStyle( document.querySelector( `main` ) ).fontSize )
+        ) ).toBe( 24 )
     } )
 
     test( `BW24 font family select`, async ( { page } ) => {
@@ -293,8 +336,10 @@ test.describe( `Browser Walkthrough`, () => {
         await page.getByRole( `button`, { name: `Settings` } ).click()
         await page.locator( `select` ).filter( { hasText: /Nunito|Georgia/ } ).selectOption( `Georgia` )
         await page.keyboard.press( `Escape` )
-        await page.waitForTimeout( 300 )
-        expect( await page.evaluate( () => getComputedStyle( document.querySelector( `main` ) ).fontFamily ) ).toContain( `Georgia` )
+        await expect( page.getByRole( `heading`, { name: `Settings` } ) ).not.toBeVisible()
+        await expect.poll( () => page.evaluate( () =>
+            getComputedStyle( document.querySelector( `main` ) ).fontFamily
+        ) ).toContain( `Georgia` )
     } )
 
     test( `BW25 masked API key in settings`, async ( { page } ) => {
@@ -310,9 +355,12 @@ test.describe( `Browser Walkthrough`, () => {
         await setup_key( page )
         await page.goto( `/library` )
         await page.getByRole( `button`, { name: `Settings` } ).click()
-        page.on( `dialog`, d => d.accept() )
-        await page.getByRole( `button`, { name: /clear.*cache/i } ).click()
-        await page.waitForTimeout( 1000 )
+        await accept_confirmation(
+            page,
+            `Clear all cached translations? This cannot be undone.`,
+            () => page.getByRole( `button`, { name: /clear.*cache/i } ).click()
+        )
+        await expect( page.getByText( `Translation cache cleared` ) ).toBeVisible()
         await expect( page.getByText( `FONT SIZE` ) ).toBeVisible()
     } )
 
@@ -333,17 +381,10 @@ test.describe( `Browser Walkthrough`, () => {
         await upload_book( page )
         await enter_reader( page )
         await expect( page.getByText( /\[TRANSLATED\]/ ).first() ).toBeVisible( { timeout: 15_000 } )
-        await page.waitForTimeout( 3000 )
-        const count = await page.evaluate( () => new Promise( r => {
-            const req = indexedDB.open( `gratis_reader` )
-            req.onsuccess = e => {
-                const c = e.target.result.transaction( `translations`, `readonly` ).objectStore( `translations` ).count()
-                c.onsuccess = () => r( c.result )
-                c.onerror = () => r( 0 )
-            }
-            req.onerror = () => r( 0 )
-        } ) )
-        expect( count ).toBeGreaterThan( 0 )
+        await expect.poll(
+            () => get_store_count( page, `translations` ),
+            { timeout: 15_000 }
+        ).toBeGreaterThan( 0 )
     } )
 
     test( `BW29 theme persists after reload`, async ( { page } ) => {
@@ -360,29 +401,31 @@ test.describe( `Browser Walkthrough`, () => {
         await setup_key( page )
         await upload_book( page )
         await enter_reader( page )
+        const first_sentence = page.locator( `span[data-sentence-id]` ).first()
+        const ch1_id = await first_sentence.getAttribute( `data-sentence-id` )
         await page.getByRole( `button`, { name: /Next/ } ).click()
-        await page.waitForTimeout( 2000 )
-        const ch2 = await page.locator( `span[data-sentence-id]` ).first().textContent()
+        await expect( first_sentence ).not.toHaveAttribute( `data-sentence-id`, ch1_id )
+        const ch2_id = await first_sentence.getAttribute( `data-sentence-id` )
+        await expect.poll( () => get_saved_chapter_index( page ) ).toBe( 1 )
         await page.keyboard.press( `Escape` )
         await page.waitForURL( `**/library` )
         await page.locator( `img[alt]` ).first().click()
         await page.waitForURL( /\/read\// )
-        await page.waitForTimeout( 3000 )
-        expect( await page.locator( `span[data-sentence-id]` ).first().textContent() ).toBe( ch2 )
+        await expect( first_sentence ).toHaveAttribute( `data-sentence-id`, ch2_id )
     } )
 
     // ── EDGE CASES ──────────────────────────────────────────────
 
     test( `BW31 /library without key → onboarding`, async ( { page } ) => {
         await page.goto( `/library` )
-        await page.waitForTimeout( 2000 )
-        expect( page.url().endsWith( `/` ) || await page.locator( `input[type="password"]` ).count() > 0 ).toBeTruthy()
+        await page.waitForURL( url => url.pathname === `/` )
+        await expect( page.locator( `input[type="password"]` ) ).toBeVisible()
     } )
 
     test( `BW32 /read/hash without key → onboarding`, async ( { page } ) => {
         await page.goto( `/read/fakeid` )
-        await page.waitForTimeout( 2000 )
-        expect( !page.url().includes( `/read/` ) || await page.locator( `input[type="password"]` ).count() > 0 ).toBeTruthy()
+        await page.waitForURL( url => url.pathname === `/` )
+        await expect( page.locator( `input[type="password"]` ) ).toBeVisible()
     } )
 
     test( `BW33 favicon loads`, async ( { page } ) => {
@@ -402,22 +445,18 @@ test.describe( `Browser Walkthrough`, () => {
         await upload_book( page )
         await page.locator( `img[alt]` ).first().click()
         await page.waitForURL( /\/read\// )
-        await page.waitForTimeout( 1000 )
 
         // Language modal should show — check the input value
         const lang_input = page.locator( `input[placeholder*="language" i]` ).first()
         await expect( lang_input ).toBeVisible( { timeout: 5000 } )
 
         // When not focused, the input shows the current value
-        const value = await lang_input.inputValue()
         // The input shows query when open, but the displayed text when closed should be "Spanish"
         // Click elsewhere to ensure the picker is in "display" mode
         await page.click( `body`, { position: { x: 10, y: 10 } } )
-        await page.waitForTimeout( 300 )
 
         // The language value should be a full name, not a code
-        const displayed = await lang_input.inputValue()
-        expect( displayed ).toBe( `Spanish` )
+        await expect( lang_input ).toHaveValue( `Spanish` )
     } )
 
     test( `BW36 system prompt matches spec (teacher role)`, async ( { page } ) => {
@@ -434,8 +473,7 @@ test.describe( `Browser Walkthrough`, () => {
         await setup_key( page )
         await upload_book( page )
         await enter_reader( page )
-        await page.waitForTimeout( 5000 )
-        expect( system_prompt ).toContain( `language teacher` )
+        await expect.poll( () => system_prompt, { timeout: 15_000 } ).toContain( `language teacher` )
     } )
 
     test( `BW37 PWA icon files are accessible`, async ( { page } ) => {
@@ -452,25 +490,21 @@ test.describe( `Browser Walkthrough`, () => {
     test( `BW38 unknown route redirects to home`, async ( { page } ) => {
         await setup_key( page )
         await page.goto( `http://localhost:5173/nonexistent-page` )
-        await page.waitForTimeout( 1000 )
-        expect( page.url() ).toContain( `/library` )
+        await page.waitForURL( /\/library/ )
     } )
 
     test( `BW39 nonexistent book_id redirects to library`, async ( { page } ) => {
         await setup_key( page )
         await page.goto( `http://localhost:5173/read/fake-book-12345` )
-        await page.waitForTimeout( 3000 )
-        expect( page.url() ).toContain( `/library` )
+        await page.waitForURL( /\/library/ )
     } )
 
     test( `BW40 corrupt localStorage does not crash app`, async ( { page } ) => {
         await page.goto( `http://localhost:5173/` )
         await page.evaluate( () => localStorage.setItem( `settings-storage`, `NOT VALID JSON!!!` ) )
         await page.reload()
-        await page.waitForTimeout( 1000 )
         // App should still load — onboarding page should be visible
-        const body_text = await page.textContent( `body` )
-        expect( body_text.length ).toBeGreaterThan( 0 )
+        await expect( page.locator( `body` ) ).toContainText( /\S/ )
     } )
 
     test( `BW42 epub title fallback strips .epub only at end`, async ( { page } ) => {
@@ -506,7 +540,6 @@ test.describe( `Browser Walkthrough`, () => {
         await page.evaluate( () => {
             window.dispatchEvent( new Event( `offline` ) )
         } )
-        await page.waitForTimeout( 500 )
 
         // Offline banner should appear
         await expect( page.getByText( /offline/i ) ).toBeVisible()
@@ -520,12 +553,10 @@ test.describe( `Browser Walkthrough`, () => {
 
         // Go offline
         await page.evaluate( () => window.dispatchEvent( new Event( `offline` ) ) )
-        await page.waitForTimeout( 500 )
         await expect( page.getByText( /offline/i ) ).toBeVisible()
 
         // Come back online
         await page.evaluate( () => window.dispatchEvent( new Event( `online` ) ) )
-        await page.waitForTimeout( 500 )
         await expect( page.getByText( /offline/i ) ).not.toBeVisible()
     } )
 
@@ -627,7 +658,6 @@ test.describe( `Browser Walkthrough`, () => {
 
         // Close popover first (click overlay), then navigate
         await page.mouse.click( 10, 10 )
-        await page.waitForTimeout( 500 )
         await expect( page.getByText( `Translation Explanation` ) ).not.toBeVisible()
 
         // Open the popover again, then navigate via button.
@@ -635,8 +665,10 @@ test.describe( `Browser Walkthrough`, () => {
         await expect( page.getByText( `Translation Explanation` ) ).toBeVisible( { timeout: 5000 } )
 
         // Navigate via Next button — popover should auto-close on chapter change
+        const first_sentence = page.locator( `span[data-sentence-id]` ).first()
+        const chapter_id = await first_sentence.getAttribute( `data-sentence-id` )
         await page.getByRole( `button`, { name: /Next/ } ).click( { force: true } )
-        await page.waitForTimeout( 2000 )
+        await expect( first_sentence ).not.toHaveAttribute( `data-sentence-id`, chapter_id )
         await expect( page.getByText( `Translation Explanation` ) ).not.toBeVisible()
     } )
 
@@ -650,10 +682,10 @@ test.describe( `Browser Walkthrough`, () => {
         const font_select = page.locator( `select` ).filter( { hasText: /Nunito|Georgia/ } )
         await font_select.selectOption( `Merriweather` )
         await page.keyboard.press( `Escape` )
-        await page.waitForTimeout( 500 )
-
-        const font = await page.evaluate( () => getComputedStyle( document.querySelector( `main` ) ).fontFamily )
-        expect( font ).toContain( `Merriweather` )
+        await expect( page.getByRole( `heading`, { name: `Settings` } ) ).not.toBeVisible()
+        await expect.poll( () => page.evaluate( () =>
+            getComputedStyle( document.querySelector( `main` ) ).fontFamily
+        ) ).toContain( `Merriweather` )
     } )
 
     // ── EDGE CASES (continued) ──────────────────────────────
@@ -665,36 +697,24 @@ test.describe( `Browser Walkthrough`, () => {
 
         // Wait for translations to appear (which creates cache entries)
         await expect( page.locator( `span[data-sentence-id]` ).first() ).toContainText( /\[TRANSLATED\]/, { timeout: 15_000 } )
-        await page.waitForTimeout( 1000 )
 
         // Count translation cache entries before delete
-        const before_count = await page.evaluate( () => new Promise( r => {
-            const req = indexedDB.open( `gratis_reader` )
-            req.onsuccess = () => {
-                const tx = req.result.transaction( `translations`, `readonly` )
-                const count_req = tx.objectStore( `translations` ).count()
-                count_req.onsuccess = () => r( count_req.result )
-            }
-        } ) )
-        expect( before_count ).toBeGreaterThan( 0 )
+        await expect.poll(
+            () => get_store_count( page, `translations` ),
+            { timeout: 15_000 }
+        ).toBeGreaterThan( 0 )
 
         // Go back to library and delete the book
         await page.goBack()
         await page.waitForURL( /\/library/ )
-        page.on( `dialog`, d => d.accept() )
-        await page.getByRole( `button`, { name: /remove/i } ).click()
-        await page.waitForTimeout( 1000 )
+        await accept_confirmation(
+            page,
+            `Remove "Smart work beats hard work" from your library?`,
+            () => page.getByRole( `button`, { name: /remove/i } ).click()
+        )
 
         // Translation cache should be empty after deletion
-        const after_count = await page.evaluate( () => new Promise( r => {
-            const req = indexedDB.open( `gratis_reader` )
-            req.onsuccess = () => {
-                const tx = req.result.transaction( `translations`, `readonly` )
-                const count_req = tx.objectStore( `translations` ).count()
-                count_req.onsuccess = () => r( count_req.result )
-            }
-        } ) )
-        expect( after_count ).toBe( 0 )
+        await expect.poll( () => get_store_count( page, `translations` ) ).toBe( 0 )
     } )
 
     test( `BW53 word lookup abort — fast clicks don't crash`, async ( { page } ) => {
@@ -708,13 +728,17 @@ test.describe( `Browser Walkthrough`, () => {
         // Rapidly click multiple translated words — should not crash
         const words = page.locator( `span[data-sentence-id] [data-translation-word-index]` )
         const count = await words.count()
-        for( let i = 0; i < Math.min( count, 8 ); i++ ) {
+        const click_count = Math.min( count, 8 )
+        for( let i = 0; i < click_count; i++ ) {
             await words.nth( i ).click( { force: true } )
-            await page.waitForTimeout( 50 )
         }
 
         // App should still be responsive — sentences still visible
-        expect( await page.locator( `span[data-sentence-id]` ).count() ).toBeGreaterThan( 0 )
+        await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible()
+        if( click_count > 0 ) {
+            await expect( words.nth( click_count - 1 ) ).toHaveAttribute( `aria-pressed`, `true` )
+            await expect( page.locator( `[data-translation-info-sheet]` ) ).toBeVisible()
+        }
     } )
 
     test( `BW54 level picker shows CEFR code and friendly label together`, async ( { page } ) => {
@@ -748,7 +772,6 @@ test.describe( `Browser Walkthrough`, () => {
 
         // Press ArrowLeft at first chapter — should stay at chapter 1
         await page.keyboard.press( `ArrowLeft` )
-        await page.waitForTimeout( 500 )
 
         // Still at chapter 1 (not 0 or negative)
         await expect( page.locator( `text=1 / ` ).first() ).toBeVisible()
@@ -778,7 +801,6 @@ test.describe( `Browser Walkthrough`, () => {
 
         // Navigate to second chapter
         await page.keyboard.press( `ArrowRight` )
-        await page.waitForTimeout( 1000 )
 
         // Progress should update to "2 / N"
         await expect( page.locator( `[class]` ).filter( { hasText: /2 \/ \d+/ } ).first() ).toBeVisible( { timeout: 5000 } )
@@ -929,16 +951,16 @@ test.describe( `Browser Walkthrough`, () => {
         await page.waitForURL( /\/library/ )
 
         // Delete the book
-        page.on( `dialog`, d => d.accept() )
-        await page.getByRole( `button`, { name: /remove/i } ).click()
-        await page.waitForTimeout( 500 )
+        await accept_confirmation(
+            page,
+            `Remove "Smart work beats hard work" from your library?`,
+            () => page.getByRole( `button`, { name: /remove/i } ).click()
+        )
+        await expect( page.getByRole( `heading`, { name: `Smart work beats hard work` } ) ).not.toBeVisible()
 
         // Navigate to the deleted book's reader URL
         await page.goto( reader_url )
-        await page.waitForTimeout( 3000 )
-
-        // Should redirect to library since book no longer exists
-        expect( page.url() ).toContain( `/library` )
+        await page.waitForURL( /\/library/ )
     } )
 
 } )

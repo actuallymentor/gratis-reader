@@ -1,7 +1,37 @@
 import { test, expect } from '@playwright/test'
-import { setup_api_key, upload_demo_book, mock_openrouter, clear_storage } from './helpers/setup.js'
+import {
+    setup_api_key,
+    upload_demo_book,
+    open_reader,
+    mock_openrouter,
+    clear_storage,
+    get_current_translation_entries
+} from './helpers/setup.js'
 
 const CHAT_URL = `**/openrouter.ai/api/v1/chat/completions`
+
+const translation_cache_count = page => page.evaluate( async () => {
+    return new Promise( ( resolve ) => {
+        const request = indexedDB.open( `gratis_reader` )
+        request.onsuccess = event => {
+            const database = event.target.result
+            const transaction = database.transaction( `translations`, `readonly` )
+            const count_request = transaction.objectStore( `translations` ).count()
+            count_request.onsuccess = () => resolve( count_request.result )
+            count_request.onerror = () => resolve( 0 )
+        }
+        request.onerror = () => resolve( 0 )
+    } )
+} )
+
+const wait_for_mocked_translations = async page => {
+    const sentences = page.locator( `span[data-sentence-id]` )
+    const sentence_count = await sentences.count()
+    const translated_sentences = sentences.filter( { hasText: `[TRANSLATED]` } )
+
+    await expect( translated_sentences ).toHaveCount( sentence_count, { timeout: 15_000 } )
+    await expect.poll( () => translation_cache_count( page ) ).toBeGreaterThanOrEqual( sentence_count )
+}
 
 test.describe( `Translation (mocked)`, () => {
 
@@ -14,17 +44,7 @@ test.describe( `Translation (mocked)`, () => {
     const enter_reader = async ( page ) => {
 
         await mock_openrouter( page )
-        await page.locator( `img[alt]` ).first().click()
-        await page.waitForURL( /\/read\// )
-
-        // Dismiss language modal if it appears
-        const start_btn = page.getByRole( `button`, { name: `Start Reading` } )
-        try {
-            await start_btn.waitFor( { state: `visible`, timeout: 3000 } )
-            await start_btn.click()
-        } catch { /* modal not shown */ }
-
-        await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible( { timeout: 10_000 } )
+        await open_reader( page )
 
     }
 
@@ -63,14 +83,7 @@ test.describe( `Translation (mocked)`, () => {
             } )
         } )
 
-        await page.locator( `img[alt]` ).first().click()
-        await page.waitForURL( /\/read\// )
-
-        const start_btn = page.getByRole( `button`, { name: `Start Reading` } )
-        try {
-            await start_btn.waitFor( { state: `visible`, timeout: 3000 } )
-            await start_btn.click()
-        } catch { /* modal not shown */ }
+        await open_reader( page )
 
         await expect( page.getByText( /\[RETRIED\]/ ).first() ).toBeVisible( { timeout: 20_000 } )
         expect( Object.values( attempts_by_sentence ).some( attempts => attempts > 1 ) ).toBe( true )
@@ -79,10 +92,7 @@ test.describe( `Translation (mocked)`, () => {
 
     test( `requests translation from OpenRouter when page loads`, async ( { page } ) => {
 
-        // Track API calls
-        let api_calls = 0
         await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
-            api_calls++
             const body = JSON.parse( route.request().postData() )
             const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
             const match = user_msg.match( /Translate this sentence:\n(.+)/s )
@@ -96,44 +106,18 @@ test.describe( `Translation (mocked)`, () => {
             } )
         } )
 
-        await page.locator( `img[alt]` ).first().click()
-        await page.waitForURL( /\/read\// )
+        const translation_request = page.waitForRequest( CHAT_URL )
+        await open_reader( page )
+        const request = await translation_request
 
-        const start_btn = page.getByRole( `button`, { name: `Start Reading` } )
-        try {
-            await start_btn.waitFor( { state: `visible`, timeout: 3000 } )
-            await start_btn.click()
-        } catch { /* modal not shown */ }
-
-        // Wait for some translations
-        await page.waitForTimeout( 5000 )
-
-        expect( api_calls ).toBeGreaterThan( 0 )
+        expect( request.postData() ).toContain( `Translate this sentence:` )
 
     } )
 
     test( `caches translations in IndexedDB`, async ( { page } ) => {
 
         await enter_reader( page )
-        await page.waitForTimeout( 5000 )
-
-        // Check IndexedDB for cached translations
-        const cache_count = await page.evaluate( async () => {
-            return new Promise( ( resolve ) => {
-                const req = indexedDB.open( `gratis_reader` )
-                req.onsuccess = ( e ) => {
-                    const db = e.target.result
-                    const tx = db.transaction( `translations`, `readonly` )
-                    const store = tx.objectStore( `translations` )
-                    const count_req = store.count()
-                    count_req.onsuccess = () => resolve( count_req.result )
-                    count_req.onerror = () => resolve( 0 )
-                }
-                req.onerror = () => resolve( 0 )
-            } )
-        } )
-
-        expect( cache_count ).toBeGreaterThan( 0 )
+        await expect.poll( () => translation_cache_count( page ) ).toBeGreaterThan( 0 )
 
     } )
 
@@ -141,16 +125,18 @@ test.describe( `Translation (mocked)`, () => {
 
         // First load — populate cache
         await enter_reader( page )
-        await page.waitForTimeout( 5000 )
+        await wait_for_mocked_translations( page )
+        const cached_entries = await get_current_translation_entries( page )
+        expect( cached_entries.length ).toBeGreaterThan( 0 )
 
         // Go back to library
         await page.getByRole( `button`, { name: `Back to library` } ).click()
         await page.waitForURL( `**/library` )
+        await page.clock.install()
 
-        // Track API calls on second load
-        let api_calls = 0
+        // Any cache miss receives a distinctive response that would overwrite
+        // the corresponding persisted current-chapter record.
         await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
-            api_calls++
             await route.fulfill( {
                 contentType: `application/json`,
                 body: JSON.stringify( {
@@ -163,11 +149,19 @@ test.describe( `Translation (mocked)`, () => {
         // Re-open book
         await page.locator( `img[alt]` ).first().click()
         await page.waitForURL( /\/read\// )
-        await page.waitForTimeout( 5000 )
+        await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible()
+
+        // Advance the translation debounce, then await the complete cache-check
+        // cycle before asserting that none of the cached sentences hit the API.
+        await page.clock.runFor( 300 )
+        const translating = page.getByText( `Translating...`, { exact: true } )
+        await expect( translating ).toBeVisible()
+        await expect( translating ).not.toBeVisible()
 
         // Should see [TRANSLATED] from cache, not [SECOND] from new API
-        const translated = await page.getByText( /\[TRANSLATED\]/ ).count()
-        expect( translated ).toBeGreaterThan( 0 )
+        await expect( page.getByText( /\[TRANSLATED\]/ ).first() ).toBeVisible()
+        await expect( page.getByText( `[SECOND]`, { exact: true } ) ).toHaveCount( 0 )
+        expect( await get_current_translation_entries( page ) ).toEqual( cached_entries )
 
     } )
 
@@ -175,20 +169,11 @@ test.describe( `Translation (mocked)`, () => {
 
         // First load — populate cache with mocked translations
         await mock_openrouter( page )
-        await page.locator( `img[alt]` ).first().click()
-        await page.waitForURL( /\/read\// )
-
-        const start_btn = page.getByRole( `button`, { name: `Start Reading` } )
-        try {
-            await start_btn.waitFor( { state: `visible`, timeout: 3000 } )
-            await start_btn.click()
-        } catch { /* modal not shown */ }
-
-        await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible( { timeout: 10_000 } )
+        await open_reader( page )
 
         // Wait for translations to populate cache
         await expect( page.getByText( /\[TRANSLATED\]/ ).first() ).toBeVisible( { timeout: 15_000 } )
-        await page.waitForTimeout( 3000 )
+        await expect.poll( () => translation_cache_count( page ) ).toBeGreaterThan( 0 )
 
         // Go back to library
         await page.getByRole( `button`, { name: `Back to library` } ).click()
@@ -200,11 +185,9 @@ test.describe( `Translation (mocked)`, () => {
         // Re-open the book — cached translations should still show
         await page.locator( `img[alt]` ).first().click()
         await page.waitForURL( /\/read\// )
-        await page.waitForTimeout( 5000 )
 
         // Cached translations should be visible
-        const translated = await page.getByText( /\[TRANSLATED\]/ ).count()
-        expect( translated ).toBeGreaterThan( 0 )
+        await expect( page.getByText( /\[TRANSLATED\]/ ).first() ).toBeVisible()
 
     } )
 
@@ -232,8 +215,11 @@ test.describe( `Translation (live)`, () => {
         await page.getByRole( `button`, { name: `Start Reading` } ).click()
         await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible( { timeout: 10_000 } )
 
-        // Wait for translations
-        await page.waitForTimeout( 15_000 )
+        // A persisted translation proves that a live response was processed.
+        await expect.poll(
+            () => translation_cache_count( page ),
+            { timeout: 30_000 }
+        ).toBeGreaterThan( 0 )
 
         // At least some sentences should now be translated
         const text = await page.evaluate( () => document.querySelector( `main` )?.innerText || `` )

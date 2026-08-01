@@ -5,6 +5,39 @@
 import { test, expect } from '@playwright/test'
 import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth, clear_storage } from './helpers/setup.js'
 
+const get_saved_chapter_index = async page => page.evaluate( async () => {
+    return new Promise( resolve => {
+        const req = indexedDB.open( `gratis_reader` )
+        req.onsuccess = () => {
+            const tx = req.result.transaction( `progress`, `readonly` )
+            const get_all = tx.objectStore( `progress` ).getAll()
+            get_all.onsuccess = () => resolve( get_all.result[ 0 ]?.chapter_index ?? -1 )
+            get_all.onerror = () => resolve( -1 )
+        }
+        req.onerror = () => resolve( -1 )
+    } )
+} )
+
+const accept_confirmation = async ( page, expected_message, action ) => {
+
+    const handled = new Promise( ( resolve, reject ) => {
+        page.once( `dialog`, async dialog => {
+            try {
+                expect( dialog.type() ).toBe( `confirm` )
+                expect( dialog.message() ).toBe( expected_message )
+                await dialog.accept()
+                resolve()
+            } catch( error ) {
+                reject( error )
+            }
+        } )
+    } )
+
+    await action()
+    await handled
+
+}
+
 test.describe( `Pass 39 — Multi-step state transitions`, () => {
 
     test.beforeEach( async ( { page } ) => {
@@ -18,29 +51,28 @@ test.describe( `Pass 39 — Multi-step state transitions`, () => {
     test( `BW190 theme persists after leaving and re-entering reader`, async ( { page } ) => {
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 1000 )
 
         // Change to dark theme
         await page.getByRole( `button`, { name: `Settings` } ).click()
-        await page.waitForTimeout( 300 )
+        await expect( page.getByRole( `heading`, { name: `Settings` } ) ).toBeVisible()
         await page.getByRole( `button`, { name: `Dark` } ).click()
-        await page.waitForTimeout( 200 )
+        await expect.poll( () => page.evaluate( () =>
+            document.documentElement.getAttribute( `data-theme` )
+        ) ).toBe( `dark` )
 
         // Go back to library
         await page.getByRole( `button`, { name: `Close`, exact: true } ).click()
-        await page.waitForTimeout( 300 )
+        await expect( page.getByRole( `heading`, { name: `Settings` } ) ).not.toBeVisible()
         await page.keyboard.press( `Escape` )
         await page.waitForURL( /\/library/, { timeout: 5000 } )
 
         // Re-enter reader
         await open_reader( page )
-        await page.waitForTimeout( 1000 )
 
         // Theme should still be dark
-        const theme = await page.evaluate( () =>
+        await expect.poll( () => page.evaluate( () =>
             document.documentElement.getAttribute( `data-theme` )
-        )
-        expect( theme ).toBe( `dark` )
+        ) ).toBe( `dark` )
     } )
 
     // ── 2. Translation state resets when changing chapters ──
@@ -48,23 +80,24 @@ test.describe( `Pass 39 — Multi-step state transitions`, () => {
     test( `BW191 navigating chapters shows fresh sentences`, async ( { page } ) => {
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 2000 )
 
         // Get first chapter sentence count
+        const first_sentence = page.locator( `span[data-sentence-id]` ).first()
         const ch1_count = await page.locator( `span[data-sentence-id]` ).count()
+        const ch1_id = await first_sentence.getAttribute( `data-sentence-id` )
         expect( ch1_count ).toBeGreaterThan( 0 )
 
         // Navigate forward
         await page.keyboard.press( `ArrowRight` )
-        await page.waitForTimeout( 2000 )
+        await expect( first_sentence ).not.toHaveAttribute( `data-sentence-id`, ch1_id )
 
         // New chapter should have sentences too
         const ch2_count = await page.locator( `span[data-sentence-id]` ).count()
         expect( ch2_count ).toBeGreaterThan( 0 )
 
         // Sentence IDs should be different (different chapter)
-        const ch1_id = await page.locator( `span[data-sentence-id]` ).first().getAttribute( `data-sentence-id` )
-        expect( ch1_id ).toBeTruthy()
+        const ch2_id = await first_sentence.getAttribute( `data-sentence-id` )
+        expect( ch2_id ).not.toBe( ch1_id )
     } )
 
     // ── 3. Inspect sentence then navigate — no stale state ──
@@ -72,22 +105,25 @@ test.describe( `Pass 39 — Multi-step state transitions`, () => {
     test( `BW192 selected translation sheet resets after chapter change`, async ( { page } ) => {
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 2000 )
 
         // Select a translated word and show its information.
-        await page.locator( `span[data-sentence-id] [data-translation-word-index]` ).first().click()
+        const first_sentence = page.locator( `span[data-sentence-id]` ).first()
+        const first_id = await first_sentence.getAttribute( `data-sentence-id` )
+        const first_word = first_sentence.locator( `[data-translation-word-index]` ).first()
+        await expect( first_word ).toBeVisible( { timeout: 15_000 } )
+        await first_word.click()
         await expect( page.locator( `[data-translation-info-sheet]` ) ).toBeVisible()
 
         // Navigate to next chapter
         await page.keyboard.press( `ArrowRight` )
-        await page.waitForTimeout( 2000 )
+        await expect( first_sentence ).not.toHaveAttribute( `data-sentence-id`, first_id )
+        await expect( page.locator( `[data-translation-info-sheet]` ) ).not.toBeVisible()
 
         // Navigate back
         await page.keyboard.press( `ArrowLeft` )
-        await page.waitForTimeout( 2000 )
+        await expect( first_sentence ).toHaveAttribute( `data-sentence-id`, first_id )
 
         // Returning to the chapter must not restore stale selection state.
-        const first_sentence = page.locator( `span[data-sentence-id]` ).first()
         await expect( first_sentence ).toBeVisible()
         await expect( page.locator( `[data-translation-info-sheet]` ) ).not.toBeVisible()
     } )
@@ -97,25 +133,24 @@ test.describe( `Pass 39 — Multi-step state transitions`, () => {
     test( `BW193 arrow keys do not navigate while settings open`, async ( { page } ) => {
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 1500 )
 
-        const progress_before = await page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` ).textContent()
+        const progress = page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` )
+        const progress_before = await progress.textContent()
 
         // Open settings
         await page.getByRole( `button`, { name: `Settings` } ).click()
-        await page.waitForTimeout( 300 )
+        await expect( page.getByRole( `heading`, { name: `Settings` } ) ).toBeVisible()
 
         // Press arrow keys — should NOT navigate
         await page.keyboard.press( `ArrowRight` )
-        await page.waitForTimeout( 500 )
+        await expect( progress ).toHaveText( progress_before )
 
         // Close settings
         await page.keyboard.press( `Escape` )
-        await page.waitForTimeout( 500 )
+        await expect( page.getByRole( `heading`, { name: `Settings` } ) ).not.toBeVisible()
 
         // Progress should be unchanged
-        const progress_after = await page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` ).textContent()
-        expect( progress_after ).toBe( progress_before )
+        await expect( progress ).toHaveText( progress_before )
     } )
 
     // ── 5. Delete book, verify redirect ──
@@ -129,12 +164,15 @@ test.describe( `Pass 39 — Multi-step state transitions`, () => {
         await expect( page.getByRole( `heading`, { name: /smart work/i } ) ).toBeVisible()
 
         // Delete with confirmation
-        page.on( `dialog`, dialog => dialog.accept() )
-        await page.getByRole( `button`, { name: /remove/i } ).click()
-        await page.waitForTimeout( 1000 )
+        await accept_confirmation(
+            page,
+            `Remove "Smart work beats hard work" from your library?`,
+            () => page.getByRole( `button`, { name: /remove/i } ).click()
+        )
 
         // Book should be gone, empty state shown
         await expect( page.getByText( /library is empty/i ) ).toBeVisible( { timeout: 5000 } )
+        await expect( page.getByRole( `heading`, { name: /smart work/i } ) ).not.toBeVisible()
         expect( errors ).toEqual( [] )
     } )
 
@@ -143,15 +181,19 @@ test.describe( `Pass 39 — Multi-step state transitions`, () => {
     test( `BW195 reading progress is restored on re-entry`, async ( { page } ) => {
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 1500 )
 
         // Navigate to chapter 3
+        const first_sentence = page.locator( `span[data-sentence-id]` ).first()
+        const chapter_one_id = await first_sentence.getAttribute( `data-sentence-id` )
         await page.keyboard.press( `ArrowRight` )
-        await page.waitForTimeout( 1500 )
+        await expect( first_sentence ).not.toHaveAttribute( `data-sentence-id`, chapter_one_id )
+        const chapter_two_id = await first_sentence.getAttribute( `data-sentence-id` )
         await page.keyboard.press( `ArrowRight` )
-        await page.waitForTimeout( 1500 )
+        await expect( first_sentence ).not.toHaveAttribute( `data-sentence-id`, chapter_two_id )
 
-        const progress_at_ch3 = await page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` ).textContent()
+        const progress = page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` )
+        const progress_at_ch3 = await progress.textContent()
+        await expect.poll( () => get_saved_chapter_index( page ) ).toBe( 2 )
 
         // Go back to library
         await page.keyboard.press( `Escape` )
@@ -159,10 +201,7 @@ test.describe( `Pass 39 — Multi-step state transitions`, () => {
 
         // Re-open the book (should skip language modal and restore progress)
         await open_reader( page )
-        await page.waitForTimeout( 2000 )
-
-        const progress_restored = await page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` ).textContent()
-        expect( progress_restored ).toBe( progress_at_ch3 )
+        await expect( progress ).toHaveText( progress_at_ch3 )
     } )
 
     // ── 7. Full round-trip: onboarding → library → reader → back ──
@@ -186,21 +225,13 @@ test.describe( `Pass 39 — Multi-step state transitions`, () => {
         await expect( page.getByRole( `heading`, { name: /smart work/i } ) ).toBeVisible( { timeout: 10000 } )
 
         // Open reader
-        await page.locator( `img[alt]` ).first().click()
-        await page.waitForURL( /\/read\// )
-
-        // Handle language modal
-        const start_btn = page.getByRole( `button`, { name: `Start Reading` } )
-        try {
-            await start_btn.waitFor( { state: `visible`, timeout: 3000 } )
-            await start_btn.click()
-        } catch { /* already dismissed */ }
-
-        await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible( { timeout: 10000 } )
+        await open_reader( page )
 
         // Navigate a chapter
+        const progress = page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` )
+        const progress_before = await progress.textContent()
         await page.keyboard.press( `ArrowRight` )
-        await page.waitForTimeout( 2000 )
+        await expect( progress ).not.toHaveText( progress_before )
 
         // Back to library
         await page.keyboard.press( `Escape` )
@@ -215,12 +246,13 @@ test.describe( `Pass 39 — Multi-step state transitions`, () => {
     test( `BW197 sepia theme sets warm background`, async ( { page } ) => {
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 1000 )
 
         await page.getByRole( `button`, { name: `Settings` } ).click()
-        await page.waitForTimeout( 300 )
+        await expect( page.getByRole( `heading`, { name: `Settings` } ) ).toBeVisible()
         await page.getByRole( `button`, { name: `Sepia` } ).click()
-        await page.waitForTimeout( 300 )
+        await expect.poll( () => page.evaluate( () =>
+            document.documentElement.getAttribute( `data-theme` )
+        ) ).toBe( `sepia` )
 
         const bg = await page.evaluate( () =>
             getComputedStyle( document.documentElement ).getPropertyValue( `--bg` ).trim()
@@ -236,9 +268,9 @@ test.describe( `Pass 39 — Multi-step state transitions`, () => {
     test( `BW198 TOC select navigates to chosen chapter`, async ( { page } ) => {
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 1500 )
 
-        const progress_before = await page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` ).textContent()
+        const progress = page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` )
+        const progress_before = await progress.textContent()
 
         // Find and use the TOC select
         const toc_select = page.locator( `select` ).first()
@@ -246,10 +278,8 @@ test.describe( `Pass 39 — Multi-step state transitions`, () => {
         if( options.length > 2 ) {
             // Select a later chapter
             await toc_select.selectOption( { index: 2 } )
-            await page.waitForTimeout( 2000 )
-
-            const progress_after = await page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` ).textContent()
-            expect( progress_after ).not.toBe( progress_before )
+            await expect( toc_select ).toHaveValue( `2` )
+            await expect( progress ).not.toHaveText( progress_before )
         }
     } )
 
@@ -261,20 +291,19 @@ test.describe( `Pass 39 — Multi-step state transitions`, () => {
 
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 2000 )
 
         // Open the explanation from the selected word's sheet.
         const sentence = page.locator( `span[data-sentence-id]` ).first()
-        await sentence.locator( `[data-translation-word-index]` ).first().click()
+        const first_word = sentence.locator( `[data-translation-word-index]` ).first()
+        await expect( first_word ).toBeVisible( { timeout: 15_000 } )
+        await first_word.click()
         await page.locator( `[data-translation-info-sheet]` ).getByRole( `button`, { name: `Explain` } ).click()
-        await page.waitForTimeout( 500 )
 
         // Popover should appear with "Translation Explanation" title
         await expect( page.getByText( `Translation Explanation` ) ).toBeVisible( { timeout: 3000 } )
 
         // Close the modal explicitly, leaving the persistent translation sheet alone.
         await page.getByRole( `button`, { name: `Close`, exact: true } ).click()
-        await page.waitForTimeout( 500 )
 
         // Should be gone
         await expect( page.getByText( `Translation Explanation` ) ).not.toBeVisible()

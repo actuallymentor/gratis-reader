@@ -3,6 +3,7 @@
  * and areas flagged by prior audit agents.
  */
 import { test, expect } from '@playwright/test'
+import { open_reader } from './helpers/setup.js'
 
 const DEMO_BOOK = `./tests/fixtures/book.epub`
 
@@ -53,13 +54,7 @@ const upload_book = async ( page ) => {
     await expect( page.getByRole( `heading`, { name: `Smart work beats hard work` } ) ).toBeVisible( { timeout: 10_000 } )
 }
 
-const enter_reader = async ( page ) => {
-    await page.locator( `img[alt]` ).first().click()
-    await page.waitForURL( /\/read\// )
-    const btn = page.getByRole( `button`, { name: `Start Reading` } )
-    try { await btn.waitFor( { state: `visible`, timeout: 3000 } ); await btn.click() } catch {}
-    await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible( { timeout: 10_000 } )
-}
+const enter_reader = open_reader
 
 test.describe( `Pass 22 — Bug Fixes & Edge Cases`, () => {
 
@@ -87,15 +82,14 @@ test.describe( `Pass 22 — Bug Fixes & Edge Cases`, () => {
 
         // Press arrow right — should NOT navigate
         await page.keyboard.press( `ArrowRight` )
-        await page.waitForTimeout( 500 )
+        await expect( page.getByText( `Font Size` ) ).toBeVisible()
 
         // Close settings
         await page.locator( `text=×` ).first().click()
-        await page.waitForTimeout( 300 )
+        await expect( page.getByText( `Font Size` ) ).not.toBeVisible()
 
         // Chapter should not have changed
-        const progress_after = await page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` ).first().textContent()
-        expect( progress_after ).toBe( progress_before )
+        await expect( page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` ).first() ).toHaveText( progress_before )
     } )
 
     test( `P22-02 arrow keys do NOT navigate when explanation popover is open`, async ( { page } ) => {
@@ -114,14 +108,13 @@ test.describe( `Pass 22 — Bug Fixes & Edge Cases`, () => {
 
         // Press arrow right — should NOT navigate
         await page.keyboard.press( `ArrowRight` )
-        await page.waitForTimeout( 500 )
+        await expect( page.getByText( `Translation Explanation` ) ).toBeVisible()
 
         // Close popover
         await page.keyboard.press( `Escape` )
-        await page.waitForTimeout( 300 )
+        await expect( page.getByText( `Translation Explanation` ) ).not.toBeVisible()
 
-        const progress_after = await page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` ).first().textContent()
-        expect( progress_after ).toBe( progress_before )
+        await expect( page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` ).first() ).toHaveText( progress_before )
     } )
 
     test( `P22-03 Escape key does NOT go to library when settings is open`, async ( { page } ) => {
@@ -136,10 +129,10 @@ test.describe( `Pass 22 — Bug Fixes & Edge Cases`, () => {
 
         // Press Escape — should close settings, NOT go to library
         await page.keyboard.press( `Escape` )
-        await page.waitForTimeout( 500 )
+        await expect( page.getByText( `Font Size` ) ).not.toBeVisible()
 
         // Should still be on reader page
-        expect( page.url() ).toContain( `/read/` )
+        await expect( page ).toHaveURL( /\/read\// )
     } )
 
     // ── BUG FIX: Explanation popover clears on language/level change ──
@@ -159,7 +152,6 @@ test.describe( `Pass 22 — Bug Fixes & Edge Cases`, () => {
 
         // Escape closes only the topmost modal. The selected word remains available.
         await page.keyboard.press( `Escape` )
-        await page.waitForTimeout( 300 )
         await expect( page.getByText( `Translation Explanation` ) ).not.toBeVisible()
         await expect( page.locator( `[data-translation-info-sheet]` ) ).toBeVisible()
 
@@ -169,7 +161,6 @@ test.describe( `Pass 22 — Bug Fixes & Edge Cases`, () => {
 
         // The modal's explicit close action has the same retained-sheet behavior.
         await page.getByRole( `button`, { name: `Close`, exact: true } ).click()
-        await page.waitForTimeout( 300 )
         await expect( page.getByText( `Translation Explanation` ) ).not.toBeVisible()
     } )
 
@@ -200,14 +191,14 @@ test.describe( `Pass 22 — Bug Fixes & Edge Cases`, () => {
 
         const model_select = page.locator( `select` ).last()
         await model_select.selectOption( `anthropic/claude-sonnet-4-6` )
-        await page.waitForTimeout( 500 )
+        await expect( model_select ).toHaveValue( `anthropic/claude-sonnet-4-6` )
 
         // Close settings
         await page.keyboard.press( `Escape` )
-        await page.waitForTimeout( 1000 )
+        await expect( page.getByText( `LLM Model` ) ).not.toBeVisible()
 
         // App should still be functional — sentences visible
-        expect( await page.locator( `span[data-sentence-id]` ).count() ).toBeGreaterThan( 0 )
+        await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible()
     } )
 
     // ── REGRESSION: Settings drawer features ────────────────────
@@ -267,15 +258,12 @@ test.describe( `Pass 22 — Bug Fixes & Edge Cases`, () => {
 
         // Click Next
         await page.getByRole( `button`, { name: /Next/ } ).click()
-        await page.waitForTimeout( 2000 )
-        const after_next = await page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` ).first().textContent()
-        expect( after_next ).not.toBe( initial )
+        const progress = page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` ).first()
+        await expect( progress ).not.toHaveText( initial )
 
         // Click Prev
         await page.getByRole( `button`, { name: /Prev/ } ).click()
-        await page.waitForTimeout( 2000 )
-        const after_prev = await page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` ).first().textContent()
-        expect( after_prev ).toBe( initial )
+        await expect( progress ).toHaveText( initial )
     } )
 
     test( `P22-10 arrow key navigation works when no overlay is open`, async ( { page } ) => {
@@ -288,9 +276,7 @@ test.describe( `Pass 22 — Bug Fixes & Edge Cases`, () => {
 
         // Arrow right should navigate
         await page.keyboard.press( `ArrowRight` )
-        await page.waitForTimeout( 2000 )
-        const after = await page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` ).first().textContent()
-        expect( after ).not.toBe( initial )
+        await expect( page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` ).first() ).not.toHaveText( initial )
     } )
 
     test( `P22-11 Escape goes to library when nothing is open`, async ( { page } ) => {
@@ -319,12 +305,9 @@ test.describe( `Pass 22 — Bug Fixes & Edge Cases`, () => {
         expect( text_before ).toContain( `[TRANSLATED]` )
 
         await sentence.dblclick()
-        await page.waitForTimeout( 500 )
-        const text_after = await sentence.innerText()
-        expect( text_after ).toContain( `[TRANSLATED]` )
+        await expect( sentence ).toContainText( `[TRANSLATED]` )
 
         await sentence.dblclick()
-        await page.waitForTimeout( 500 )
         await expect( sentence ).toContainText( `[TRANSLATED]` )
     } )
 
@@ -371,7 +354,6 @@ test.describe( `Pass 22 — Bug Fixes & Edge Cases`, () => {
 
         // Press arrow keys — should not navigate (modal is up)
         await page.keyboard.press( `ArrowRight` )
-        await page.waitForTimeout( 500 )
 
         // Modal should still be visible
         await expect( page.getByText( `Choose Your Language` ) ).toBeVisible()
@@ -386,10 +368,10 @@ test.describe( `Pass 22 — Bug Fixes & Edge Cases`, () => {
         await page.goto( `/` )
         await page.locator( `input[type="password"]` ).fill( `bad-key` )
         await page.getByRole( `button`, { name: /connect/i } ).click()
-        await page.waitForTimeout( 3000 )
+        await expect( page.getByText( /invalid api key/i ) ).toBeVisible()
 
         // Should still be on onboarding — not redirected
-        expect( page.url() ).not.toContain( `/library` )
+        await expect( page ).not.toHaveURL( /\/library/ )
     } )
 
     // ── REGRESSION: Back button ─────────────────────────────────
@@ -418,10 +400,9 @@ test.describe( `Pass 22 — Bug Fixes & Edge Cases`, () => {
         const slider = page.locator( `input[type="range"]` )
         await slider.fill( `28` )
         await page.keyboard.press( `Escape` )
-        await page.waitForTimeout( 300 )
 
-        const new_size = await page.locator( `main` ).evaluate( el => getComputedStyle( el ).fontSize )
-        expect( new_size ).not.toBe( initial_size )
+        await expect( page.locator( `main` ) ).toHaveCSS( `font-size`, `28px` )
+        expect( initial_size ).not.toBe( `28px` )
     } )
 
     // ── REGRESSION: Progress bar visible ────────────────────────
@@ -441,10 +422,7 @@ test.describe( `Pass 22 — Bug Fixes & Edge Cases`, () => {
     test( `P22-20 unknown route redirects to library or onboarding`, async ( { page } ) => {
         await setup_key( page )
         await page.goto( `/totally-random-url` )
-        await page.waitForTimeout( 2000 )
-        // Should be on library (has key) or onboarding (no key)
-        const url = page.url()
-        expect( url.includes( `/library` ) || url.includes( `/` ) ).toBeTruthy()
+        await expect( page ).toHaveURL( /\/library\/?$/ )
     } )
 
     // ── REGRESSION: TOC dropdown ────────────────────────────────

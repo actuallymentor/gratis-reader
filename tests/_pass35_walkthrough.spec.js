@@ -24,7 +24,10 @@ test.describe( `Pass 35 — Walkthrough`, () => {
 
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 2000 )
+        await expect(
+            page.locator( `span[data-sentence-id] [data-translation-word-index]` ).first()
+        ).toBeVisible( { timeout: 15_000 } )
+        await expect( page.getByText( `Translating...` ) ).not.toBeVisible()
 
         // Filter out known non-issues (e.g. React DevTools suggestions)
         const real_warnings = warnings.filter( w =>
@@ -52,7 +55,7 @@ test.describe( `Pass 35 — Walkthrough`, () => {
 
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 3000 )
+        await expect.poll( () => captured_headers, { timeout: 15_000 } ).not.toBeNull()
 
         expect( captured_headers ).toBeTruthy()
         expect( captured_headers[`authorization`] ).toMatch( /^Bearer\s+\S+/ )
@@ -77,7 +80,7 @@ test.describe( `Pass 35 — Walkthrough`, () => {
 
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 3000 )
+        await expect.poll( () => captured_body, { timeout: 15_000 } ).not.toBeNull()
 
         expect( captured_body ).toBeTruthy()
         expect( captured_body.model ).toBeTruthy()
@@ -99,13 +102,16 @@ test.describe( `Pass 35 — Walkthrough`, () => {
 
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 2000 )
+        await expect(
+            page.locator( `span[data-sentence-id] [data-translation-word-index]` ).first()
+        ).toBeVisible( { timeout: 15_000 } )
 
         // Change theme to sepia
         await page.getByRole( `button`, { name: `Settings` } ).click()
         await page.getByRole( `button`, { name: `Sepia` } ).click()
+        await expect( page.locator( `html` ) ).toHaveAttribute( `data-theme`, `sepia` )
         await page.getByRole( `button`, { name: `Close` } ).click()
-        await page.waitForTimeout( 300 )
+        await expect( page.getByText( `FONT SIZE` ) ).not.toBeVisible()
 
         // Inspect a word and then close its sheet.
         await page.locator( `span[data-sentence-id] [data-translation-word-index]` ).first().click()
@@ -130,20 +136,20 @@ test.describe( `Pass 35 — Walkthrough`, () => {
 
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 500 )
 
-        // Navigate forward rapidly
-        for( let i = 0; i < 3; i++ ) {
-            await page.keyboard.press( `ArrowRight` )
-            await page.waitForTimeout( 50 )
-        }
+        const toc = page.locator( `header select` )
+        await expect( toc ).toBeVisible()
+
+        // Keep the key burst genuinely rapid; the settings interaction below is
+        // the responsiveness barrier after all three events have been queued.
+        for( let i = 0; i < 3; i++ ) await page.keyboard.press( `ArrowRight` )
 
         // Immediately open settings
         await page.getByRole( `button`, { name: `Settings` } ).click()
-        await page.waitForTimeout( 500 )
 
         // Settings should be visible without crash
         await expect( page.getByText( `FONT SIZE` ) ).toBeVisible( { timeout: 3000 } )
+        await expect( toc ).toHaveValue( `3` )
         expect( errors ).toEqual( [] )
     } )
 
@@ -167,7 +173,8 @@ test.describe( `Pass 35 — Walkthrough`, () => {
         // First visit — translations fetched from API
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 3000 )
+        await expect( page.locator( `body` ) ).toContainText( `[CACHED]`, { timeout: 15_000 } )
+        await expect( page.getByText( `Translating...` ) ).not.toBeVisible()
 
         const first_count = api_call_count
 
@@ -184,7 +191,8 @@ test.describe( `Pass 35 — Walkthrough`, () => {
             await start.waitFor( { state: `visible`, timeout: 2000 } )
             await start.click()
         } catch { /* no modal */ }
-        await page.waitForTimeout( 3000 )
+        await expect( page.locator( `body` ) ).toContainText( `[CACHED]`, { timeout: 15_000 } )
+        await expect( page.getByText( `Translating...` ) ).not.toBeVisible()
 
         // Second visit should have fewer API calls (served from cache)
         expect( api_call_count ).toBeLessThan( first_count )
@@ -195,7 +203,7 @@ test.describe( `Pass 35 — Walkthrough`, () => {
     test( `BW144 sentences with special chars render without XSS`, async ( { page } ) => {
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 2000 )
+        await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible()
 
         // No script tags should exist in the reading area
         const scripts = await page.locator( `main script` ).count()

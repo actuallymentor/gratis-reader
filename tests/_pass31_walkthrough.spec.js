@@ -46,7 +46,9 @@ test.describe( `Pass 31 — Walkthrough`, () => {
 
         // Open reader
         await open_reader( page )
-        await page.waitForTimeout( 2000 )
+        await expect(
+            page.locator( `span[data-sentence-id] [data-translation-word-index]` ).first()
+        ).toBeVisible( { timeout: 15_000 } )
 
         // Verify translations arrived
         const text = await page.locator( `span[data-sentence-id]` ).first().textContent()
@@ -58,7 +60,7 @@ test.describe( `Pass 31 — Walkthrough`, () => {
 
         // Change theme
         await page.getByRole( `button`, { name: `Sepia` } ).click()
-        await page.waitForTimeout( 300 )
+        await expect( page.locator( `html` ) ).toHaveAttribute( `data-theme`, `sepia` )
 
         const theme = await page.evaluate( () =>
             document.documentElement.getAttribute( `data-theme` )
@@ -77,7 +79,7 @@ test.describe( `Pass 31 — Walkthrough`, () => {
     test( `BW95 EPUB text content rendered as plain text, not HTML`, async ( { page } ) => {
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 1000 )
+        await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible()
 
         // Verify no script tags or HTML tags in sentence text
         const sentence_texts = await page.$$eval(
@@ -98,7 +100,9 @@ test.describe( `Pass 31 — Walkthrough`, () => {
     test( `BW96 API key not leaked to page text`, async ( { page } ) => {
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 2000 )
+        await expect(
+            page.locator( `span[data-sentence-id] [data-translation-word-index]` ).first()
+        ).toBeVisible( { timeout: 15_000 } )
 
         const body_text = await page.locator( `body` ).textContent()
 
@@ -133,10 +137,9 @@ test.describe( `Pass 31 — Walkthrough`, () => {
 
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 4000 )
 
         // Check IndexedDB for translation cache entries
-        const cache_keys = await page.evaluate( async () => {
+        const read_cache_keys = () => page.evaluate( async () => {
             return new Promise( ( resolve, reject ) => {
                 const req = indexedDB.open( `gratis_reader` )
                 req.onsuccess = () => {
@@ -150,6 +153,8 @@ test.describe( `Pass 31 — Walkthrough`, () => {
                 req.onerror = () => reject( req.error )
             } )
         } )
+        await expect.poll( read_cache_keys, { timeout: 15_000 } ).not.toHaveLength( 0 )
+        const cache_keys = await read_cache_keys()
 
         expect( cache_keys.length ).toBeGreaterThan( 0 )
 
@@ -184,7 +189,7 @@ test.describe( `Pass 31 — Walkthrough`, () => {
 
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 3000 )
+        await expect.poll( () => system_prompt, { timeout: 15_000 } ).not.toBe( `` )
 
         // Verify system prompt per spec §5
         expect( system_prompt ).toBeTruthy()
@@ -200,7 +205,6 @@ test.describe( `Pass 31 — Walkthrough`, () => {
     test( `BW99 cover object URLs are created for display`, async ( { page } ) => {
         await upload_demo_book( page )
         await page.goto( `/library` )
-        await page.waitForTimeout( 1000 )
 
         // Cover image should be visible
         const img = page.locator( `img[alt]` ).first()

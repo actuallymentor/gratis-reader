@@ -4,6 +4,7 @@
  * OpenRouter timeout/JSON safety, and additional edge cases.
  */
 import { test, expect } from '@playwright/test'
+import { open_reader } from './helpers/setup.js'
 
 const DEMO_BOOK = `./tests/fixtures/book.epub`
 
@@ -65,11 +66,7 @@ const upload_and_read = async ( page ) => {
         await page.locator( `input[type="file"]` ).setInputFiles( DEMO_BOOK )
         await expect( demo_book ).toBeVisible( { timeout: 10000 } )
     }
-    await page.locator( `img[alt="Smart work beats hard work"]` ).first().click()
-    await page.waitForURL( /\/read\// )
-    const start = page.getByRole( `button`, { name: `Start Reading` } )
-    try { await start.waitFor( { state: `visible`, timeout: 3000 } ); await start.click() } catch {}
-    await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible( { timeout: 10000 } )
+    await open_reader( page )
 }
 
 // ─── Tests ───
@@ -128,23 +125,33 @@ test.describe( `Pass 25 — Regression & Coverage`, () => {
     // --- OpenRouter timeout & JSON safety ---
 
     test( `P25-06 API timeout does not crash the app`, async ( { page } ) => {
+        let release_response
+        const response_gate = new Promise( resolve => { release_response = resolve } )
+
         // Override the mock to simulate a very slow response
         await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
             // Don't respond — simulate timeout
             // The app should handle this gracefully
-            await new Promise( r => setTimeout( r, 5000 ) )
+            await response_gate
             await route.fulfill( {
                 contentType: `application/json`,
                 body: JSON.stringify( { choices: [ { message: { content: `[TR] late` } } ] } )
             } )
         } )
+
+        const pending_request = page.waitForRequest( request =>
+            request.url().includes( `openrouter.ai/api/v1/chat/completions` )
+        )
         await upload_and_read( page )
+        await pending_request
 
         // Tap a sentence — should not crash even with slow API
         await page.locator( `span[data-sentence-id]` ).first().click()
-        await page.waitForTimeout( 2000 )
         // App should still be functional
-        expect( await page.locator( `span[data-sentence-id]` ).count() ).toBeGreaterThan( 0 )
+        await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible()
+
+        release_response()
+        await expect( page.getByText( /\[TR\] late/ ).first() ).toBeVisible()
     } )
 
     test( `P25-07 malformed JSON response does not crash`, async ( { page } ) => {
@@ -154,12 +161,15 @@ test.describe( `Pass 25 — Regression & Coverage`, () => {
                 body: `<html><body>Service Unavailable</body></html>`
             } )
         } )
+        const malformed_response = page.waitForResponse( response =>
+            response.url().includes( `openrouter.ai/api/v1/chat/completions` )
+        )
         await upload_and_read( page )
+        await malformed_response
 
         await page.locator( `span[data-sentence-id]` ).first().click()
-        await page.waitForTimeout( 2000 )
         // App should still work — no crash
-        expect( await page.locator( `span[data-sentence-id]` ).count() ).toBeGreaterThan( 0 )
+        await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible()
     } )
 
     // --- Information-sheet overflow protection ---
@@ -186,13 +196,11 @@ test.describe( `Pass 25 — Regression & Coverage`, () => {
 
         // Tap a word span
         const word = page.locator( `span[data-sentence-id] [data-translation-word-index]` ).first()
-        if( await word.count() > 0 ) {
-            await word.click()
-            await page.waitForTimeout( 500 )
-            await expect( page.locator( `[data-translation-info-sheet]` ) ).toBeVisible()
-            // App should not crash — the sheet should keep long content bounded.
-            expect( await page.locator( `span[data-sentence-id]` ).count() ).toBeGreaterThan( 0 )
-        }
+        await expect( word ).toBeVisible()
+        await word.click()
+        await expect( page.locator( `[data-translation-info-sheet]` ) ).toBeVisible()
+        // App should not crash — the sheet should keep long content bounded.
+        await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible()
     } )
 
     // --- Book deletion cleans up properly ---
@@ -201,8 +209,10 @@ test.describe( `Pass 25 — Regression & Coverage`, () => {
         await upload_and_read( page )
 
         // Generate some reading progress by navigating
+        const progress = page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` ).first()
+        const progress_before = await progress.textContent()
         await page.keyboard.press( `ArrowRight` )
-        await page.waitForTimeout( 1500 )
+        await expect( progress ).not.toHaveText( progress_before )
 
         // Go back to library and delete
         await page.goto( `/library` )
@@ -210,7 +220,6 @@ test.describe( `Pass 25 — Regression & Coverage`, () => {
 
         page.once( `dialog`, dialog => dialog.accept() )
         await page.getByRole( `button`, { name: `Remove` } ).first().click()
-        await page.waitForTimeout( 1000 )
 
         // Verify the uploaded book is gone without counting Gutenberg catalog headings.
         await expect( page.getByRole( `heading`, { name: `Smart work beats hard work` } ) ).toHaveCount( 0 )
@@ -246,17 +255,16 @@ test.describe( `Pass 25 — Regression & Coverage`, () => {
         await page.getByRole( `button`, { name: /settings/i } ).click()
         await expect( page.getByText( /font size/i ) ).toBeVisible( { timeout: 3000 } )
 
-        // Get current URL (which includes chapter position)
-        const url_before = page.url()
+        // Get the current chapter indicator.
+        const progress = page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` ).first()
+        const progress_before = await progress.textContent()
 
         // Press arrow keys while settings is open
         await page.keyboard.press( `ArrowRight` )
-        await page.waitForTimeout( 500 )
         await page.keyboard.press( `ArrowLeft` )
-        await page.waitForTimeout( 500 )
 
-        // URL should not have changed (no navigation occurred)
-        expect( page.url() ).toBe( url_before )
+        // Chapter should not have changed.
+        await expect( progress ).toHaveText( progress_before )
 
         // Settings should still be visible
         await expect( page.getByText( /font size/i ) ).toBeVisible()
@@ -266,10 +274,10 @@ test.describe( `Pass 25 — Regression & Coverage`, () => {
 
     test( `P25-11 drag-and-drop file upload works`, async ( { page } ) => {
         await page.goto( `/library` )
-        await page.waitForTimeout( 500 )
 
         // Use the file input as proxy (Playwright can't simulate real DnD with files easily)
         const input = page.locator( `input[type="file"]` )
+        await expect( input ).toBeAttached()
         await input.setInputFiles( DEMO_BOOK )
         await expect( page.locator( `h3` ).first() ).toBeVisible( { timeout: 10000 } )
     } )
@@ -284,16 +292,10 @@ test.describe( `Pass 25 — Regression & Coverage`, () => {
         await page.getByRole( `button`, { name: /settings/i } ).click()
         await expect( page.getByText( /font size/i ) ).toBeVisible( { timeout: 3000 } )
 
-        // Look for language label or dropdown
-        const lang_label = page.getByText( /language/i )
-        if( await lang_label.count() > 0 ) {
-            // Click on language area to open dropdown/modal
-            await lang_label.first().click()
-            await page.waitForTimeout( 500 )
-
-            // App should not crash when interacting with language
-            expect( await page.locator( `span[data-sentence-id]` ).count() >= 0 ).toBe( true )
-        }
+        const lang_input = page.locator( `input[placeholder="Search languages..."]` )
+        await expect( lang_input ).toBeVisible()
+        await lang_input.fill( `Japan` )
+        await expect( page.getByText( `Japanese`, { exact: true } ) ).toBeVisible()
     } )
 
     // --- Back button navigation ---
@@ -319,15 +321,12 @@ test.describe( `Pass 25 — Regression & Coverage`, () => {
 
         // Click first sentence
         await sentences.nth( 0 ).click()
-        await page.waitForTimeout( 1000 )
 
         // Click second sentence
         await sentences.nth( 1 ).click()
-        await page.waitForTimeout( 1000 )
 
         // Both should have translations (check for [TR] markers)
-        const tr_count = await page.locator( `text=/\\[TR\\]/` ).count()
-        expect( tr_count ).toBeGreaterThanOrEqual( 1 )
+        await expect( page.locator( `text=/\\[TR\\]/` ).first() ).toBeVisible()
     } )
 
     // --- Escape key from reader returns to library ---

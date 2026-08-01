@@ -19,14 +19,12 @@ test.describe( `Pass 36 — Walkthrough`, () => {
 
         // Go offline
         await page.context().setOffline( true )
-        await page.waitForTimeout( 500 )
 
         // Offline banner should appear
         await expect( page.getByText( /offline/i ) ).toBeVisible()
 
         // Go back online
         await page.context().setOffline( false )
-        await page.waitForTimeout( 500 )
 
         // Banner should disappear
         await expect( page.getByText( /offline.*cached/i ) ).not.toBeVisible()
@@ -37,15 +35,12 @@ test.describe( `Pass 36 — Walkthrough`, () => {
     test( `BW147 reader page shows offline banner when network drops`, async ( { page } ) => {
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 1000 )
 
         await page.context().setOffline( true )
-        await page.waitForTimeout( 500 )
 
         await expect( page.getByText( /offline/i ) ).toBeVisible()
 
         await page.context().setOffline( false )
-        await page.waitForTimeout( 500 )
 
         await expect( page.getByText( /offline.*cached/i ) ).not.toBeVisible()
     } )
@@ -78,14 +73,13 @@ test.describe( `Pass 36 — Walkthrough`, () => {
         await page.goto( `/library` )
 
         await page.getByRole( `button`, { name: `Settings` } ).click()
-        await page.waitForTimeout( 500 )
 
         // Settings content should be visible
         await expect( page.getByText( `FONT SIZE` ) ).toBeVisible( { timeout: 3000 } )
 
         // Close it
         await page.getByRole( `button`, { name: `Close` } ).click()
-        await page.waitForTimeout( 300 )
+        await expect( page.getByText( `FONT SIZE` ) ).not.toBeVisible()
     } )
 
     // ── 6. Sentence splitter handles real book content ──
@@ -93,7 +87,7 @@ test.describe( `Pass 36 — Walkthrough`, () => {
     test( `BW151 all sentences in reader have non-empty text content`, async ( { page } ) => {
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 2000 )
+        await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible()
 
         const texts = await page.$$eval(
             `span[data-sentence-id]`,
@@ -124,7 +118,7 @@ test.describe( `Pass 36 — Walkthrough`, () => {
         } )
 
         await page.goto( `/library` )
-        await page.waitForTimeout( 500 )
+        await expect( page.locator( `html` ) ).toHaveAttribute( `data-theme`, `dark` )
 
         const theme = await page.evaluate( () =>
             document.documentElement.getAttribute( `data-theme` )

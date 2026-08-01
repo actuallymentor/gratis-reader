@@ -18,14 +18,14 @@ test.describe( `Pass 33 — Walkthrough`, () => {
     test( `BW116 inspecting one sentence does not affect others`, async ( { page } ) => {
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 2000 )
 
         const sentences = page.locator( `span[data-sentence-id]` )
-        const count = await sentences.count()
-        if( count < 2 ) return
+        await expect( sentences.nth( 1 ) ).toBeVisible()
 
         const first_word = sentences.first().locator( `[data-translation-word-index]` ).first()
         const second_word = sentences.nth( 1 ).locator( `[data-translation-word-index]` ).first()
+        await expect( first_word ).toBeVisible( { timeout: 15_000 } )
+        await expect( second_word ).toBeVisible( { timeout: 15_000 } )
         await first_word.click()
 
         await expect( first_word ).toHaveAttribute( `aria-pressed`, `true` )
@@ -37,7 +37,6 @@ test.describe( `Pass 33 — Walkthrough`, () => {
     test( `BW117 chapter headings render with correct HTML element types`, async ( { page } ) => {
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 1000 )
 
         // The reading area should exist
         const reading_area = page.locator( `[style*="font-size"], main, article, section` ).first()
@@ -59,8 +58,12 @@ test.describe( `Pass 33 — Walkthrough`, () => {
         await expect( page.getByText( `FONT SIZE` ) ).toBeVisible( { timeout: 3000 } )
         const slider = page.locator( `input[type="range"]` ).first()
         await slider.fill( `28` )
+        await expect( slider ).toHaveValue( `28` )
         await page.getByRole( `button`, { name: `Close` } ).click()
-        await page.waitForTimeout( 300 )
+        await expect.poll( () => page.evaluate( () => {
+            const store = JSON.parse( localStorage.getItem( `settings-storage` ) || `{}` )
+            return store?.state?.font_size
+        } ) ).toBe( 28 )
 
         // Hard reload
         await page.reload()
@@ -81,19 +84,18 @@ test.describe( `Pass 33 — Walkthrough`, () => {
 
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 1000 )
 
-        // Rapid forward/back navigation
-        for( let i = 0; i < 5; i++ ) {
-            await page.keyboard.press( `ArrowRight` )
-            await page.waitForTimeout( 100 )
-        }
-        for( let i = 0; i < 5; i++ ) {
-            await page.keyboard.press( `ArrowLeft` )
-            await page.waitForTimeout( 100 )
-        }
+        const toc = page.locator( `header select` )
+        await expect( toc ).toBeVisible()
 
-        await page.waitForTimeout( 1000 )
+        // Send each directional burst without serializing it on intermediate UI.
+        for( let i = 0; i < 5; i++ ) await page.keyboard.press( `ArrowRight` )
+        await expect( toc ).toHaveValue( `5` )
+
+        for( let i = 0; i < 5; i++ ) await page.keyboard.press( `ArrowLeft` )
+
+        await expect( toc ).toHaveValue( `0` )
+        await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible()
         expect( errors ).toEqual( [] )
     } )
 
@@ -102,15 +104,12 @@ test.describe( `Pass 33 — Walkthrough`, () => {
     test( `BW120 clicking a translated word shows information sheet`, async ( { page } ) => {
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 2000 )
 
         // Find a word span inside a translated sentence
         const word = page.locator( `span[data-sentence-id] [data-translation-word-index]` ).first()
-
-        if( await word.count() > 0 ) {
-            await word.click()
-            await expect( page.locator( `[data-translation-info-sheet]` ) ).toBeVisible()
-        }
+        await expect( word ).toBeVisible( { timeout: 15_000 } )
+        await word.click()
+        await expect( page.locator( `[data-translation-info-sheet]` ) ).toBeVisible()
 
         // Main check: no errors from clicking
         const errors = []
@@ -153,7 +152,7 @@ test.describe( `Pass 33 — Walkthrough`, () => {
     test( `BW123 mock translations render with [TRANSLATED] prefix`, async ( { page } ) => {
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 3000 )
+        await expect( page.locator( `body` ) ).toContainText( `[TRANSLATED]`, { timeout: 15_000 } )
 
         const body_text = await page.locator( `body` ).textContent()
         expect( body_text ).toContain( `[TRANSLATED]` )
@@ -164,7 +163,6 @@ test.describe( `Pass 33 — Walkthrough`, () => {
     test( `BW124 reading area contains paragraph elements`, async ( { page } ) => {
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 1000 )
 
         // Should have paragraph-like structures with sentences
         const sentence_count = await page.locator( `span[data-sentence-id]` ).count()
@@ -182,7 +180,9 @@ test.describe( `Pass 33 — Walkthrough`, () => {
         page.on( `pageerror`, e => errors.push( e.message ) )
 
         await page.goto( `/library` )
-        await page.waitForTimeout( 2000 )
+        await expect(
+            page.getByText( /public domain books from Project Gutenberg/i )
+        ).toBeVisible( { timeout: 10_000 } )
 
         expect( errors ).toEqual( [] )
     } )

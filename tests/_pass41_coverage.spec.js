@@ -9,6 +9,39 @@
 import { test, expect } from '@playwright/test'
 import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth, clear_storage } from './helpers/setup.js'
 
+const get_store_count = async ( page, store_name ) => page.evaluate( async ( name ) => {
+    return new Promise( resolve => {
+        const req = indexedDB.open( `gratis_reader` )
+        req.onsuccess = () => {
+            const tx = req.result.transaction( name, `readonly` )
+            const count_req = tx.objectStore( name ).count()
+            count_req.onsuccess = () => resolve( count_req.result )
+            count_req.onerror = () => resolve( -1 )
+        }
+        req.onerror = () => resolve( -1 )
+    } )
+}, store_name )
+
+const accept_confirmation = async ( page, expected_message, action ) => {
+
+    const handled = new Promise( ( resolve, reject ) => {
+        page.once( `dialog`, async dialog => {
+            try {
+                expect( dialog.type() ).toBe( `confirm` )
+                expect( dialog.message() ).toBe( expected_message )
+                await dialog.accept()
+                resolve()
+            } catch( error ) {
+                reject( error )
+            }
+        } )
+    } )
+
+    await action()
+    await handled
+
+}
+
 test.describe( `Pass 41 — Coverage Gaps`, () => {
 
     test.beforeEach( async ( { page } ) => {
@@ -26,52 +59,26 @@ test.describe( `Pass 41 — Coverage Gaps`, () => {
         // Upload book and read it to generate token usage
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 5000 )
 
         // Verify token_usage was stored in IDB
-        const usage_before = await page.evaluate( async () => {
-            return new Promise( resolve => {
-                const req = indexedDB.open( `gratis_reader` )
-                req.onsuccess = ( e ) => {
-                    const db = e.target.result
-                    const tx = db.transaction( `token_usage`, `readonly` )
-                    const store = tx.objectStore( `token_usage` )
-                    const count_req = store.count()
-                    count_req.onsuccess = () => resolve( count_req.result )
-                    count_req.onerror = () => resolve( 0 )
-                }
-                req.onerror = () => resolve( 0 )
-            } )
-        } )
-
-        expect( usage_before ).toBeGreaterThan( 0 )
+        await expect.poll(
+            () => get_store_count( page, `token_usage` ),
+            { timeout: 30_000 }
+        ).toBeGreaterThan( 0 )
 
         // Go back to library
         await page.getByRole( `button`, { name: /back/i } ).click()
         await page.waitForURL( /\/library/ )
 
         // Delete the book
-        page.on( `dialog`, dialog => dialog.accept() )
-        await page.getByRole( `button`, { name: `Remove` } ).click()
-        await page.waitForTimeout( 2000 )
+        await accept_confirmation(
+            page,
+            `Remove "Smart work beats hard work" from your library?`,
+            () => page.getByRole( `button`, { name: `Remove` } ).click()
+        )
 
         // Verify token_usage was cleaned up
-        const usage_after = await page.evaluate( async () => {
-            return new Promise( resolve => {
-                const req = indexedDB.open( `gratis_reader` )
-                req.onsuccess = ( e ) => {
-                    const db = e.target.result
-                    const tx = db.transaction( `token_usage`, `readonly` )
-                    const store = tx.objectStore( `token_usage` )
-                    const count_req = store.count()
-                    count_req.onsuccess = () => resolve( count_req.result )
-                    count_req.onerror = () => resolve( -1 )
-                }
-                req.onerror = () => resolve( -1 )
-            } )
-        } )
-
-        expect( usage_after ).toBe( 0 )
+        await expect.poll( () => get_store_count( page, `token_usage` ) ).toBe( 0 )
 
     } )
 
@@ -83,25 +90,12 @@ test.describe( `Pass 41 — Coverage Gaps`, () => {
         // Upload book and read to populate translation cache
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 5000 )
 
         // Verify translations were cached
-        const cache_before = await page.evaluate( async () => {
-            return new Promise( resolve => {
-                const req = indexedDB.open( `gratis_reader` )
-                req.onsuccess = ( e ) => {
-                    const db = e.target.result
-                    const tx = db.transaction( `translations`, `readonly` )
-                    const store = tx.objectStore( `translations` )
-                    const count_req = store.count()
-                    count_req.onsuccess = () => resolve( count_req.result )
-                    count_req.onerror = () => resolve( 0 )
-                }
-                req.onerror = () => resolve( 0 )
-            } )
-        } )
-
-        expect( cache_before ).toBeGreaterThan( 0 )
+        await expect.poll(
+            () => get_store_count( page, `translations` ),
+            { timeout: 30_000 }
+        ).toBeGreaterThan( 0 )
 
         // Go back to library and open settings
         await page.getByRole( `button`, { name: /back/i } ).click()
@@ -110,27 +104,15 @@ test.describe( `Pass 41 — Coverage Gaps`, () => {
         await page.getByRole( `button`, { name: `Settings` } ).click()
 
         // Accept confirmation dialog and clear cache
-        page.on( `dialog`, dialog => dialog.accept() )
-        await page.getByRole( `button`, { name: `Clear Translation Cache` } ).click()
-        await page.waitForTimeout( 2000 )
+        await accept_confirmation(
+            page,
+            `Clear all cached translations? This cannot be undone.`,
+            () => page.getByRole( `button`, { name: `Clear Translation Cache` } ).click()
+        )
 
         // Verify translations store is now empty
-        const cache_after = await page.evaluate( async () => {
-            return new Promise( resolve => {
-                const req = indexedDB.open( `gratis_reader` )
-                req.onsuccess = ( e ) => {
-                    const db = e.target.result
-                    const tx = db.transaction( `translations`, `readonly` )
-                    const store = tx.objectStore( `translations` )
-                    const count_req = store.count()
-                    count_req.onsuccess = () => resolve( count_req.result )
-                    count_req.onerror = () => resolve( -1 )
-                }
-                req.onerror = () => resolve( -1 )
-            } )
-        } )
-
-        expect( cache_after ).toBe( 0 )
+        await expect( page.getByText( `Translation cache cleared` ) ).toBeVisible()
+        await expect.poll( () => get_store_count( page, `translations` ) ).toBe( 0 )
 
     } )
 
@@ -167,55 +149,28 @@ test.describe( `Pass 41 — Coverage Gaps`, () => {
         // Upload and read to generate progress
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 3000 )
 
         // Navigate to chapter 2 to ensure progress is saved
+        const first_sentence = page.locator( `span[data-sentence-id]` ).first()
+        const first_id = await first_sentence.getAttribute( `data-sentence-id` )
         await page.keyboard.press( `ArrowRight` )
-        await page.waitForTimeout( 2000 )
+        await expect( first_sentence ).not.toHaveAttribute( `data-sentence-id`, first_id )
 
         // Verify progress exists in IDB
-        const progress_before = await page.evaluate( async () => {
-            return new Promise( resolve => {
-                const req = indexedDB.open( `gratis_reader` )
-                req.onsuccess = ( e ) => {
-                    const db = e.target.result
-                    const tx = db.transaction( `progress`, `readonly` )
-                    const store = tx.objectStore( `progress` )
-                    const count_req = store.count()
-                    count_req.onsuccess = () => resolve( count_req.result )
-                    count_req.onerror = () => resolve( 0 )
-                }
-                req.onerror = () => resolve( 0 )
-            } )
-        } )
-
-        expect( progress_before ).toBeGreaterThan( 0 )
+        await expect.poll( () => get_store_count( page, `progress` ) ).toBeGreaterThan( 0 )
 
         // Go back to library and delete
         await page.getByRole( `button`, { name: /back/i } ).click()
         await page.waitForURL( /\/library/ )
 
-        page.on( `dialog`, dialog => dialog.accept() )
-        await page.getByRole( `button`, { name: `Remove` } ).click()
-        await page.waitForTimeout( 2000 )
+        await accept_confirmation(
+            page,
+            `Remove "Smart work beats hard work" from your library?`,
+            () => page.getByRole( `button`, { name: `Remove` } ).click()
+        )
 
         // Verify progress was cleaned up
-        const progress_after = await page.evaluate( async () => {
-            return new Promise( resolve => {
-                const req = indexedDB.open( `gratis_reader` )
-                req.onsuccess = ( e ) => {
-                    const db = e.target.result
-                    const tx = db.transaction( `progress`, `readonly` )
-                    const store = tx.objectStore( `progress` )
-                    const count_req = store.count()
-                    count_req.onsuccess = () => resolve( count_req.result )
-                    count_req.onerror = () => resolve( -1 )
-                }
-                req.onerror = () => resolve( -1 )
-            } )
-        } )
-
-        expect( progress_after ).toBe( 0 )
+        await expect.poll( () => get_store_count( page, `progress` ) ).toBe( 0 )
 
     } )
 
@@ -227,51 +182,25 @@ test.describe( `Pass 41 — Coverage Gaps`, () => {
         // Upload and read to populate translation cache
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 5000 )
 
         // Verify translations exist
-        const trans_before = await page.evaluate( async () => {
-            return new Promise( resolve => {
-                const req = indexedDB.open( `gratis_reader` )
-                req.onsuccess = ( e ) => {
-                    const db = e.target.result
-                    const tx = db.transaction( `translations`, `readonly` )
-                    const store = tx.objectStore( `translations` )
-                    const count_req = store.count()
-                    count_req.onsuccess = () => resolve( count_req.result )
-                    count_req.onerror = () => resolve( 0 )
-                }
-                req.onerror = () => resolve( 0 )
-            } )
-        } )
-
-        expect( trans_before ).toBeGreaterThan( 0 )
+        await expect.poll(
+            () => get_store_count( page, `translations` ),
+            { timeout: 30_000 }
+        ).toBeGreaterThan( 0 )
 
         // Go back and delete the book
         await page.getByRole( `button`, { name: /back/i } ).click()
         await page.waitForURL( /\/library/ )
 
-        page.on( `dialog`, dialog => dialog.accept() )
-        await page.getByRole( `button`, { name: `Remove` } ).click()
-        await page.waitForTimeout( 2000 )
+        await accept_confirmation(
+            page,
+            `Remove "Smart work beats hard work" from your library?`,
+            () => page.getByRole( `button`, { name: `Remove` } ).click()
+        )
 
         // Verify translations were cleaned up
-        const trans_after = await page.evaluate( async () => {
-            return new Promise( resolve => {
-                const req = indexedDB.open( `gratis_reader` )
-                req.onsuccess = ( e ) => {
-                    const db = e.target.result
-                    const tx = db.transaction( `translations`, `readonly` )
-                    const store = tx.objectStore( `translations` )
-                    const count_req = store.count()
-                    count_req.onsuccess = () => resolve( count_req.result )
-                    count_req.onerror = () => resolve( -1 )
-                }
-                req.onerror = () => resolve( -1 )
-            } )
-        } )
-
-        expect( trans_after ).toBe( 0 )
+        await expect.poll( () => get_store_count( page, `translations` ) ).toBe( 0 )
 
     } )
 

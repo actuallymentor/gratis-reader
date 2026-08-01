@@ -25,7 +25,6 @@ test.describe( `Pass 27 — Coverage Expansion`, () => {
 
     test( `P27-01 uploading a non-EPUB file shows error`, async ( { page } ) => {
         await page.goto( `/library` )
-        await page.waitForTimeout( 500 )
 
         // Create a fake .mobi file
         const buffer = Buffer.from( `fake mobi content` )
@@ -34,7 +33,7 @@ test.describe( `Pass 27 — Coverage Expansion`, () => {
             mimeType: `application/octet-stream`,
             buffer
         } )
-        await page.waitForTimeout( 2000 )
+        await expect( page.getByText( /only epub files are supported/i ) ).toBeVisible()
 
         // Should NOT create a book card (file rejected)
         const demo_book = page.getByRole( `heading`, { name: `Smart work beats hard work` } )
@@ -73,12 +72,8 @@ test.describe( `Pass 27 — Coverage Expansion`, () => {
 
     test( `P27-04a A0 translation prompt allows caveman simplification`, async ( { page } ) => {
 
-        let captured_system = ``
-
         await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
             const body = JSON.parse( route.request().postData() )
-            const system_msg = body.messages?.find( m => m.role === `system` )?.content || ``
-            if( !captured_system && system_msg.length > 0 ) captured_system = system_msg
             const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
             const match = user_msg.match( /Translate this sentence:\n(.+)/s )
             const sentence = match ? match[1].trim() : `unknown`
@@ -96,8 +91,13 @@ test.describe( `Pass 27 — Coverage Expansion`, () => {
         } )
 
         await upload_demo_book( page )
+        const translation_request = page.waitForRequest( request =>
+            request.url().includes( `openrouter.ai/api/v1/chat/completions` ) &&
+            request.postData()?.includes( `Translate this sentence` )
+        )
         await open_reader( page )
-        await page.waitForTimeout( 3000 )
+        const body = ( await translation_request ).postDataJSON()
+        const captured_system = body.messages?.find( m => m.role === `system` )?.content || ``
 
         expect( captured_system ).toContain( `Caveman` )
         expect( captured_system ).toContain( `A0` )
@@ -106,12 +106,8 @@ test.describe( `Pass 27 — Coverage Expansion`, () => {
 
     test( `P27-04 A1 translation prompt includes strict simplification rules`, async ( { page } ) => {
 
-        let captured_system = ``
-
         await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
             const body = JSON.parse( route.request().postData() )
-            const system_msg = body.messages?.find( m => m.role === `system` )?.content || ``
-            if( !captured_system && system_msg.length > 0 ) captured_system = system_msg
             const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
             const match = user_msg.match( /Translate this sentence:\n(.+)/s )
             const sentence = match ? match[1].trim() : `unknown`
@@ -129,8 +125,13 @@ test.describe( `Pass 27 — Coverage Expansion`, () => {
         } )
 
         await upload_demo_book( page )
+        const translation_request = page.waitForRequest( request =>
+            request.url().includes( `openrouter.ai/api/v1/chat/completions` ) &&
+            request.postData()?.includes( `Translate this sentence` )
+        )
         await open_reader( page )
-        await page.waitForTimeout( 3000 )
+        const body = ( await translation_request ).postDataJSON()
+        const captured_system = body.messages?.find( m => m.role === `system` )?.content || ``
 
         // System prompt should contain A1-specific rules
         expect( captured_system ).toContain( `language teacher` )
@@ -139,12 +140,8 @@ test.describe( `Pass 27 — Coverage Expansion`, () => {
 
     test( `P27-05 C1-C2 translation prompt preserves style and nuance`, async ( { page } ) => {
 
-        let captured_system = ``
-
         await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
             const body = JSON.parse( route.request().postData() )
-            const system_msg = body.messages?.find( m => m.role === `system` )?.content || ``
-            if( !captured_system && system_msg.length > 0 ) captured_system = system_msg
             const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
             const match = user_msg.match( /Translate this sentence:\n(.+)/s )
             const sentence = match ? match[1].trim() : `unknown`
@@ -162,8 +159,13 @@ test.describe( `Pass 27 — Coverage Expansion`, () => {
         } )
 
         await upload_demo_book( page )
+        const translation_request = page.waitForRequest( request =>
+            request.url().includes( `openrouter.ai/api/v1/chat/completions` ) &&
+            request.postData()?.includes( `Translate this sentence` )
+        )
         await open_reader( page )
-        await page.waitForTimeout( 3000 )
+        const body = ( await translation_request ).postDataJSON()
+        const captured_system = body.messages?.find( m => m.role === `system` )?.content || ``
 
         // System prompt should contain C1-C2 rules about preserving style
         expect( captured_system.toLowerCase() ).toMatch( /nuance|style|tone|preserve|full vocabulary/i )
@@ -174,10 +176,9 @@ test.describe( `Pass 27 — Coverage Expansion`, () => {
     test( `P27-06 translation cache keys follow spec format`, async ( { page } ) => {
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 5000 )
 
         // Read cache keys from IndexedDB
-        const keys = await page.evaluate( () => {
+        const read_cache_keys = () => page.evaluate( () => {
             return new Promise( resolve => {
                 const req = indexedDB.open( `gratis_reader` )
                 req.onsuccess = () => {
@@ -195,6 +196,8 @@ test.describe( `Pass 27 — Coverage Expansion`, () => {
                 req.onerror = () => resolve( [] )
             } )
         } )
+        await expect.poll( read_cache_keys ).not.toEqual( [] )
+        const keys = await read_cache_keys()
 
         expect( keys.length ).toBeGreaterThan( 0 )
 
@@ -233,15 +236,16 @@ test.describe( `Pass 27 — Coverage Expansion`, () => {
 
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 3000 )
 
         // Select a word and open its explanation.
-        await page.locator( `span[data-sentence-id] [data-translation-word-index]` ).first().click()
+        const word = page.locator( `span[data-sentence-id] [data-translation-word-index]` ).first()
+        await expect( word ).toBeVisible()
+        await word.click()
         await page.locator( `[data-translation-info-sheet]` ).getByRole( `button`, { name: `Explain` } ).click()
-        await page.waitForTimeout( 3000 )
 
         // Explanation title should be visible
         await expect( page.getByText( /translation explanation/i ) ).toBeVisible( { timeout: 5000 } )
+        await expect( page.getByText( /Breakdown/ ) ).toBeVisible()
 
         // Should show original and translated sections
         const content = await page.evaluate( () => document.body.textContent )
@@ -253,11 +257,9 @@ test.describe( `Pass 27 — Coverage Expansion`, () => {
     test( `P27-08 offline banner appears when network drops`, async ( { page } ) => {
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 2000 )
 
         // Simulate going offline
         await page.evaluate( () => window.dispatchEvent( new Event( `offline` ) ) )
-        await page.waitForTimeout( 1000 )
 
         // Check for offline banner
         const offline_text = page.getByText( /offline/i )
@@ -265,7 +267,6 @@ test.describe( `Pass 27 — Coverage Expansion`, () => {
 
         // Simulate coming back online
         await page.evaluate( () => window.dispatchEvent( new Event( `online` ) ) )
-        await page.waitForTimeout( 1000 )
 
         // Banner should disappear
         await expect( offline_text ).not.toBeVisible( { timeout: 3000 } )
@@ -276,7 +277,7 @@ test.describe( `Pass 27 — Coverage Expansion`, () => {
     test( `P27-09 changing language in settings clears translations`, async ( { page } ) => {
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 3000 )
+        await expect( page.getByText( /\[TRANSLATED\]/ ).first() ).toBeVisible()
 
         // Verify translations are showing
         const tr_count_before = await page.locator( `text=/\\[TRANSLATED\\]/` ).count()
@@ -287,30 +288,28 @@ test.describe( `Pass 27 — Coverage Expansion`, () => {
 
         // Click on the language input to open dropdown
         const lang_input = page.locator( `input[placeholder*="anguage" i], input[placeholder*="earch" i]` ).first()
-        if( await lang_input.count() > 0 ) {
-            await lang_input.click()
-            await lang_input.fill( `French` )
-            await page.waitForTimeout( 300 )
-            // Select from dropdown via mousedown on matching option
-            const option = page.getByText( `French`, { exact: true } ).first()
-            if( await option.count() > 0 ) {
-                await option.click( { force: true } )
-            } else {
-                await page.keyboard.press( `Enter` )
-            }
-        }
-        await page.waitForTimeout( 500 )
+        await expect( lang_input ).toBeVisible()
+        await lang_input.fill( `French` )
+
+        // Select from dropdown and wait for the changed-language request.
+        const option = page.getByText( `French`, { exact: true } ).first()
+        await expect( option ).toBeVisible()
+        const french_request = page.waitForRequest( request =>
+            request.url().includes( `openrouter.ai/api/v1/chat/completions` ) &&
+            request.postData()?.includes( `French` )
+        )
+        await option.click( { force: true } )
+        await french_request
 
         // Close settings
         await page.keyboard.press( `Escape` )
-        await page.waitForTimeout( 3000 )
+        await expect( page.getByText( /font size/i ) ).not.toBeVisible()
 
         // Language should have changed in store
-        const stored_lang = await page.evaluate( () => {
+        await expect.poll( () => page.evaluate( () => {
             const store = JSON.parse( localStorage.getItem( `settings-storage` ) || `{}` )
             return store?.state?.last_language
-        } )
-        expect( stored_lang ).toBe( `French` )
+        } ) ).toBe( `French` )
     } )
 
     // ── Spec §7: Swipe navigation (mobile touch) ──
@@ -328,12 +327,12 @@ test.describe( `Pass 27 — Coverage Expansion`, () => {
         await upload_demo_book( page )
         await open_reader( page )
 
-        // Get initial sentence text
-        const initial_text = await page.locator( `span[data-sentence-id]` ).first().textContent()
+        // Get the initial chapter position.
+        const progress = page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` ).first()
+        const initial_progress = await progress.textContent()
 
         // Simulate swipe left (next chapter) - touch at center, drag left
         await page.touchscreen.tap( 187, 400 )
-        await page.waitForTimeout( 100 )
         await page.evaluate( () => {
             const area = document.querySelector( `[class*="reading"], [class*="Reading"], main, article` ) || document.body
             const rect = area.getBoundingClientRect()
@@ -350,13 +349,10 @@ test.describe( `Pass 27 — Coverage Expansion`, () => {
                 changedTouches: [ new Touch( { identifier: 0, target: area, clientX: endX, clientY: startY } ) ]
             } ) )
         } )
-        await page.waitForTimeout( 2000 )
 
         // Content should have changed (next chapter)
-        const new_text = await page.locator( `span[data-sentence-id]` ).first().textContent().catch( () => `` )
-        // Note: text may or may not change depending on chapter content
-        // The test just verifies no crash occurred
-        expect( await page.locator( `span[data-sentence-id]` ).count() ).toBeGreaterThanOrEqual( 0 )
+        await expect( progress ).not.toHaveText( initial_progress )
+        await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible()
 
         await context.close()
     } )
@@ -382,23 +378,19 @@ test.describe( `Pass 27 — Coverage Expansion`, () => {
     test( `P27-12 clear cache shows confirmation dialog`, async ( { page } ) => {
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 2000 )
         await open_settings( page )
 
         // Find and click clear cache button
-        let dialog_shown = false
-        page.once( `dialog`, dialog => {
-            dialog_shown = true
-            dialog.dismiss() // cancel
-        } )
-
         const clear_btn = page.getByRole( `button`, { name: /clear/i } )
-        if( await clear_btn.count() > 0 ) {
-            await clear_btn.click()
-            await page.waitForTimeout( 500 )
-        }
+        await expect( clear_btn ).toBeVisible()
+        const dialog_message = page.waitForEvent( `dialog` ).then( async dialog => {
+            const message = dialog.message()
+            await dialog.dismiss()
+            return message
+        } )
+        await clear_btn.click()
 
-        expect( dialog_shown ).toBe( true )
+        expect( await dialog_message ).toMatch( /clear/i )
     } )
 
     // ── Spec §7: Progress indicator format ──
@@ -420,12 +412,8 @@ test.describe( `Pass 27 — Coverage Expansion`, () => {
 
     test( `P27-14 system prompt instructs output ONLY translated sentence`, async ( { page } ) => {
 
-        let captured_system = ``
-
         await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
             const body = JSON.parse( route.request().postData() )
-            const system_msg = body.messages?.find( m => m.role === `system` )?.content || ``
-            if( !captured_system && system_msg.length > 0 ) captured_system = system_msg
             const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
             const match = user_msg.match( /Translate this sentence:\n(.+)/s )
             const sentence = match ? match[1].trim() : `unknown`
@@ -436,8 +424,13 @@ test.describe( `Pass 27 — Coverage Expansion`, () => {
         } )
 
         await upload_demo_book( page )
+        const translation_request = page.waitForRequest( request =>
+            request.url().includes( `openrouter.ai/api/v1/chat/completions` ) &&
+            request.postData()?.includes( `Translate this sentence` )
+        )
         await open_reader( page )
-        await page.waitForTimeout( 3000 )
+        const body = ( await translation_request ).postDataJSON()
+        const captured_system = body.messages?.find( m => m.role === `system` )?.content || ``
 
         // System prompt must instruct: output ONLY the translated sentence
         expect( captured_system.toLowerCase() ).toMatch( /only.*translat|no explanat|no quote|no additional/i )
@@ -448,9 +441,9 @@ test.describe( `Pass 27 — Coverage Expansion`, () => {
     test( `P27-15 selected translated word shows and clears its contextual tooltip`, async ( { page } ) => {
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 3000 )
 
         const word = page.locator( `span[data-sentence-id] [data-translation-word-index]` ).first()
+        await expect( word ).toBeVisible()
         await word.click()
 
         await expect( page.locator( `[data-reader-word-tooltip]` ) ).toBeVisible()

@@ -24,8 +24,12 @@ test.describe( `Pass 32 — Walkthrough`, () => {
 
         // Upload same book again
         const file_input = page.locator( `input[type="file"]` )
-        await file_input.setInputFiles( `./tests/fixtures/book.epub` )
-        await page.waitForTimeout( 4000 )
+        const processing = page.getByText( `Processing...` )
+        await Promise.all( [
+            processing.waitFor( { state: `visible` } ),
+            file_input.setInputFiles( `./tests/fixtures/book.epub` )
+        ] )
+        await expect( processing ).not.toBeVisible( { timeout: 10_000 } )
 
         // Count after — should be the same (upsert, not insert)
         const books_after = await page.getByRole( `heading`, { name: `Smart work beats hard work` } ).count()
@@ -62,7 +66,6 @@ test.describe( `Pass 32 — Walkthrough`, () => {
     test( `BW103 repeated word selections keep one stable information sheet`, async ( { page } ) => {
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 2000 )
 
         const sentence = page.locator( `span[data-sentence-id]` ).first()
         const words = sentence.locator( `[data-translation-word-index]` )
@@ -93,7 +96,6 @@ test.describe( `Pass 32 — Walkthrough`, () => {
 
         // Press Escape
         await page.keyboard.press( `Escape` )
-        await page.waitForTimeout( 300 )
 
         // Settings should be closed — FONT SIZE not visible
         await expect( page.getByText( `FONT SIZE` ) ).not.toBeVisible()
@@ -104,7 +106,6 @@ test.describe( `Pass 32 — Walkthrough`, () => {
     test( `BW105 navigation: library → reader → library → reader preserves state`, async ( { page } ) => {
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 2000 )
 
         // Remember the first sentence text
         const first_sentence = await page.locator( `span[data-sentence-id]` ).first().textContent()
@@ -125,7 +126,6 @@ test.describe( `Pass 32 — Walkthrough`, () => {
         } catch { /* no modal */ }
 
         await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible( { timeout: 10000 } )
-        await page.waitForTimeout( 2000 )
 
         // Sentence content should still be available
         const re_entered_sentence = await page.locator( `span[data-sentence-id]` ).first().textContent()
@@ -150,11 +150,11 @@ test.describe( `Pass 32 — Walkthrough`, () => {
         // Find the slider and set to max
         const slider = page.locator( `input[type="range"]` ).first()
         await slider.fill( `32` )
-        await page.waitForTimeout( 300 )
+        await expect( slider ).toHaveValue( `32` )
 
         // Close settings
         await page.getByRole( `button`, { name: `Close` } ).click()
-        await page.waitForTimeout( 300 )
+        await expect( page.getByText( `FONT SIZE` ) ).not.toBeVisible()
 
         // Check font size changed
         const new_size = await page.locator( `span[data-sentence-id]` ).first().evaluate(
@@ -173,7 +173,7 @@ test.describe( `Pass 32 — Walkthrough`, () => {
         // Open settings and switch to dark
         await page.getByRole( `button`, { name: `Settings` } ).click()
         await page.getByRole( `button`, { name: `Dark` } ).click()
-        await page.waitForTimeout( 300 )
+        await expect( page.locator( `html` ) ).toHaveAttribute( `data-theme`, `dark` )
 
         // Check that data-theme is set
         const theme = await page.evaluate( () =>
@@ -208,7 +208,6 @@ test.describe( `Pass 32 — Walkthrough`, () => {
         // Handle confirm dialog
         page.on( `dialog`, dialog => dialog.accept() )
         await delete_btn.click()
-        await page.waitForTimeout( 1000 )
 
         // Book should be gone without counting Gutenberg catalog headings.
         await expect( page.getByRole( `heading`, { name: `Smart work beats hard work` } ) ).toHaveCount( 0 )
@@ -237,7 +236,7 @@ test.describe( `Pass 32 — Walkthrough`, () => {
         // Enter a bad key
         await input.fill( `sk-or-invalid-key` )
         await page.getByRole( `button`, { name: /connect/i } ).click()
-        await page.waitForTimeout( 2000 )
+        await expect( page.getByText( /invalid.*api.*key/i ) ).toBeVisible( { timeout: 5000 } )
 
         // Should still be on onboarding (not redirected to library)
         expect( page.url() ).not.toContain( `/library` )
@@ -248,7 +247,6 @@ test.describe( `Pass 32 — Walkthrough`, () => {
     test( `BW110 progress bar shows non-zero after opening reader`, async ( { page } ) => {
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 1000 )
 
         // Check for progress text like "1 / N · X%"
         const progress_text = await page.locator( `body` ).textContent()
@@ -261,7 +259,9 @@ test.describe( `Pass 32 — Walkthrough`, () => {
     test( `BW111 each sentence has a unique data-sentence-id`, async ( { page } ) => {
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 2000 )
+        await expect.poll(
+            () => page.locator( `span[data-sentence-id]` ).count()
+        ).toBeGreaterThan( 1 )
 
         const ids = await page.$$eval(
             `span[data-sentence-id]`,
@@ -280,7 +280,7 @@ test.describe( `Pass 32 — Walkthrough`, () => {
     test( `BW112 sentence IDs match format {hash}:{chapter}:{paragraph}:{index}`, async ( { page } ) => {
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 2000 )
+        await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible()
 
         const ids = await page.$$eval(
             `span[data-sentence-id]`,
@@ -307,15 +307,17 @@ test.describe( `Pass 32 — Walkthrough`, () => {
 
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 2000 )
+        await expect(
+            page.locator( `span[data-sentence-id] [data-translation-word-index]` ).first()
+        ).toBeVisible( { timeout: 15_000 } )
 
         // Open settings
         await page.getByRole( `button`, { name: `Settings` } ).click()
-        await page.waitForTimeout( 500 )
+        await expect( page.getByText( `FONT SIZE` ) ).toBeVisible()
 
         // Change theme
         await page.getByRole( `button`, { name: `Sepia` } ).click()
-        await page.waitForTimeout( 300 )
+        await expect( page.locator( `html` ) ).toHaveAttribute( `data-theme`, `sepia` )
 
         // Close settings
         await page.getByRole( `button`, { name: `Close` } ).click()
@@ -351,9 +353,8 @@ test.describe( `Pass 32 — Walkthrough`, () => {
     test( `BW115 translations appear in IndexedDB after reading`, async ( { page } ) => {
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 4000 )
 
-        const cache_count = await page.evaluate( async () => {
+        const read_cache_count = () => page.evaluate( async () => {
             return new Promise( ( resolve, reject ) => {
                 const req = indexedDB.open( `gratis_reader` )
                 req.onsuccess = () => {
@@ -367,6 +368,8 @@ test.describe( `Pass 32 — Walkthrough`, () => {
                 req.onerror = () => reject( req.error )
             } )
         } )
+        await expect.poll( read_cache_count, { timeout: 15_000 } ).toBeGreaterThan( 0 )
+        const cache_count = await read_cache_count()
 
         expect( cache_count ).toBeGreaterThan( 0 )
     } )

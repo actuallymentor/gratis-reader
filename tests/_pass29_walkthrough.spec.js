@@ -37,6 +37,9 @@ test.describe( `Pass 29 — Walkthrough`, () => {
 
     test( `BW67 word information sheet appears and stays stable`, async ( { page } ) => {
 
+        const errors = []
+        page.on( `pageerror`, error => errors.push( error.message ) )
+
         // Override mock to handle word lookups
         await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
             const body = JSON.parse( route.request().postData() )
@@ -59,20 +62,15 @@ test.describe( `Pass 29 — Walkthrough`, () => {
         } )
 
         await open_reader( page )
-        await page.waitForTimeout( 2000 )
 
         // Find a clickable word span
         const word = page.locator( `span[data-sentence-id] [data-translation-word-index]` ).first()
-        if( await word.isVisible() ) {
-            await word.click()
-            await expect( page.locator( `[data-translation-info-sheet]` ) ).toBeVisible()
-        }
+        await expect( word ).toBeVisible()
+        await word.click()
+        await expect( page.locator( `[data-translation-info-sheet]` ) ).toBeVisible()
 
         // No page errors expected
-        let error_count = 0
-        page.on( `pageerror`, () => error_count++ )
-        await page.waitForTimeout( 500 )
-        expect( error_count ).toBe( 0 )
+        expect( errors ).toEqual( [] )
     } )
 
     // ── 3. Sentence splitter handles long unpunctuated text ──
@@ -132,21 +130,20 @@ test.describe( `Pass 29 — Walkthrough`, () => {
         page.on( `pageerror`, e => errors.push( e.message ) )
 
         await open_reader( page )
-        await page.waitForTimeout( 1000 )
+        const progress = page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` ).first()
+        const progress_before = await progress.textContent()
 
         // Navigate forward
         const next_btn = page.getByRole( `button`, { name: /next/i } )
-        if( await next_btn.isVisible() ) {
-            await next_btn.click()
-            await page.waitForTimeout( 1500 )
-        }
+        await expect( next_btn ).toBeEnabled()
+        await next_btn.click()
+        await expect( progress ).not.toHaveText( progress_before )
 
         // Navigate back
         const prev_btn = page.getByRole( `button`, { name: /prev/i } )
-        if( await prev_btn.isVisible() ) {
-            await prev_btn.click()
-            await page.waitForTimeout( 1500 )
-        }
+        await expect( prev_btn ).toBeEnabled()
+        await prev_btn.click()
+        await expect( progress ).toHaveText( progress_before )
 
         expect( errors ).toEqual( [] )
     } )
@@ -174,21 +171,19 @@ test.describe( `Pass 29 — Walkthrough`, () => {
 
     test( `BW72 double-click leaves translated sentence visible`, async ( { page } ) => {
         await open_reader( page )
-        await page.waitForTimeout( 2000 )
 
         const sentence = page.locator( `span[data-sentence-id]` ).first()
         await expect( sentence ).toContainText( `[TRANSLATED]`, { timeout: 15_000 } )
         const id_before = await sentence.evaluate( el => el.dataset.sentenceId )
 
         await sentence.dblclick()
-        await page.waitForTimeout( 300 )
 
         await expect( sentence ).toContainText( `[TRANSLATED]` )
         const id_after = await sentence.evaluate( el => el.dataset.sentenceId )
         expect( id_after ).toBe( id_before )
 
         await sentence.dblclick()
-        await page.waitForTimeout( 300 )
+        await expect( sentence ).toContainText( `[TRANSLATED]` )
 
         const id_restored = await sentence.evaluate( el => el.dataset.sentenceId )
         expect( id_restored ).toBe( id_before )
@@ -218,10 +213,11 @@ test.describe( `Pass 29 — Walkthrough`, () => {
         } )
 
         await open_reader( page )
-        await page.waitForTimeout( 2000 )
 
         // Select a word and use the explicit Explain action.
-        await page.locator( `span[data-sentence-id] [data-translation-word-index]` ).first().click()
+        const word = page.locator( `span[data-sentence-id] [data-translation-word-index]` ).first()
+        await expect( word ).toBeVisible()
+        await word.click()
         await page.locator( `[data-translation-info-sheet]` ).getByRole( `button`, { name: `Explain` } ).click()
 
         // Explanation popover should appear
@@ -229,7 +225,7 @@ test.describe( `Pass 29 — Walkthrough`, () => {
 
         // Close the modal, leaving the persistent translation sheet alone.
         await page.getByRole( `button`, { name: `Close`, exact: true } ).click()
-        await page.waitForTimeout( 500 )
+        await expect( page.getByText( /translation explanation/i ) ).not.toBeVisible()
     } )
 
     // ── 9. Themes switch correctly ──
@@ -240,7 +236,7 @@ test.describe( `Pass 29 — Walkthrough`, () => {
 
         // Switch to dark theme
         await page.getByRole( `button`, { name: `Dark` } ).click()
-        await page.waitForTimeout( 300 )
+        await expect( page.locator( `html` ) ).toHaveAttribute( `data-theme`, `dark` )
 
         const dark_bg = await page.evaluate( () =>
             getComputedStyle( document.documentElement ).getPropertyValue( `--bg` ).trim()
@@ -248,7 +244,7 @@ test.describe( `Pass 29 — Walkthrough`, () => {
 
         // Switch to light theme
         await page.getByRole( `button`, { name: `Light` } ).click()
-        await page.waitForTimeout( 300 )
+        await expect( page.locator( `html` ) ).toHaveAttribute( `data-theme`, `light` )
 
         const light_bg = await page.evaluate( () =>
             getComputedStyle( document.documentElement ).getPropertyValue( `--bg` ).trim()
@@ -320,25 +316,20 @@ test.describe( `Pass 29 — Walkthrough`, () => {
 
     test( `BW79 deleting a book cleans up translations and progress`, async ( { page } ) => {
         await open_reader( page )
-        await page.waitForTimeout( 2000 )
 
         // Go back to library
         await page.keyboard.press( `Escape` )
         await page.waitForURL( /library/ )
 
-        // Count books before
-        const books_before = await page.$$( `h3` )
+        const uploaded_book = page.getByRole( `heading`, { name: `Smart work beats hard work` } )
+        await expect( uploaded_book ).toHaveCount( 1 )
 
         // Delete the book
-        const delete_btn = page.getByRole( `button`, { name: /delete/i } ).first()
-        if( await delete_btn.isVisible() ) {
-            page.on( `dialog`, async d => await d.accept() )
-            await delete_btn.click()
-            await page.waitForTimeout( 1000 )
-
-            const books_after = await page.$$( `h3` )
-            expect( books_after.length ).toBeLessThan( books_before.length )
-        }
+        const delete_btn = page.getByRole( `button`, { name: `Remove` } ).first()
+        await expect( delete_btn ).toBeVisible()
+        page.once( `dialog`, dialog => dialog.accept() )
+        await delete_btn.click()
+        await expect( uploaded_book ).toHaveCount( 0 )
     } )
 
     // ── 15. Onboarding redirects when no key ──
@@ -347,11 +338,10 @@ test.describe( `Pass 29 — Walkthrough`, () => {
         // Clear the API key
         await page.evaluate( () => localStorage.clear() )
         await page.goto( `/library` )
-        await page.waitForTimeout( 2000 )
 
         // Should be on onboarding page
-        const body_text = await page.locator( `body` ).textContent()
-        expect( body_text ).toMatch( /api key|openrouter|get started/i )
+        await expect( page ).toHaveURL( `/` )
+        await expect( page.locator( `input[type="password"]` ) ).toBeVisible()
     } )
 
 } )

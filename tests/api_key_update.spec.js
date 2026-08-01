@@ -29,7 +29,6 @@ test.describe( `API Key Management`, () => {
 
         // Click Update Key
         await page.getByText( `Update Key`, { exact: true } ).click()
-        await page.waitForTimeout( 300 )
 
         // Input should appear
         const input = page.locator( `input[placeholder*="sk-or"]` )
@@ -44,11 +43,12 @@ test.describe( `API Key Management`, () => {
 
         // Open update input
         await page.getByText( `Update Key`, { exact: true } ).click()
-        await page.waitForTimeout( 300 )
+        const input = page.locator( `input[placeholder*="sk-or"]` )
+        await expect( input ).toBeVisible()
 
         // Cancel
         await page.getByText( `Cancel`, { exact: true } ).click()
-        await page.waitForTimeout( 300 )
+        await expect( input ).not.toBeVisible()
 
         // Input should be gone, masked key should be back
         const code = page.locator( `code` ).first()
@@ -63,19 +63,14 @@ test.describe( `API Key Management`, () => {
 
         // Open update input
         await page.getByText( `Update Key`, { exact: true } ).click()
-        await page.waitForTimeout( 300 )
 
         // Enter new key
         await page.locator( `input[placeholder*="sk-or"]` ).fill( `sk-or-brand-new-key-ABCD` )
         await page.getByText( `Save`, { exact: true } ).click()
 
-        // Wait for validation + save (async now)
-        await page.waitForTimeout( 1500 )
-
         // Masked display should show new key suffix
         const code = page.locator( `code` ).first()
-        const text = await code.textContent()
-        expect( text ).toContain( `ABCD` )
+        await expect( code ).toContainText( `ABCD` )
 
     } )
 
@@ -92,7 +87,6 @@ test.describe( `API Key Management`, () => {
         await page.getByText( `Update Key`, { exact: true } ).click()
         await page.locator( `input[placeholder*="sk-or"]` ).fill( `sk-or-bad-key` )
         await page.getByText( `Save`, { exact: true } ).click()
-        await page.waitForTimeout( 1500 )
 
         // Should show error toast
         await expect( page.getByText( /invalid api key/i ) ).toBeVisible( { timeout: 3000 } )
@@ -111,7 +105,7 @@ test.describe( `API Key Management`, () => {
         await page.getByText( `Update Key`, { exact: true } ).click()
         await page.locator( `input[placeholder*="sk-or"]` ).fill( `sk-or-persistent-new-WXYZ` )
         await page.getByText( `Save`, { exact: true } ).click()
-        await page.waitForTimeout( 1500 )
+        await expect( page.locator( `code` ).first() ).toContainText( `WXYZ` )
 
         // Close settings and reload
         await page.keyboard.press( `Escape` )
@@ -119,12 +113,10 @@ test.describe( `API Key Management`, () => {
 
         // Re-open settings
         await page.getByRole( `button`, { name: `Settings` } ).click()
-        await page.waitForTimeout( 300 )
 
         // Verify key survived
         const code = page.locator( `code` ).first()
-        const text = await code.textContent()
-        expect( text ).toContain( `WXYZ` )
+        await expect( code ).toContainText( `WXYZ` )
 
     } )
 

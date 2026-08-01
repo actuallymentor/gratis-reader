@@ -47,10 +47,11 @@ test.describe( `Pass 28 — Accessibility`, () => {
         } )
 
         await open_reader( page )
-        await page.waitForTimeout( 3000 )
 
         // Open the explanation through the selected word's sheet.
-        await page.locator( `span[data-sentence-id] [data-translation-word-index]` ).first().click()
+        const word = page.locator( `span[data-sentence-id] [data-translation-word-index]` ).first()
+        await expect( word ).toBeVisible()
+        await word.click()
         await page.locator( `[data-translation-info-sheet]` ).getByRole( `button`, { name: `Explain` } ).click()
         await expect( page.getByText( /translation explanation/i ) ).toBeVisible( { timeout: 5000 } )
 
@@ -78,7 +79,6 @@ test.describe( `Pass 28 — Accessibility`, () => {
         // Open the book (should show language modal)
         await page.locator( `img[alt]` ).first().click()
         await page.waitForURL( /\/read\// )
-        await page.waitForTimeout( 2000 )
 
         // Modal should have role="dialog" and aria-modal
         const dialog = page.locator( `[role="dialog"]` )

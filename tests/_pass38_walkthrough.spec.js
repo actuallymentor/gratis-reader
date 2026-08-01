@@ -66,7 +66,6 @@ test.describe( `Pass 38 — Library`, () => {
         page.on( `dialog`, dialog => dialog.accept() )
 
         await page.getByRole( `button`, { name: /remove/i } ).click()
-        await page.waitForTimeout( 1000 )
 
         // Book should be gone
         await expect( page.getByRole( `heading`, { name: /smart work/i } ) ).not.toBeVisible()
@@ -112,7 +111,9 @@ test.describe( `Pass 38 — Reader core flows`, () => {
     test( `BW174 sentences display translated text`, async ( { page } ) => {
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 2000 )
+        await expect(
+            page.locator( `span[data-sentence-id] [data-translation-word-index]` ).first()
+        ).toBeVisible( { timeout: 15_000 } )
 
         // At least some sentences should show [TRANSLATED] prefix (mock)
         const text = await page.locator( `span[data-sentence-id]` ).first().textContent()
@@ -122,9 +123,9 @@ test.describe( `Pass 38 — Reader core flows`, () => {
     test( `BW175 selecting a word opens the simplified fragment with contextual tooltip`, async ( { page } ) => {
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 2000 )
 
         const word = page.locator( `span[data-sentence-id] [data-translation-word-index]` ).first()
+        await expect( word ).toBeVisible( { timeout: 15_000 } )
         await word.click()
 
         await expect( page.locator( `[data-reader-word-tooltip]` ) ).toBeVisible()
@@ -134,16 +135,16 @@ test.describe( `Pass 38 — Reader core flows`, () => {
     test( `BW176 keyboard arrows navigate chapters`, async ( { page } ) => {
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 1500 )
 
         // Get progress text before navigation
-        const progress_before = await page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` ).textContent()
+        const progress = page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` )
+        await expect( progress ).toBeVisible()
+        const progress_before = await progress.textContent()
 
         // Navigate forward
         await page.keyboard.press( `ArrowRight` )
-        await page.waitForTimeout( 2000 )
-
-        const progress_after = await page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` ).textContent()
+        await expect( progress ).not.toHaveText( progress_before )
+        const progress_after = await progress.textContent()
 
         // Progress should change
         expect( progress_after ).not.toBe( progress_before )
@@ -152,7 +153,6 @@ test.describe( `Pass 38 — Reader core flows`, () => {
     test( `BW177 escape key returns to library`, async ( { page } ) => {
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 1000 )
 
         await page.keyboard.press( `Escape` )
         await page.waitForURL( /\/library/, { timeout: 3000 } )
@@ -161,7 +161,6 @@ test.describe( `Pass 38 — Reader core flows`, () => {
     test( `BW178 progress bar and text visible`, async ( { page } ) => {
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 1500 )
 
         // Progress text (X / Y · Z%)
         await expect( page.locator( `text=/\\d+\\s*\\/\\s*\\d+.*%/` ) ).toBeVisible()
@@ -170,7 +169,6 @@ test.describe( `Pass 38 — Reader core flows`, () => {
     test( `BW179 chapter title in header`, async ( { page } ) => {
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 1500 )
 
         // Some text should be visible in the header area (chapter title or book title)
         const header = page.locator( `header` )
@@ -190,10 +188,8 @@ test.describe( `Pass 38 — Settings drawer`, () => {
     test( `BW180 settings drawer opens from reader`, async ( { page } ) => {
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 1000 )
 
         await page.getByRole( `button`, { name: `Settings` } ).click()
-        await page.waitForTimeout( 300 )
 
         // All settings sections should be visible
         await expect( page.getByText( `FONT SIZE` ) ).toBeVisible()
@@ -204,14 +200,13 @@ test.describe( `Pass 38 — Settings drawer`, () => {
     test( `BW181 theme change applies immediately`, async ( { page } ) => {
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 1000 )
 
         await page.getByRole( `button`, { name: `Settings` } ).click()
-        await page.waitForTimeout( 300 )
+        await expect( page.getByText( `FONT SIZE` ) ).toBeVisible()
 
         // Click Dark theme
         await page.getByRole( `button`, { name: `Dark` } ).click()
-        await page.waitForTimeout( 300 )
+        await expect( page.locator( `html` ) ).toHaveAttribute( `data-theme`, `dark` )
 
         const theme = await page.evaluate( () =>
             document.documentElement.getAttribute( `data-theme` )
@@ -222,14 +217,13 @@ test.describe( `Pass 38 — Settings drawer`, () => {
     test( `BW182 font size slider works`, async ( { page } ) => {
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 1000 )
 
         await page.getByRole( `button`, { name: `Settings` } ).click()
-        await page.waitForTimeout( 300 )
+        await expect( page.getByText( `FONT SIZE` ) ).toBeVisible()
 
         const slider = page.locator( `input[type="range"]` )
         await slider.fill( `24` )
-        await page.waitForTimeout( 200 )
+        await expect( slider ).toHaveValue( `24` )
 
         // The slider value display should show 24px
         await expect( page.getByText( `24px` ) ).toBeVisible()
@@ -238,15 +232,13 @@ test.describe( `Pass 38 — Settings drawer`, () => {
     test( `BW183 close settings with escape`, async ( { page } ) => {
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 1000 )
 
         await page.getByRole( `button`, { name: `Settings` } ).click()
-        await page.waitForTimeout( 300 )
 
         await expect( page.getByText( `FONT SIZE` ) ).toBeVisible()
 
         await page.keyboard.press( `Escape` )
-        await page.waitForTimeout( 500 )
+        await expect( page.getByText( `FONT SIZE` ) ).not.toBeVisible()
 
         // Settings should be closed but we should still be in reader
         await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible()
@@ -255,7 +247,6 @@ test.describe( `Pass 38 — Settings drawer`, () => {
     test( `BW184 API key masked display`, async ( { page } ) => {
         await page.goto( `/library` )
         await page.getByRole( `button`, { name: `Settings` } ).click()
-        await page.waitForTimeout( 300 )
 
         // Should show masked key (sk-or-...XXXX pattern)
         await expect( page.getByText( /sk-or-.*\.\.\./ ) ).toBeVisible()
@@ -287,7 +278,9 @@ test.describe( `Pass 38 — Edge cases`, () => {
         page.on( `pageerror`, e => errors.push( e.message ) )
 
         await page.goto( `/library` )
-        await page.waitForTimeout( 2000 )
+        await expect(
+            page.getByText( /public domain books from Project Gutenberg/i )
+        ).toBeVisible( { timeout: 10_000 } )
         expect( errors ).toEqual( [] )
     } )
 
@@ -297,7 +290,10 @@ test.describe( `Pass 38 — Edge cases`, () => {
 
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 3000 )
+        await expect(
+            page.locator( `span[data-sentence-id] [data-translation-word-index]` ).first()
+        ).toBeVisible( { timeout: 15_000 } )
+        await expect( page.getByText( `Translating...` ) ).not.toBeVisible()
 
         expect( errors ).toEqual( [] )
     } )
@@ -308,16 +304,15 @@ test.describe( `Pass 38 — Edge cases`, () => {
 
         await upload_demo_book( page )
         await open_reader( page )
-        await page.waitForTimeout( 1500 )
+
+        const toc = page.locator( `header select` )
+        await expect( toc ).toBeVisible()
 
         // Rapidly press arrow right 5 times
-        for( let i = 0; i < 5; i++ ) {
-            await page.keyboard.press( `ArrowRight` )
-            await page.waitForTimeout( 200 )
-        }
-        await page.waitForTimeout( 2000 )
+        for( let i = 0; i < 5; i++ ) await page.keyboard.press( `ArrowRight` )
 
         // No crashes
+        await expect( toc ).toHaveValue( `5` )
         expect( errors ).toEqual( [] )
         // Still in reader
         await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible( { timeout: 5000 } )
