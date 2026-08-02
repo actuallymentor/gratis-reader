@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef, Fragment } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
+import * as Throttle from 'promise-parallel-throttle'
 import { use_book } from '../../hooks/use_book.js'
 import { use_translation } from '../../hooks/use_translation.js'
 import { use_word_lookup } from '../../hooks/use_word_lookup.js'
@@ -395,7 +396,7 @@ export default function ReaderPage() {
     const selected_translation = selected_sentence
         ? translations[selected_sentence.id]
         : null
-    const { lookup_word, get_lookup_state } = use_word_lookup( {
+    const { lookup_word, get_lookup_state, cancel_lookups } = use_word_lookup( {
         source_language,
         target_language: last_language,
         sentence_context: selected_translation || ``,
@@ -419,31 +420,53 @@ export default function ReaderPage() {
         }
     } )
     const word_by_word_loading = word_by_word_segments.some(
-        segment => segment.is_word && segment.loading
+        segment => segment.is_word
+            && !segment.content
+            && !segment.error
+            && segment.can_lookup
     )
 
     useEffect( () => {
-        if( !translation_selection || !selected_translation ) return
+        if( !translation_selection?.word || !selected_translation ) return
+        lookup_word( translation_selection.word )
+    }, [ translation_selection, selected_translation, lookup_word ] )
 
-        const selected_segment = selected_translation_segments.find(
-            segment => segment.word_index === translation_selection.word_index
-        )
-        const remaining_segments = selected_translation_segments.filter(
-            segment => segment.is_word && segment.word_index !== translation_selection.word_index
-        )
-        const prioritized_segments = selected_segment
-            ? [ selected_segment, ...remaining_segments ]
-            : remaining_segments
+    useEffect( () => {
+        if( !selected_sentence || !selected_translation ) return
 
-        // Resolve the tapped word first so its tooltip stays responsive while
-        // the rest of the direct translation fills in around it.
-        prioritized_segments.forEach( segment => lookup_word( segment.text ) )
+        const queue_controller = new AbortController()
+        const word_segments = selected_translation_segments.filter( segment => segment.is_word )
+        const unique_segments = word_segments.filter( ( segment, index ) =>
+            word_segments.findIndex( candidate =>
+                candidate.text.toLowerCase() === segment.text.toLowerCase()
+            ) === index
+        )
+        const lookup_tasks = unique_segments.map( segment => async () => {
+            if( queue_controller.signal.aborted ) return
+            await lookup_word( segment.text, {
+                retry: false,
+                signal: queue_controller.signal
+            } )
+        } )
+
+        // Keep the direct translation responsive without bursting one API
+        // request per word. The tapped-word effect runs first and shares this
+        // hook's three-request ceiling with the background queue.
+        Throttle.all( lookup_tasks, {
+            maxInProgress: 3,
+            failFast: false,
+            nextCheck: async () => !queue_controller.signal.aborted
+        } ).catch( () => {} )
+
+        return () => queue_controller.abort()
     }, [
-        translation_selection,
+        selected_sentence,
         selected_translation,
         selected_translation_segments,
         lookup_word
     ] )
+
+    useEffect( () => () => cancel_lookups(), [ selected_translation, cancel_lookups ] )
 
     // Save progress on chapter change
     useEffect( () => {

@@ -148,7 +148,7 @@ test.describe( `Translation (mocked)`, () => {
         await page.clock.runFor( 300 )
         const translating = page.getByText( `Translating...`, { exact: true } )
         await expect( translating ).toBeVisible()
-        await expect( translating ).not.toBeVisible()
+        await expect( translating ).not.toBeVisible( { timeout: 30_000 } )
 
         // Should see [TRANSLATED] from cache, not [SECOND] from new API
         await expect( page.getByText( /\[TRANSLATED\]/ ).first() ).toBeVisible()

@@ -167,9 +167,8 @@ export default function TranslationInfoSheet( {
     const word_by_word_content = word_by_word_segments.map( ( segment, index ) => {
         if( !segment.is_word ) return segment.text
 
-        const direct_translation = segment.loading
-            ? `...`
-            : segment.content || `Translation unavailable`
+        const direct_translation = segment.content
+            || ( !segment.error && segment.can_lookup ? `...` : `Translation unavailable` )
         const selected_label = segment.selected
             ? <ScreenReaderOnly>Selected word: </ScreenReaderOnly>
             : null
@@ -188,7 +187,7 @@ export default function TranslationInfoSheet( {
     return <Sheet
         data-translation-info-sheet
         aria-label="Translation information"
-        aria-busy={ loading || word_by_word_loading }
+        aria-busy={ loading }
     >
         <CloseButton type="button" onClick={ on_close } aria-label="Close translation information">
             ×
@@ -207,7 +206,7 @@ export default function TranslationInfoSheet( {
                     <SectionLabel>Word by word</SectionLabel>
                     <TranslationValue
                         data-word-by-word-translation
-                        aria-live="polite"
+                        aria-busy={ word_by_word_loading }
                     >
                         { word_by_word_content }
                     </TranslationValue>

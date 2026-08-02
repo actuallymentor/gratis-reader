@@ -9,7 +9,7 @@ const READER_WORD_TOOLTIP = `[data-reader-word-tooltip]`
 const unique_translation_word_count = sentence => sentence
     .locator( `[data-translation-word]` )
     .evaluateAll( words => new Set(
-        words.map( word => word.dataset.translationWord.toLocaleLowerCase() )
+        words.map( word => word.dataset.translationWord.toLowerCase() )
     ).size )
 
 const enter_reader_with_translations = async ( page ) => {
@@ -59,7 +59,9 @@ test.describe( `Sentence Interactions`, () => {
         await expect( sheet.getByRole( `heading`, { name: `Meaning` } ) ).toBeVisible()
         await expect( sheet.getByRole( `heading`, { name: `Word by word` } ) ).toBeVisible()
         await expect( direct_word ).toContainText( `[WORD] definition of the word` )
+        await expect( direct_word ).toContainText( `Selected word:` )
         await expect( direct_word ).toHaveCSS( `text-decoration-line`, `underline` )
+        await expect( sheet.locator( `[data-word-by-word-translation]` ) ).toHaveAttribute( `aria-busy`, `false` )
         await expect( sheet ).toHaveAttribute( `aria-busy`, `false` )
         await expect( word ).toHaveAttribute( `aria-pressed`, `true` )
         await expect( word ).toHaveCSS( `text-decoration-line`, `none` )
@@ -372,7 +374,7 @@ test.describe( `Sentence Interactions`, () => {
         await expect(
             direct_translation.locator( `[data-direct-translation-word-index="0"]` )
         ).toHaveCSS( `text-decoration-line`, `none` )
-        await expect( sheet ).toHaveAttribute( `aria-busy`, `false` )
+        await expect( direct_translation ).toHaveAttribute( `aria-busy`, `false` )
         await expect( page.locator( READER_WORD_TOOLTIP ) ).toHaveText( `source:work` )
         await expect( sentence ).toContainText( adapted_sentence )
         expect( meaning_prompt ).toContain( adapted_sentence )

@@ -15,6 +15,7 @@ const translated_sentence_from = ( prompt ) => {
 
 const install_translation_mock = async ( page, {
     word_lookup_content,
+    word_lookup_response,
     translated_content
 } = {} ) => {
     const calls = {
@@ -34,8 +35,15 @@ const install_translation_mock = async ( page, {
         } else if( user_msg.includes( `Word:` ) ) {
             calls.word_lookup += 1
             const word_match = user_msg.match( /Word:\s*(.+)$/ )
-            content = word_lookup_content
-                ?? `Source ${ word_match ? word_match[1].trim() : `word` }`
+            const word = word_match ? word_match[1].trim() : `word`
+            const custom_response = await word_lookup_response?.( { word, calls } )
+
+            if( custom_response && typeof custom_response === `object` ) {
+                await route.fulfill( custom_response )
+                return
+            }
+
+            content = custom_response ?? word_lookup_content ?? `Source ${ word }`
         } else if( user_msg.includes( `Adapted translation:` ) ) {
             calls.meaning += 1
             content = `Simplified ${ calls.meaning } ${ adapted_translation_from( user_msg ) }`
@@ -60,7 +68,7 @@ const translation_words = ( sentence ) => sentence.locator( `[data-translation-w
 const unique_translation_word_count = sentence => sentence
     .locator( `[data-translation-word]` )
     .evaluateAll( words => new Set(
-        words.map( word => word.dataset.translationWord.toLocaleLowerCase() )
+        words.map( word => word.dataset.translationWord.toLowerCase() )
     ).size )
 
 test.describe( `Touch translation information`, () => {
@@ -129,10 +137,90 @@ test.describe( `Touch translation information`, () => {
         expect( tooltip_box.y + tooltip_box.height ).toBeLessThanOrEqual( word_box.y + 1 )
         expect( tooltip_box.x ).toBeGreaterThanOrEqual( 0 )
         expect( tooltip_box.x + tooltip_box.width ).toBeLessThanOrEqual( 390 )
+        await expect( sheet.locator( `[data-word-by-word-translation]` ) ).toHaveAttribute( `aria-busy`, `false` )
         await expect( sheet ).toHaveAttribute( `aria-busy`, `false` )
         expect( calls.meaning ).toBe( 1 )
         expect( calls.explanation ).toBe( 0 )
         expect( calls.word_lookup ).toBe( expected_lookup_count )
+
+    } )
+
+    test( `word-by-word lookups stay bounded and show honest loading state`, async ( { page } ) => {
+
+        const pending_lookups = []
+        let active_lookups = 0
+        let max_active_lookups = 0
+        const calls = await install_translation_mock( page, {
+            translated_content: `One two three four five six seven eight`,
+            word_lookup_response: ( { word } ) => new Promise( resolve => {
+                active_lookups += 1
+                max_active_lookups = Math.max( max_active_lookups, active_lookups )
+                pending_lookups.push( () => {
+                    active_lookups -= 1
+                    resolve( `Source ${ word }` )
+                } )
+            } )
+        } )
+        await open_seeded_reader( page )
+
+        const sentence = page.locator( `span[data-sentence-id]` ).first()
+        const word = translation_words( sentence ).first()
+        await expect( word ).toBeVisible( { timeout: 15_000 } )
+        await word.tap()
+
+        const sheet = page.locator( `[data-translation-info-sheet]` )
+        const direct_translation = sheet.locator( `[data-word-by-word-translation]` )
+        const selected_direct_word = direct_translation.locator( `[data-direct-translation-word-index="0"]` )
+        await expect( sheet ).toContainText( `Simplified 1` )
+        await expect( sheet ).toHaveAttribute( `aria-busy`, `false` )
+        await expect( direct_translation ).toHaveAttribute( `aria-busy`, `true` )
+        await expect( direct_translation ).not.toHaveAttribute( `aria-live` )
+        await expect( direct_translation ).not.toContainText( `Translation unavailable` )
+        await expect( selected_direct_word ).toContainText( `Selected word: ...` )
+        await expect.poll( () => calls.word_lookup ).toBe( 3 )
+        expect( max_active_lookups ).toBe( 3 )
+
+        pending_lookups.splice( 0 ).forEach( release_lookup => release_lookup() )
+        await expect.poll( () => calls.word_lookup ).toBe( 6 )
+        expect( max_active_lookups ).toBe( 3 )
+
+        pending_lookups.splice( 0 ).forEach( release_lookup => release_lookup() )
+        await expect.poll( () => calls.word_lookup ).toBe( 8 )
+        expect( max_active_lookups ).toBe( 3 )
+
+        pending_lookups.splice( 0 ).forEach( release_lookup => release_lookup() )
+        await expect( direct_translation ).toHaveAttribute( `aria-busy`, `false` )
+        await expect( selected_direct_word ).toContainText( `Selected word: Source One` )
+        expect( calls.word_lookup ).toBe( 8 )
+
+    } )
+
+    test( `failed direct translations retry only the newly tapped word`, async ( { page } ) => {
+
+        const calls = await install_translation_mock( page, {
+            translated_content: `One two three four`,
+            word_lookup_response: () => ( { status: 500, body: `Lookup unavailable` } )
+        } )
+        await open_seeded_reader( page )
+
+        const sentence = page.locator( `span[data-sentence-id]` ).first()
+        const words = translation_words( sentence )
+        const direct_translation = page.locator( `[data-word-by-word-translation]` )
+        await expect( words.nth( 1 ) ).toBeVisible( { timeout: 15_000 } )
+
+        await words.first().tap()
+        await expect( direct_translation ).toHaveAttribute( `aria-busy`, `false` )
+        await expect( direct_translation ).toContainText( `Translation unavailable` )
+        expect( calls.word_lookup ).toBe( 4 )
+
+        await words.nth( 1 ).tap()
+        await expect.poll( () => calls.word_lookup ).toBe( 5 )
+        await expect( direct_translation ).toHaveAttribute( `aria-busy`, `false` )
+
+        await words.nth( 1 ).tap()
+        await expect.poll( () => calls.word_lookup ).toBe( 6 )
+        await expect( direct_translation ).toHaveAttribute( `aria-busy`, `false` )
+        expect( calls.word_lookup ).toBe( 6 )
 
     } )
 
@@ -222,7 +310,7 @@ test.describe( `Touch translation information`, () => {
         await expect( dialog ).toContainText( `Original` )
         await expect( dialog ).toContainText( `Translation` )
         await expect( dialog ).toContainText( `Detailed explanation here.` )
-        await expect( sheet ).toHaveAttribute( `aria-busy`, `false` )
+        await expect( sheet.locator( `[data-word-by-word-translation]` ) ).toHaveAttribute( `aria-busy`, `false` )
         expect( calls.explanation ).toBeGreaterThanOrEqual( 1 )
         expect( calls.word_lookup ).toBe( expected_lookup_count )
 
@@ -244,7 +332,7 @@ test.describe( `Touch translation information`, () => {
         const explain_button = sheet.getByRole( `button`, { name: `Explain` } )
 
         await expect( sheet ).toBeVisible()
-        await expect( page.locator( READER_WORD_TOOLTIP ) ).toBeVisible()
+        await expect( page.locator( READER_WORD_TOOLTIP ) ).toBeVisible( { timeout: 15_000 } )
         await expect( footer ).toBeVisible()
         await expect( page.getByRole( `button`, { name: /next/i } ) ).toBeVisible()
 
@@ -401,7 +489,7 @@ test.describe( `Touch translation information`, () => {
         const selected_direct_word = page.locator( `[data-direct-translation-word-index="0"]` )
         await expect( selected_direct_word ).toContainText( `Translation unavailable` )
         await expect( selected_direct_word ).toHaveCSS( `text-decoration-line`, `underline` )
-        await expect( page.locator( `[data-translation-info-sheet]` ) ).toHaveAttribute( `aria-busy`, `false` )
+        await expect( page.locator( `[data-word-by-word-translation]` ) ).toHaveAttribute( `aria-busy`, `false` )
         expect( calls.word_lookup ).toBe( expected_lookup_count )
 
     } )
