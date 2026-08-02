@@ -6,6 +6,12 @@ const INFO_SHEET = `[data-translation-info-sheet]`
 const READER_WORD = `span[data-sentence-id] [data-translation-word-index]`
 const READER_WORD_TOOLTIP = `[data-reader-word-tooltip]`
 
+const unique_translation_word_count = sentence => sentence
+    .locator( `[data-translation-word]` )
+    .evaluateAll( words => new Set(
+        words.map( word => word.dataset.translationWord.toLocaleLowerCase() )
+    ).size )
+
 const enter_reader_with_translations = async ( page ) => {
     await mock_openrouter( page )
     await open_seeded_reader( page )
@@ -43,16 +49,23 @@ test.describe( `Sentence Interactions`, () => {
 
         const sentence = page.locator( `span[data-sentence-id]` ).first()
         const word = sentence.locator( `[data-translation-word-index]` ).first()
+        const expected_lookup_count = await unique_translation_word_count( sentence )
         await word.click()
 
         const sheet = page.locator( INFO_SHEET )
+        const direct_word = sheet.locator( `[data-direct-translation-word-index="0"]` )
         await expect( sheet ).toBeVisible()
         await expect( sheet ).toContainText( `[MEANING]`, { timeout: 5000 } )
+        await expect( sheet.getByRole( `heading`, { name: `Meaning` } ) ).toBeVisible()
+        await expect( sheet.getByRole( `heading`, { name: `Word by word` } ) ).toBeVisible()
+        await expect( direct_word ).toContainText( `[WORD] definition of the word` )
+        await expect( direct_word ).toHaveCSS( `text-decoration-line`, `underline` )
+        await expect( sheet ).toHaveAttribute( `aria-busy`, `false` )
         await expect( word ).toHaveAttribute( `aria-pressed`, `true` )
         await expect( word ).toHaveCSS( `text-decoration-line`, `none` )
         await expect( page.locator( READER_WORD_TOOLTIP ) ).toHaveText( `[WORD] definition of the word` )
         await expect( page.getByRole( `dialog`, { name: `Translation Explanation` } ) ).not.toBeVisible()
-        expect( word_lookup_calls ).toBe( 1 )
+        expect( word_lookup_calls ).toBe( expected_lookup_count )
 
     } )
 
@@ -347,11 +360,23 @@ test.describe( `Sentence Interactions`, () => {
         await sentence.locator( `[data-translation-word-index="1"]` ).click()
 
         const sheet = page.locator( INFO_SHEET )
+        const direct_translation = sheet.locator( `[data-word-by-word-translation]` )
+        const selected_direct_word = direct_translation.locator( `[data-direct-translation-word-index="1"]` )
         await expect( sheet ).toContainText( source_meaning, { timeout: 5000 } )
+        await expect( direct_translation ).toContainText( `source:Big` )
+        await expect( direct_translation ).toContainText( `source:work` )
+        await expect( direct_translation ).toContainText( `source:Smart` )
+        await expect( direct_translation ).toContainText( `source:way` )
+        await expect( selected_direct_word ).toContainText( `source:work` )
+        await expect( selected_direct_word ).toHaveCSS( `text-decoration-line`, `underline` )
+        await expect(
+            direct_translation.locator( `[data-direct-translation-word-index="0"]` )
+        ).toHaveCSS( `text-decoration-line`, `none` )
+        await expect( sheet ).toHaveAttribute( `aria-busy`, `false` )
         await expect( page.locator( READER_WORD_TOOLTIP ) ).toHaveText( `source:work` )
         await expect( sentence ).toContainText( adapted_sentence )
         expect( meaning_prompt ).toContain( adapted_sentence )
-        expect( word_lookup_calls ).toBe( 1 )
+        expect( word_lookup_calls ).toBe( 4 )
 
         await sheet.getByRole( `button`, { name: `Explain` } ).click()
 

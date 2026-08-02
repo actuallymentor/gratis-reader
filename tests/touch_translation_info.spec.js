@@ -57,6 +57,12 @@ const install_translation_mock = async ( page, {
 
 const translation_words = ( sentence ) => sentence.locator( `[data-translation-word-index]` )
 
+const unique_translation_word_count = sentence => sentence
+    .locator( `[data-translation-word]` )
+    .evaluateAll( words => new Set(
+        words.map( word => word.dataset.translationWord.toLocaleLowerCase() )
+    ).size )
+
 test.describe( `Touch translation information`, () => {
 
     test.use( {
@@ -78,11 +84,18 @@ test.describe( `Touch translation information`, () => {
         const first_word = words.nth( 0 )
         const second_word = words.nth( 1 )
         const sheet = page.locator( `[data-translation-info-sheet]` )
+        const expected_lookup_count = await unique_translation_word_count( sentence )
 
         await first_word.tap()
 
+        const first_direct_word = sheet.locator( `[data-direct-translation-word-index="0"]` )
+        const second_direct_word = sheet.locator( `[data-direct-translation-word-index="1"]` )
         await expect( sheet ).toBeVisible()
         await expect( sheet ).toContainText( `Simplified 1 Target` )
+        await expect( sheet.getByRole( `heading`, { name: `Meaning` } ) ).toBeVisible()
+        await expect( sheet.getByRole( `heading`, { name: `Word by word` } ) ).toBeVisible()
+        await expect( first_direct_word ).toHaveCSS( `text-decoration-line`, `underline` )
+        await expect( second_direct_word ).toHaveCSS( `text-decoration-line`, `none` )
         await expect( first_word ).toHaveAttribute( `aria-pressed`, `true` )
         await expect( first_word ).toHaveCSS( `text-decoration-line`, `none` )
         await expect( page.locator( READER_WORD_TOOLTIP ) ).toHaveText(
@@ -100,6 +113,8 @@ test.describe( `Touch translation information`, () => {
         await expect( first_word ).toHaveAttribute( `aria-pressed`, `false` )
         await expect( second_word ).toHaveAttribute( `aria-pressed`, `true` )
         await expect( second_word ).toHaveCSS( `text-decoration-line`, `none` )
+        await expect( first_direct_word ).toHaveCSS( `text-decoration-line`, `none` )
+        await expect( second_direct_word ).toHaveCSS( `text-decoration-line`, `underline` )
         await expect( page.locator( READER_WORD_TOOLTIP ) ).toHaveCount( 1 )
         await expect( page.locator( READER_WORD_TOOLTIP ) ).toHaveText(
             `Source ${ await second_word.getAttribute( `data-translation-word` ) }`
@@ -114,9 +129,10 @@ test.describe( `Touch translation information`, () => {
         expect( tooltip_box.y + tooltip_box.height ).toBeLessThanOrEqual( word_box.y + 1 )
         expect( tooltip_box.x ).toBeGreaterThanOrEqual( 0 )
         expect( tooltip_box.x + tooltip_box.width ).toBeLessThanOrEqual( 390 )
+        await expect( sheet ).toHaveAttribute( `aria-busy`, `false` )
         expect( calls.meaning ).toBe( 1 )
         expect( calls.explanation ).toBe( 0 )
-        expect( calls.word_lookup ).toBe( 2 )
+        expect( calls.word_lookup ).toBe( expected_lookup_count )
 
     } )
 
@@ -190,8 +206,10 @@ test.describe( `Touch translation information`, () => {
         await open_seeded_reader( page )
 
         const word = page.locator( `[data-translation-word-index]` ).first()
+        const sentence = word.locator( `xpath=ancestor::span[@data-sentence-id]` )
         const sheet = page.locator( `[data-translation-info-sheet]` )
         await expect( word ).toBeVisible( { timeout: 15_000 } )
+        const expected_lookup_count = await unique_translation_word_count( sentence )
 
         await word.tap()
         await expect( sheet ).toBeVisible()
@@ -204,8 +222,9 @@ test.describe( `Touch translation information`, () => {
         await expect( dialog ).toContainText( `Original` )
         await expect( dialog ).toContainText( `Translation` )
         await expect( dialog ).toContainText( `Detailed explanation here.` )
+        await expect( sheet ).toHaveAttribute( `aria-busy`, `false` )
         expect( calls.explanation ).toBeGreaterThanOrEqual( 1 )
-        expect( calls.word_lookup ).toBe( 1 )
+        expect( calls.word_lookup ).toBe( expected_lookup_count )
 
     } )
 
@@ -370,14 +389,20 @@ test.describe( `Touch translation information`, () => {
         await open_seeded_reader( page )
 
         const word = page.locator( `[data-translation-word-index]` ).first()
+        const sentence = word.locator( `xpath=ancestor::span[@data-sentence-id]` )
         const tooltip = page.locator( READER_WORD_TOOLTIP )
         await expect( word ).toBeVisible( { timeout: 15_000 } )
+        const expected_lookup_count = await unique_translation_word_count( sentence )
 
         await word.tap()
 
         await expect( tooltip ).toHaveText( `Translation unavailable` )
         await expect( tooltip ).not.toHaveAttribute( `aria-live` )
-        expect( calls.word_lookup ).toBe( 1 )
+        const selected_direct_word = page.locator( `[data-direct-translation-word-index="0"]` )
+        await expect( selected_direct_word ).toContainText( `Translation unavailable` )
+        await expect( selected_direct_word ).toHaveCSS( `text-decoration-line`, `underline` )
+        await expect( page.locator( `[data-translation-info-sheet]` ) ).toHaveAttribute( `aria-busy`, `false` )
+        expect( calls.word_lookup ).toBe( expected_lookup_count )
 
     } )
 

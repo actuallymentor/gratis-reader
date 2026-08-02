@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.19.0] - 2026-08-02
+
+### Added
+- Show meaning and word-by-word translations on word taps (uncommitted)
+
 ## [1.18.1] - 2026-08-01
 
 ### Fixed

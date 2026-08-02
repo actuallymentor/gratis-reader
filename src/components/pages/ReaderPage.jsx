@@ -7,6 +7,7 @@ import { use_word_lookup } from '../../hooks/use_word_lookup.js'
 import { use_settings_store } from '../../stores/settings_store.js'
 import { save_progress, get_progress } from '../../modules/cache.js'
 import { DEFAULT_LEVEL, LEVELS } from '../../modules/prompts.js'
+import { segment_translation_text } from '../../modules/translation_alignment.js'
 import Sentence from '../molecules/Sentence.jsx'
 import ExplanationPopover from '../molecules/ExplanationPopover.jsx'
 import TranslationInfoSheet from '../molecules/TranslationInfoSheet.jsx'
@@ -400,14 +401,49 @@ export default function ReaderPage() {
         sentence_context: selected_translation || ``,
         cache_by_context: true
     } )
+    const selected_translation_segments = useMemo(
+        () => segment_translation_text( selected_translation ),
+        [ selected_translation ]
+    )
     const selected_word_lookup = translation_selection?.word
         ? get_lookup_state( translation_selection.word )
         : null
 
+    const word_by_word_segments = selected_translation_segments.map( segment => {
+        if( !segment.is_word ) return segment
+
+        return {
+            ...segment,
+            ...get_lookup_state( segment.text ),
+            selected: segment.word_index === translation_selection?.word_index
+        }
+    } )
+    const word_by_word_loading = word_by_word_segments.some(
+        segment => segment.is_word && segment.loading
+    )
+
     useEffect( () => {
-        if( !translation_selection?.word || !selected_translation ) return
-        lookup_word( translation_selection.word )
-    }, [ translation_selection, selected_translation, lookup_word ] )
+        if( !translation_selection || !selected_translation ) return
+
+        const selected_segment = selected_translation_segments.find(
+            segment => segment.word_index === translation_selection.word_index
+        )
+        const remaining_segments = selected_translation_segments.filter(
+            segment => segment.is_word && segment.word_index !== translation_selection.word_index
+        )
+        const prioritized_segments = selected_segment
+            ? [ selected_segment, ...remaining_segments ]
+            : remaining_segments
+
+        // Resolve the tapped word first so its tooltip stays responsive while
+        // the rest of the direct translation fills in around it.
+        prioritized_segments.forEach( segment => lookup_word( segment.text ) )
+    }, [
+        translation_selection,
+        selected_translation,
+        selected_translation_segments,
+        lookup_word
+    ] )
 
     // Save progress on chapter change
     useEffect( () => {
@@ -825,6 +861,8 @@ export default function ReaderPage() {
                 meaning={ meanings[selected_sentence.id] }
                 loading={ !!meaning_loading[selected_sentence.id] }
                 error={ !!meaning_errors[selected_sentence.id] }
+                word_by_word_segments={ word_by_word_segments }
+                word_by_word_loading={ word_by_word_loading }
                 on_close={ close_translation_sheet }
                 on_explain={ explain_selected_translation }
             /> }

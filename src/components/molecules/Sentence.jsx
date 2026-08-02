@@ -85,7 +85,7 @@ export default function Sentence( {
             tabIndex={ 0 }
             aria-pressed={ selected }
             aria-describedby={ selected ? tooltip_id : undefined }
-            aria-label={ `Translate ${ segment.text } and show its simplified original-language fragment` }
+            aria-label={ `Translate ${ segment.text } and show its meaning and word-by-word translation` }
             data-translation-word={ segment.text }
             data-translation-word-index={ segment.word_index }
             onClick={ e => activate_word( e, segment ) }
