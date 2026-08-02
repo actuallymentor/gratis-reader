@@ -428,7 +428,11 @@ export default function ReaderPage() {
 
     useEffect( () => {
         if( !translation_selection?.word || !selected_translation ) return
-        lookup_word( translation_selection.word )
+
+        const tap_controller = new AbortController()
+        lookup_word( translation_selection.word, { signal: tap_controller.signal } )
+
+        return () => tap_controller.abort()
     }, [ translation_selection, selected_translation, lookup_word ] )
 
     useEffect( () => {
