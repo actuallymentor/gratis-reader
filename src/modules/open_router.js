@@ -1,6 +1,7 @@
 import { log } from 'mentie'
 
 const BASE_URL = `https://openrouter.ai/api/v1`
+const REQUEST_TIMEOUT_MS = 60_000
 
 /**
  * Validates an OpenRouter API key by calling the /auth/key endpoint
@@ -50,69 +51,72 @@ export const chat_completion = async ( { api_key, model, system_prompt, user_mes
     log.debug( `Translating ${ user_message?.length } chars with "${ model }" (sys ${ system_prompt?.length } chars) and temperature ${ temperature }` )
     log.insane( `Translation details:`, { user_message, system_prompt, model, temperature } )
 
-    // Add a 60-second timeout if no external signal is provided
-    let timeout_id
-    let effective_signal = signal
-    if( !signal ) {
-        const timeout_controller = new AbortController()
-        timeout_id = setTimeout( () => timeout_controller.abort(), 60000 )
-        effective_signal = timeout_controller.signal
-    }
+    // A caller signal handles navigation/offline cancellation. This controller
+    // adds a hard deadline that remains active through response body parsing.
+    const request_controller = new AbortController()
+    const cancel_request = () => request_controller.abort()
+    const timeout_id = setTimeout( cancel_request, REQUEST_TIMEOUT_MS )
 
-    const response = await fetch( `${ BASE_URL }/chat/completions`, {
-        method: `POST`,
-        headers: {
-            'Authorization': `Bearer ${ api_key }`,
-            'Content-Type': `application/json`,
-            'X-Title': `Gratis Reader`
-        },
-        body: JSON.stringify( {
-            model,
-            messages: [
-                { role: `system`, content: system_prompt },
-                { role: `user`, content: user_message }
-            ],
-            temperature
-        } ),
-        signal: effective_signal
-    } )
+    if( signal?.aborted ) cancel_request()
+    else signal?.addEventListener( `abort`, cancel_request, { once: true } )
 
-    if( timeout_id ) clearTimeout( timeout_id )
-
-    if( !response.ok ) {
-        const error_text = await response.text().catch( () => `Unknown error` )
-        log.error( `OpenRouter error ${ response.status }:`, error_text )
-        throw new Error( `OpenRouter error: ${ response.status }` )
-    }
-
-    let data
     try {
-        data = await response.clone().json()
-    } catch {
-        log.debug( `Failed to parse OpenRouter response as JSON. Response text:`, await response.text() )
-        throw new Error( `OpenRouter returned invalid JSON (possible maintenance page)` )
-    }
+        const response = await fetch( `${ BASE_URL }/chat/completions`, {
+            method: `POST`,
+            headers: {
+                'Authorization': `Bearer ${ api_key }`,
+                'Content-Type': `application/json`,
+                'X-Title': `Gratis Reader`
+            },
+            body: JSON.stringify( {
+                model,
+                messages: [
+                    { role: `system`, content: system_prompt },
+                    { role: `user`, content: user_message }
+                ],
+                temperature
+            } ),
+            signal: request_controller.signal
+        } )
 
-    const { choices, usage } = data
-
-    if( !choices?.length || !choices[0]?.message?.content ) {
-        log.debug( `OpenRouter response missing expected fields. Full response data:`, data )
-        throw new Error( `OpenRouter returned an empty or malformed response` )
-    }
-
-    const content = choices[0].message.content.trim()
-    if( !content ) {
-        log.debug( `OpenRouter response contained only whitespace. Full response data:`, data )
-        throw new Error( `OpenRouter returned an empty or malformed response` )
-    }
-
-    return {
-        content,
-        usage: {
-            prompt_tokens: usage?.prompt_tokens || 0,
-            completion_tokens: usage?.completion_tokens || 0,
-            total_tokens: usage?.total_tokens || 0
+        if( !response.ok ) {
+            const error_text = await response.text().catch( () => `Unknown error` )
+            log.error( `OpenRouter error ${ response.status }:`, error_text )
+            throw new Error( `OpenRouter error: ${ response.status }` )
         }
+
+        let data
+        try {
+            data = await response.clone().json()
+        } catch {
+            log.debug( `Failed to parse OpenRouter response as JSON. Response text:`, await response.text() )
+            throw new Error( `OpenRouter returned invalid JSON (possible maintenance page)` )
+        }
+
+        const { choices, usage } = data
+
+        if( !choices?.length || !choices[0]?.message?.content ) {
+            log.debug( `OpenRouter response missing expected fields. Full response data:`, data )
+            throw new Error( `OpenRouter returned an empty or malformed response` )
+        }
+
+        const content = choices[0].message.content.trim()
+        if( !content ) {
+            log.debug( `OpenRouter response contained only whitespace. Full response data:`, data )
+            throw new Error( `OpenRouter returned an empty or malformed response` )
+        }
+
+        return {
+            content,
+            usage: {
+                prompt_tokens: usage?.prompt_tokens || 0,
+                completion_tokens: usage?.completion_tokens || 0,
+                total_tokens: usage?.total_tokens || 0
+            }
+        }
+    } finally {
+        clearTimeout( timeout_id )
+        signal?.removeEventListener( `abort`, cancel_request )
     }
 
 }

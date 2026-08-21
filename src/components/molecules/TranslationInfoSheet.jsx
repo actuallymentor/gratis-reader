@@ -1,5 +1,5 @@
+import { useId, useState } from 'react'
 import styled, { keyframes } from 'styled-components'
-import Skeleton from '../atoms/Skeleton.jsx'
 
 const open_sheet = keyframes`
     from { transform: translateY(0.75rem); opacity: 0; }
@@ -50,32 +50,16 @@ const CloseButton = styled.button`
 `
 
 const SheetContent = styled.div`
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: end;
-    gap: var(--space-l);
     padding-right: calc(44px + var(--space-s));
-
-    @media (max-width: 420px) {
-        grid-template-columns: 1fr;
-        gap: var(--space-m);
-    }
 `
 
 const TranslationDetails = styled.div`
-    display: grid;
-    gap: var(--space-m);
     max-height: min(12rem, 35dvh);
     overflow-y: auto;
 `
 
 const TranslationSection = styled.section`
     min-width: 0;
-
-    & + & {
-        padding-top: var(--space-m);
-        border-top: 1px solid var(--border);
-    }
 `
 
 const SectionLabel = styled.h2`
@@ -93,15 +77,29 @@ const TranslationValue = styled.div`
     overflow-wrap: anywhere;
 `
 
-const MeaningError = styled.span`
-    color: var(--text-muted);
-`
-
-const DirectWord = styled.span`
-    font-weight: ${ p => p.$selected ? 700 : `inherit` };
+const DirectWord = styled.button`
+    appearance: none;
+    display: inline;
+    margin: 0 0 0 ${ p => p.$needs_separator ? `0.25em` : `0` };
+    padding: 0;
+    border: 0;
+    border-radius: 2px;
+    background: none;
+    color: inherit;
+    font: inherit;
+    line-height: inherit;
     text-decoration-line: ${ p => p.$selected ? `underline` : `none` };
     text-decoration-thickness: 2px;
     text-underline-offset: 0.15em;
+
+    &:hover {
+        color: var(--accent-dark);
+    }
+
+    &:focus-visible {
+        outline: 2px solid var(--accent-dark);
+        outline-offset: 2px;
+    }
 `
 
 const ScreenReaderOnly = styled.span`
@@ -116,53 +114,60 @@ const ScreenReaderOnly = styled.span`
     border: 0;
 `
 
-const ExplainButton = styled.button`
-    min-width: 7rem;
-    min-height: 48px;
-    padding: var(--space-s) var(--space-l);
-    border: 1px solid var(--text);
+const ActionRow = styled.div`
+    display: flex;
+    gap: var(--space-xs);
+    margin-top: var(--space-s);
+`
+
+const ActionButton = styled.button`
+    min-height: 44px;
+    padding: 0 var(--space-s);
+    border: 1px solid var(--border);
     border-radius: var(--radius-s);
-    background: var(--text);
-    color: var(--bg-surface);
-    font-weight: 700;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 0.78em;
+    font-weight: 600;
 
     &:hover,
     &:focus-visible {
-        filter: brightness(0.9);
-    }
-
-    @media (max-width: 420px) {
-        justify-self: end;
+        background: var(--bg-hover);
+        color: var(--text);
     }
 `
 
+const OriginalSentence = styled.div`
+    margin-top: var(--space-s);
+    padding-top: var(--space-s);
+    border-top: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 0.9em;
+    line-height: 1.6;
+`
+
 /**
- * Shows a natural source-language meaning, direct word-by-word translation,
- * and access to the full translation explanation.
+ * Shows direct word-by-word translation with source and explanation actions.
  * @param {Object} props
- * @param {string} [props.meaning] - Simplified source-language fragment
- * @param {boolean} [props.loading] - Whether the source fragment is loading
- * @param {boolean} [props.error] - Whether the source fragment could not be loaded
+ * @param {string} props.original - Exact source sentence
  * @param {Array} [props.word_by_word_segments] - Literal translation display segments
  * @param {boolean} [props.word_by_word_loading] - Whether any literal word is loading
  * @param {Function} props.on_close - Closes the sheet
  * @param {Function} props.on_explain - Opens the existing explanation modal
+ * @param {Function} props.on_select_word - Selects the corresponding word in the book sentence
  * @returns {JSX.Element}
  */
 export default function TranslationInfoSheet( {
-    meaning,
-    loading = false,
-    error = false,
+    original,
     word_by_word_segments = [],
     word_by_word_loading = false,
     on_close,
-    on_explain
+    on_explain,
+    on_select_word
 } ) {
 
-    let meaning_content = <Skeleton width="100%" height="1.5em" />
-
-    if( error ) meaning_content = <MeaningError>Meaning unavailable</MeaningError>
-    else if( meaning ) meaning_content = meaning
+    const [ show_original, set_show_original ] = useState( false )
+    const original_id = useId()
 
     const word_by_word_content = word_by_word_segments.map( ( segment, index ) => {
         if( !segment.is_word ) return segment.text
@@ -175,9 +180,14 @@ export default function TranslationInfoSheet( {
 
         return <DirectWord
             key={ `${ index }-${ segment.word_index }` }
+            type="button"
             $selected={ segment.selected }
+            $needs_separator={ index > 0 && word_by_word_segments[index - 1].is_word }
+            aria-label={ `Select ${ segment.text } in the book sentence` }
+            aria-pressed={ segment.selected }
             data-direct-translation-word-index={ segment.word_index }
             data-selected={ segment.selected ? `true` : undefined }
+            onClick={ () => on_select_word( segment ) }
         >
             { selected_label }
             { direct_translation }
@@ -187,7 +197,6 @@ export default function TranslationInfoSheet( {
     return <Sheet
         data-translation-info-sheet
         aria-label="Translation information"
-        aria-busy={ loading }
     >
         <CloseButton type="button" onClick={ on_close } aria-label="Close translation information">
             ×
@@ -195,13 +204,6 @@ export default function TranslationInfoSheet( {
 
         <SheetContent>
             <TranslationDetails>
-                <TranslationSection>
-                    <SectionLabel>Meaning</SectionLabel>
-                    <TranslationValue data-translation-meaning aria-live="polite">
-                        { meaning_content }
-                    </TranslationValue>
-                </TranslationSection>
-
                 <TranslationSection>
                     <SectionLabel>Word by word</SectionLabel>
                     <TranslationValue
@@ -213,9 +215,25 @@ export default function TranslationInfoSheet( {
                 </TranslationSection>
             </TranslationDetails>
 
-            <ExplainButton type="button" onClick={ on_explain }>
-                Explain
-            </ExplainButton>
+            <ActionRow>
+                <ActionButton
+                    type="button"
+                    aria-expanded={ show_original }
+                    aria-controls={ original_id }
+                    onClick={ () => set_show_original( visible => !visible ) }
+                >
+                    Original
+                </ActionButton>
+
+                <ActionButton type="button" onClick={ on_explain }>
+                    Explain
+                </ActionButton>
+            </ActionRow>
+
+            { show_original && <OriginalSentence id={ original_id } data-original-sentence>
+                <ScreenReaderOnly>Original sentence: </ScreenReaderOnly>
+                { original }
+            </OriginalSentence> }
         </SheetContent>
     </Sheet>
 

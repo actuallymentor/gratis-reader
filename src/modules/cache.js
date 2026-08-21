@@ -41,7 +41,7 @@ export const open_db = () => {
                 db.createObjectStore( `translations`, { keyPath: `key` } )
             }
 
-            // Back-translated meanings shown in the translation information sheet
+            // Legacy back-translations remain readable so older databases can be cleaned safely.
             if( !db.objectStoreNames.contains( `meanings` ) ) {
                 db.createObjectStore( `meanings`, { keyPath: `key` } )
             }
@@ -205,58 +205,7 @@ export const delete_translation = async ( cache_key ) => {
 }
 
 /**
- * Saves a source-language meaning for an adapted translation fragment.
- * @param {Object} entry - Meaning cache record
- * @param {string} entry.key
- * @param {string} entry.translated
- * @param {string} entry.meaning
- * @param {string} entry.source_language
- * @param {string} entry.target_language
- * @param {string} entry.level
- * @param {string} entry.created_at
- * @returns {Promise<void>}
- */
-export const save_sentence_meaning = async ( entry ) => {
-    const db = await open_db()
-    return new Promise( ( resolve, reject ) => {
-        const tx = db.transaction( `meanings`, `readwrite` )
-        tx.objectStore( `meanings` ).put( entry )
-        tx.oncomplete = () => resolve()
-        tx.onerror = () => reject( tx.error )
-    } )
-}
-
-/**
- * Gets a cached source-language meaning record by key.
- * @param {string} cache_key
- * @returns {Promise<Object|null>} The complete meaning record or null
- */
-export const get_sentence_meaning = async ( cache_key ) => {
-    const db = await open_db()
-    return new Promise( ( resolve, reject ) => {
-        const tx = db.transaction( `meanings`, `readonly` )
-        const request = tx.objectStore( `meanings` ).get( cache_key )
-        request.onsuccess = () => resolve( request.result || null )
-        request.onerror = () => reject( request.error )
-    } )
-}
-
-/**
- * Deletes a cached source-language meaning by key.
- * @param {string} cache_key
- */
-export const delete_sentence_meaning = async ( cache_key ) => {
-    const db = await open_db()
-    return new Promise( ( resolve, reject ) => {
-        const tx = db.transaction( `meanings`, `readwrite` )
-        tx.objectStore( `meanings` ).delete( cache_key )
-        tx.oncomplete = () => resolve()
-        tx.onerror = () => reject( tx.error )
-    } )
-}
-
-/**
- * Clears all cached translations and source-language meanings
+ * Clears translations and legacy source-language meanings.
  */
 export const clear_translations = async () => {
     const db = await open_db()

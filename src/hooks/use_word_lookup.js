@@ -40,13 +40,15 @@ export const word_cache_key = ( word, source_language, target_language, lookup_c
  * @param {string} options.target_language
  * @param {string} options.sentence_context
  * @param {boolean} [options.cache_by_context] - Prevents ambiguous words sharing translations across fragments
+ * @param {boolean} [options.is_online] - Allows cached lookup while suppressing offline requests
  * @returns {Object}
  */
 export const use_word_lookup = ( {
     source_language,
     target_language,
     sentence_context,
-    cache_by_context = false
+    cache_by_context = false,
+    is_online = typeof navigator === `undefined` || navigator.onLine
 } ) => {
 
     const [ , set_lookup_version ] = useState( 0 )
@@ -179,6 +181,8 @@ export const use_word_lookup = ( {
                     return
                 }
 
+                if( !is_online ) return
+
                 const { system, user } = build_word_lookup_prompt( clean_word, source_language, target_language, sentence_context )
                 const { content } = await chat_completion( {
                     api_key,
@@ -244,6 +248,7 @@ export const use_word_lookup = ( {
         target_language,
         sentence_context,
         lookup_context,
+        is_online,
         get_word_translation,
         cache_word_translation,
         remember_lookup_key,
@@ -260,9 +265,13 @@ export const use_word_lookup = ( {
             content: word_translations_ref.current[cache_key],
             loading: !!loading_words_ref.current[cache_key],
             error: !!lookup_errors_ref.current[cache_key],
-            can_lookup: !!api_key
+            can_lookup: !!api_key && is_online
         }
-    }, [ source_language, target_language, lookup_context, api_key ] )
+    }, [ source_language, target_language, lookup_context, api_key, is_online ] )
+
+    useEffect( () => {
+        if( !is_online ) cancel_lookups()
+    }, [ is_online, cancel_lookups ] )
 
     useEffect( () => {
         mounted_ref.current = true

@@ -77,13 +77,13 @@ export const LANGUAGE_NOTES = {
         
         Examples of Albanian Tosk vs Kosovar Gheg:
         - Tosk (wrong): A mund të flasësh anglisht?
-          Kovovar Gheg (correct): A din me fol anglisht?
+          Kosovar Gheg (correct): A din me fol anglisht?
         - Tosk (wrong): Babai im është nga Kosova
-          Kovovar Gheg (correct): Babai jem asht prej Kosovës
+          Kosovar Gheg (correct): Babai jem asht prej Kosovës
         - Tosk (wrong): Çfarë do të thotë kjo?
-          Kovovar Gheg (correct): Çka do me thanë kjo?
+          Kosovar Gheg (correct): Çka do me thanë kjo?
         - Tosk (wrong): Po mësoj shqip
-          Kovovar Gheg (correct): Jam tu mësu shqip
+          Kosovar Gheg (correct): Jam tu mësu shqip
     ` )
 }
 
@@ -145,39 +145,6 @@ export const build_translation_user_prompt = ( sentence, context ) => {
     Translate this sentence:
     ${ sentence }
 ` )
-}
-
-/**
- * Builds a prompt for translating an adapted target-language sentence back into the source language.
- * @param {string} source_language
- * @param {string} target_language
- * @param {string} translated_sentence
- * @returns {Object} { system, user } message pair
- */
-export const build_back_translation_prompt = ( source_language, target_language, translated_sentence ) => {
-
-    return {
-
-        system: multiline_trim( `
-            You translate adapted learner text from ${ target_language } back into ${ source_language }.
-
-            The input may be simplified, condensed, or intentionally rough because it was written for a language learner.
-            Translate only the meaning that is present in the adapted fragment.
-            Do not reconstruct missing details, nuance, style, or clauses that are not in the adapted fragment.
-
-            Return ONLY the complete ${ source_language } translation as plain text.
-            Do not include markdown, explanations, notes, comments, or alternatives.
-        ` ),
-
-        user: multiline_trim( `
-            Adapted translation:
-            ${ translated_sentence }
-
-            Translate the adapted fragment into ${ source_language }.
-        ` )
-
-    }
-
 }
 
 /**

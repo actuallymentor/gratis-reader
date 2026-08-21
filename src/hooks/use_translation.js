@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { log } from 'mentie'
 import { chat_completion } from '../modules/open_router.js'
 import {
-    build_back_translation_prompt,
     build_translation_system_prompt,
     build_translation_user_prompt,
     DEFAULT_LEVEL,
@@ -12,9 +11,6 @@ import {
     save_translation,
     get_translation,
     delete_translation,
-    save_sentence_meaning,
-    get_sentence_meaning,
-    delete_sentence_meaning,
     add_token_usage,
     get_token_usage
 } from '../modules/cache.js'
@@ -28,9 +24,6 @@ const FAILED_TRANSLATION_RETRY_DELAYS_MS = [ 5_000, 15_000, 30_000, 60_000 ]
 const translation_cache_key = ( sentence_id, target_language, level ) =>
     `${ sentence_id }:${ target_language }:${ level }`
 
-const sentence_meaning_cache_key = ( sentence_id, source_language, target_language, level ) =>
-    `${ sentence_id }:${ target_language }:${ source_language }:${ level }`
-
 const is_abort_error = error => error?.name === `AbortError`
 
 const remove_store_key = ( store, key ) => {
@@ -41,32 +34,15 @@ const remove_store_key = ( store, key ) => {
     return next_store
 }
 
-const sentence_meaning_from_response = ( content ) => {
-    const plain_content = String( content || `` ).trim().replace( /^```(?:json)?\s*|\s*```$/gi, `` )
-
-    try {
-        const parsed_content = JSON.parse( plain_content )
-        const declared_meaning = typeof parsed_content?.meaning === `string`
-            ? parsed_content.meaning.trim()
-            : ``
-        const legacy_segment_meaning = Array.isArray( parsed_content?.segments )
-            ? parsed_content.segments
-                .filter( segment => typeof segment?.text === `string` )
-                .map( segment => segment.text )
-                .join( `` )
-                .trim()
-            : ``
-
-        return declared_meaning || legacy_segment_meaning || plain_content
-    } catch {
-        return plain_content
-    }
-}
-
+/**
+ * Detects fragments that do not contain translatable text.
+ * @param {string} text
+ * @returns {{ nonsense: boolean, reason: string }}
+ */
 export function is_nonsense( text ) {
 
     const nonsense_patterns = [
-        '\\n', '\\tr', '\\r',          // literal escape sequences
+        '\\n', '\\t', '\\r',           // literal escape sequences
         /[\p{P}\p{S}\p{Cf}\s]/gu,      // punctuation, symbols, format chars, whitespace
     ]
     let nonsense = false
@@ -84,7 +60,7 @@ export function is_nonsense( text ) {
     }
 
     // Check for interpunction-only
-    if( cleaned?.length && !/[a-zA-Z0-9]/.test( cleaned ) ) {
+    if( cleaned?.length && !/[\p{L}\p{N}]/u.test( cleaned ) ) {
         nonsense = true
         reason = `Interpunction-only sentence`
     }
@@ -101,28 +77,32 @@ export function is_nonsense( text ) {
  * @param {string} options.level - Level code e.g. 'a1', 'b2'
  * @param {string} options.source_language
  * @param {string} [options.book_id] - For tracking per-book token usage
- * @returns {{ translations, meanings, meaning_loading, meaning_errors, request_sentence_meaning, retranslate_sentence, is_translating, translation_progress, token_usage }}
+ * @param {boolean} [options.is_online] - Allows cached hydration while suppressing offline requests
+ * @returns {{ translations, retranslate_sentence, is_translating, translation_progress, token_usage }}
  */
-export const use_translation = ( { all_sentences = [], target_language, level, source_language, book_id } ) => {
+export const use_translation = ( {
+    all_sentences = [],
+    target_language,
+    level,
+    source_language,
+    book_id,
+    is_online = typeof navigator === `undefined` || navigator.onLine
+} ) => {
 
     const [ translations, set_translations ] = useState( {} )
-    const [ meanings, set_meanings ] = useState( {} )
-    const [ meaning_loading, set_meaning_loading ] = useState( {} )
-    const [ meaning_errors, set_meaning_errors ] = useState( {} )
     const [ is_translating, set_is_translating ] = useState( false )
     const [ token_usage, set_token_usage ] = useState( { prompt_tokens: 0, completion_tokens: 0 } )
     const token_usage_loaded = useRef( false )
     const abort_ref = useRef( null )
     const retry_abort_ref = useRef( null )
+    const retranslate_abort_ref = useRef( null )
     const retry_running_ref = useRef( false )
+    const active_operations_ref = useRef( new Set() )
+    const active_controllers_ref = useRef( new Set() )
     const translations_ref = useRef( {} )
-    // Keep request deduplication outside render state so loading/error changes
-    // cannot recreate the callback and start an automatic retry loop.
-    const meanings_ref = useRef( {} )
     const failed_sentences_ref = useRef( {} )
     const translation_requests_ref = useRef( {} )
     const translation_versions_ref = useRef( {} )
-    const meaning_requests_ref = useRef( {} )
     const mounted_ref = useRef( true )
     const api_key = use_settings_store( state => state.api_key )
     const model = use_settings_store( state => state.model )
@@ -134,125 +114,27 @@ export const use_translation = ( { all_sentences = [], target_language, level, s
         translations_ref.current = translations
     }, [ translations ] )
 
-    const request_sentence_meaning = useCallback( async ( { sentence_id, translated } ) => {
+    const begin_translation = useCallback( () => {
+        const operation = Symbol( `translation_operation` )
+        active_operations_ref.current.add( operation )
+        if( mounted_ref.current ) set_is_translating( true )
+        return operation
+    }, [] )
 
-        if( !sentence_id || !translated || !source_language || !target_language || !level ) return
+    const finish_translation = useCallback( ( operation ) => {
+        active_operations_ref.current.delete( operation )
+        if( mounted_ref.current ) set_is_translating( active_operations_ref.current.size > 0 )
+    }, [] )
 
-        if( meanings_ref.current[sentence_id] || meaning_requests_ref.current[sentence_id] ) return
+    const register_controller = useCallback( ( controller ) => {
+        active_controllers_ref.current.add( controller )
+        return () => active_controllers_ref.current.delete( controller )
+    }, [] )
 
-        if( !api_key ) {
-            set_meaning_errors( prev => ( { ...prev, [sentence_id]: true } ) )
-            return
-        }
-
-        const cache_key = sentence_meaning_cache_key( sentence_id, source_language, target_language, level )
-        const controller = new AbortController()
-
-        meaning_requests_ref.current = { ...meaning_requests_ref.current, [sentence_id]: controller }
-        set_meaning_loading( prev => ( { ...prev, [sentence_id]: true } ) )
-        set_meaning_errors( prev => {
-            if( !prev[sentence_id] ) return prev
-
-            const next_errors = { ...prev }
-            delete next_errors[sentence_id]
-            return next_errors
-        } )
-
-        try {
-            const cached = await get_sentence_meaning( cache_key )
-            if( controller.signal.aborted ) return
-
-            const cached_matches_translation = cached?.translated === translated
-                && typeof cached.meaning === `string`
-                && !!cached.meaning.trim()
-            if( cached_matches_translation ) {
-                meanings_ref.current = {
-                    ...meanings_ref.current,
-                    [sentence_id]: cached.meaning
-                }
-
-                if( mounted_ref.current ) set_meanings( prev => ( { ...prev, [sentence_id]: cached.meaning } ) )
-                return
-            }
-
-            const { system, user } = build_back_translation_prompt( source_language, target_language, translated )
-
-            const { content, usage } = await chat_completion( {
-                api_key,
-                model,
-                system_prompt: system,
-                user_message: user,
-                temperature: 0.1,
-                signal: controller.signal
-            } )
-
-            if( controller.signal.aborted ) return
-
-            const meaning = sentence_meaning_from_response( content )
-
-            if( !meaning.trim() ) throw new Error( `Sentence meaning response was empty` )
-
-            meanings_ref.current = { ...meanings_ref.current, [sentence_id]: meaning }
-
-            if( mounted_ref.current ) set_meanings( prev => ( { ...prev, [sentence_id]: meaning } ) )
-
-            const prompt_tokens = usage?.prompt_tokens || 0
-            const completion_tokens = usage?.completion_tokens || 0
-
-            if( prompt_tokens > 0 || completion_tokens > 0 ) {
-                set_token_usage( prev => ( {
-                    prompt_tokens: prev.prompt_tokens + prompt_tokens,
-                    completion_tokens: prev.completion_tokens + completion_tokens
-                } ) )
-                if( book_id ) {
-                    add_token_usage( book_id, prompt_tokens, completion_tokens ).catch( () => {} )
-                }
-            }
-
-            try {
-                await save_sentence_meaning( {
-                    key: cache_key,
-                    translated,
-                    meaning,
-                    source_language,
-                    target_language,
-                    level,
-                    created_at: new Date().toISOString()
-                } )
-            } catch {
-                // Meaning cache writes are best-effort; the inline result is already available.
-            }
-        } catch ( error ) {
-            if( controller.signal.aborted || error?.name === `AbortError` ) return
-
-            log.warn( `Sentence meaning failed:`, error?.message || error )
-            if( mounted_ref.current ) {
-                set_meaning_errors( prev => ( { ...prev, [sentence_id]: true } ) )
-            }
-        } finally {
-            const remaining_requests = { ...meaning_requests_ref.current }
-            delete remaining_requests[sentence_id]
-            meaning_requests_ref.current = remaining_requests
-
-            if( mounted_ref.current ) {
-                set_meaning_loading( prev => {
-                    if( !prev[sentence_id] ) return prev
-
-                    const next_loading = { ...prev }
-                    delete next_loading[sentence_id]
-                    return next_loading
-                } )
-            }
-        }
-
-    }, [
-        source_language,
-        target_language,
-        level,
-        api_key,
-        model,
-        book_id
-    ] )
+    const abort_active_translations = useCallback( () => {
+        active_controllers_ref.current.forEach( controller => controller.abort() )
+        active_controllers_ref.current.clear()
+    }, [] )
 
     const forget_failed_sentence = useCallback( ( sentence_id ) => {
         if( !failed_sentences_ref.current[sentence_id] ) return
@@ -281,8 +163,14 @@ export const use_translation = ( { all_sentences = [], target_language, level, s
 
     const translate_sentence = useCallback( async ( sentence, signal, options = {} ) => {
 
-        const { bypass_cache = false, version = translation_versions_ref.current[sentence.id] || 0 } = options
+        const {
+            bypass_cache = false,
+            cache_only = false,
+            version = translation_versions_ref.current[sentence.id] || 0
+        } = options
         const cache_key = translation_cache_key( sentence.id, target_language, level )
+
+        if( signal.aborted ) return { id: sentence.id, skipped: true }
 
         // Check if is nonsense, return original if so (avoid unnecessary API calls and cache pollution)
         const { nonsense, reason } = is_nonsense( sentence.text )
@@ -294,8 +182,11 @@ export const use_translation = ( { all_sentences = [], target_language, level, s
         // Check cache first unless the user explicitly asked for a fresh translation
         if( !bypass_cache ) {
             const cached = await get_translation( cache_key )
+            if( signal.aborted ) return { id: sentence.id, skipped: true }
             if( cached ) return { id: sentence.id, translated: cached, from_cache: true }
         }
+
+        if( cache_only ) return { id: sentence.id, skipped: true }
 
         const user_message = build_translation_user_prompt( sentence.text, sentence.context || sentence.text )
 
@@ -319,6 +210,8 @@ export const use_translation = ( { all_sentences = [], target_language, level, s
             created_at: new Date().toISOString()
         } )
 
+        if( signal.aborted ) return { id: sentence.id, skipped: true }
+
         return { id: sentence.id, translated: content, from_cache: false, usage }
 
     }, [ api_key, model, target_language, level ] )
@@ -326,9 +219,11 @@ export const use_translation = ( { all_sentences = [], target_language, level, s
     // Translate a batch of sentences
     const translate_batch = useCallback( async ( sentences_to_translate, signal, options = {} ) => {
 
-        const system_prompt = build_translation_system_prompt(
-            source_language, target_language, level_info.code, level_info.label
-        )
+        const system_prompt = options.cache_only
+            ? undefined
+            : build_translation_system_prompt(
+                source_language, target_language, level_info.code, level_info.label
+            )
         const batch_translations = {}
 
         // Process in chunks of MAX_CONCURRENT
@@ -432,7 +327,7 @@ export const use_translation = ( { all_sentences = [], target_language, level, s
     // Trigger translation when visible sentences or settings change (debounced)
     useEffect( () => {
 
-        if( !all_sentences.length || !target_language || !level || !api_key ) return
+        if( !all_sentences.length || !target_language || !level ) return
 
         // Debounce to prevent rapid-fire requests during fast navigation
         const debounce_timer = setTimeout( () => {
@@ -443,28 +338,28 @@ export const use_translation = ( { all_sentences = [], target_language, level, s
             abort_ref.current = controller
 
             const run = async () => {
+                const to_translate = all_sentences.filter(
+                    sentence => !translations_ref.current[sentence.id]
+                )
+                if( to_translate.length === 0 ) return
 
-                set_is_translating( true )
+                const can_request = is_online && !!api_key
+                const operation = can_request ? begin_translation() : null
+                const unregister_controller = register_controller( controller )
 
                 try {
-
-                    // Determine which sentences need translation
-                    // Translate all untranslated sentences in the chapter
-                    // (cached translations are served instantly, only uncached hit the API)
-                    const to_translate = all_sentences.filter(
-                        sentence => !translations_ref.current[sentence.id]
-                    )
-
-                    if( to_translate.length > 0 ) {
-                        await translate_batch( to_translate, controller.signal )
-                    }
-
+                    // Always hydrate IndexedDB. Only cache misses reach the network while online.
+                    await translate_batch( to_translate, controller.signal, {
+                        cache_only: !can_request
+                    } )
                 } catch ( error ) {
-                    if( error.name !== `AbortError` ) {
+                    if( !is_abort_error( error ) ) {
                         log.error( `Translation failed:`, error )
                     }
                 } finally {
-                    set_is_translating( false )
+                    unregister_controller()
+                    if( abort_ref.current === controller ) abort_ref.current = null
+                    if( operation ) finish_translation( operation )
                 }
 
             }
@@ -478,12 +373,22 @@ export const use_translation = ( { all_sentences = [], target_language, level, s
             if( abort_ref.current ) abort_ref.current.abort()
         }
 
-    }, [ all_sentences, target_language, level, api_key, translate_batch ] )
+    }, [
+        all_sentences,
+        target_language,
+        level,
+        api_key,
+        is_online,
+        translate_batch,
+        begin_translation,
+        finish_translation,
+        register_controller
+    ] )
 
     // Retry transient sentence failures without waiting for navigation or a settings change.
     useEffect( () => {
 
-        if( !all_sentences.length || !target_language || !level || !api_key ) return
+        if( !all_sentences.length || !target_language || !level || !api_key || !is_online ) return
 
         const retry_failed_translations = async () => {
             if( retry_running_ref.current ) return
@@ -500,16 +405,18 @@ export const use_translation = ( { all_sentences = [], target_language, level, s
             const controller = new AbortController()
             retry_abort_ref.current = controller
             retry_running_ref.current = true
-            set_is_translating( true )
+            const operation = begin_translation()
+            const unregister_controller = register_controller( controller )
 
             try {
                 await translate_batch( sentences_to_retry, controller.signal )
             } catch ( error ) {
                 if( !is_abort_error( error ) ) log.warn( `Translation retry failed:`, error?.message || error )
             } finally {
+                unregister_controller()
                 retry_running_ref.current = false
                 if( retry_abort_ref.current === controller ) retry_abort_ref.current = null
-                if( mounted_ref.current ) set_is_translating( false )
+                finish_translation( operation )
             }
         }
 
@@ -520,15 +427,24 @@ export const use_translation = ( { all_sentences = [], target_language, level, s
             if( retry_abort_ref.current ) retry_abort_ref.current.abort()
         }
 
-    }, [ all_sentences, target_language, level, api_key, translate_batch ] )
+    }, [
+        all_sentences,
+        target_language,
+        level,
+        api_key,
+        is_online,
+        translate_batch,
+        begin_translation,
+        finish_translation,
+        register_controller
+    ] )
 
     const retranslate_sentence = useCallback( async ( { sentence_id } ) => {
 
         const sentence = all_sentences.find( candidate => candidate.id === sentence_id )
-        if( !sentence || !target_language || !level || !source_language || !api_key ) return null
+        if( !sentence || !target_language || !level || !source_language || !api_key || !is_online ) return null
 
         const cache_key = translation_cache_key( sentence.id, target_language, level )
-        const meaning_cache_key = sentence_meaning_cache_key( sentence.id, source_language, target_language, level )
         const next_version = ( translation_versions_ref.current[sentence.id] || 0 ) + 1
 
         translation_versions_ref.current = {
@@ -538,24 +454,14 @@ export const use_translation = ( { all_sentences = [], target_language, level, s
         translations_ref.current = remove_store_key( translations_ref.current, sentence.id )
         forget_failed_sentence( sentence.id )
 
-        meaning_requests_ref.current[sentence.id]?.abort()
-        const remaining_meaning_requests = { ...meaning_requests_ref.current }
-        delete remaining_meaning_requests[sentence.id]
-        meaning_requests_ref.current = remaining_meaning_requests
-        meanings_ref.current = remove_store_key( meanings_ref.current, sentence.id )
-
         set_translations( prev => remove_store_key( prev, sentence.id ) )
-        set_meanings( prev => remove_store_key( prev, sentence.id ) )
-        set_meaning_loading( prev => remove_store_key( prev, sentence.id ) )
-        set_meaning_errors( prev => remove_store_key( prev, sentence.id ) )
+        await delete_translation( cache_key ).catch( () => {} )
 
-        await Promise.allSettled( [
-            delete_translation( cache_key ),
-            delete_sentence_meaning( meaning_cache_key )
-        ] )
-
+        retranslate_abort_ref.current?.abort()
         const controller = new AbortController()
-        set_is_translating( true )
+        retranslate_abort_ref.current = controller
+        const operation = begin_translation()
+        const unregister_controller = register_controller( controller )
 
         try {
             const translated_by_id = await translate_batch( [ sentence ], controller.signal, { bypass_cache: true } )
@@ -568,7 +474,9 @@ export const use_translation = ( { all_sentences = [], target_language, level, s
                 translated
             }
         } finally {
-            if( mounted_ref.current ) set_is_translating( false )
+            unregister_controller()
+            if( retranslate_abort_ref.current === controller ) retranslate_abort_ref.current = null
+            finish_translation( operation )
         }
 
     }, [
@@ -577,37 +485,37 @@ export const use_translation = ( { all_sentences = [], target_language, level, s
         level,
         source_language,
         api_key,
+        is_online,
         translate_batch,
-        forget_failed_sentence
+        forget_failed_sentence,
+        begin_translation,
+        finish_translation,
+        register_controller
     ] )
 
-    // Clear translations and meanings when the language context changes
+    // Clear translation state when the language context changes.
     useEffect( () => {
         set_translations( {} )
-        set_meanings( {} )
-        set_meaning_loading( {} )
-        set_meaning_errors( {} )
         translations_ref.current = {}
-        meanings_ref.current = {}
         failed_sentences_ref.current = {}
         translation_requests_ref.current = {}
         translation_versions_ref.current = {}
-        if( retry_abort_ref.current ) retry_abort_ref.current.abort()
-        Object.values( meaning_requests_ref.current ).forEach( controller => controller.abort() )
-        meaning_requests_ref.current = {}
-    }, [ source_language, target_language, level ] )
+        abort_active_translations()
+    }, [ source_language, target_language, level, abort_active_translations ] )
+
+    useEffect( () => {
+        if( !is_online ) abort_active_translations()
+    }, [ is_online, abort_active_translations ] )
 
     useEffect( () => {
         mounted_ref.current = true
 
         return () => {
             mounted_ref.current = false
-            if( abort_ref.current ) abort_ref.current.abort()
-            if( retry_abort_ref.current ) retry_abort_ref.current.abort()
-            Object.values( meaning_requests_ref.current ).forEach( controller => controller.abort() )
-            meaning_requests_ref.current = {}
+            abort_active_translations()
+            active_operations_ref.current.clear()
         }
-    }, [] )
+    }, [ abort_active_translations ] )
 
     // Load saved token usage for this book on mount
     // Uses functional update to merge with any in-flight additions (avoids race condition)
@@ -626,16 +534,13 @@ export const use_translation = ( { all_sentences = [], target_language, level, s
         } ).catch( () => {} )
     }, [ book_id ] )
 
+    const translated_sentence_count = all_sentences.filter( sentence => translations[sentence.id] ).length
     const translation_progress = all_sentences.length > 0
-        ? Math.round(  Object.keys( translations ).length / all_sentences.length  * 100 )
+        ? Math.round( translated_sentence_count / all_sentences.length * 100 )
         : 0
 
     return {
         translations,
-        meanings,
-        meaning_loading,
-        meaning_errors,
-        request_sentence_meaning,
         retranslate_sentence,
         is_translating,
         translation_progress,

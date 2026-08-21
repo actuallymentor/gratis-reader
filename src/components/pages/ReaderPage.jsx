@@ -13,7 +13,6 @@ import Sentence from '../molecules/Sentence.jsx'
 import ExplanationPopover from '../molecules/ExplanationPopover.jsx'
 import TranslationInfoSheet from '../molecules/TranslationInfoSheet.jsx'
 import SettingsDrawer from '../molecules/SettingsDrawer.jsx'
-import ReaderVocabularyPanel from '../molecules/ReaderVocabularyPanel.jsx'
 import LanguagePicker from '../molecules/LanguagePicker.jsx'
 import LevelPicker from '../molecules/LevelPicker.jsx'
 import ProgressBar from '../atoms/ProgressBar.jsx'
@@ -178,14 +177,18 @@ const StatusRow = styled.div`
     margin-bottom: var(--space-s);
 `
 
-const TranslatingIndicator = styled.span`
+const TranslationStatus = styled.span`
     font-size: 0.75em;
-    color: var(--accent);
-    animation: pulse 1.5s ease infinite;
+    color: ${ p => p.$active ? `var(--accent-dark)` : `var(--text-muted)` };
+    animation: ${ p => p.$active ? `pulse 1.5s ease infinite` : `none` };
 
     @keyframes pulse {
         0%, 100% { opacity: 1; }
         50% { opacity: 0.5; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        animation: none;
     }
 `
 
@@ -285,6 +288,10 @@ const TocSelect = styled.select`
 
 // --- Component ---
 
+/**
+ * Renders the translated book reader and its chapter controls.
+ * @returns {JSX.Element|null}
+ */
 export default function ReaderPage() {
 
     const { book_id } = useParams()
@@ -372,10 +379,6 @@ export default function ReaderPage() {
     // Translation hook
     const {
         translations,
-        meanings,
-        meaning_loading,
-        meaning_errors,
-        request_sentence_meaning,
         retranslate_sentence,
         is_translating,
         token_usage
@@ -384,7 +387,8 @@ export default function ReaderPage() {
         target_language: language_chosen ? last_language : null,
         level: language_chosen ? last_level : null,
         source_language,
-        book_id
+        book_id,
+        is_online: !is_offline
     } )
 
     const selected_sentence = useMemo(
@@ -400,7 +404,8 @@ export default function ReaderPage() {
         source_language,
         target_language: last_language,
         sentence_context: selected_translation || ``,
-        cache_by_context: true
+        cache_by_context: true,
+        is_online: !is_offline
     } )
     const selected_translation_segments = useMemo(
         () => segment_translation_text( selected_translation ),
@@ -556,6 +561,30 @@ export default function ReaderPage() {
         set_translation_selection( null )
     }, [] )
 
+    const select_word_by_word = useCallback( ( segment ) => {
+        if( !selected_sentence || !segment?.is_word ) return
+
+        const sentence_elements = Array.from(
+            reading_area_ref.current?.querySelectorAll( `[data-sentence-id]` ) || []
+        )
+        const sentence_element = sentence_elements.find(
+            element => element.dataset.sentenceId === selected_sentence.id
+        )
+        const word_elements = Array.from(
+            sentence_element?.querySelectorAll( `[data-translation-word-index]` ) || []
+        )
+        const word_element = word_elements.find(
+            element => Number( element.dataset.translationWordIndex ) === segment.word_index
+        )
+
+        select_translation_word( {
+            sentence_id: selected_sentence.id,
+            word_index: segment.word_index,
+            word: segment.text,
+            element: word_element
+        } )
+    }, [ selected_sentence, select_translation_word ] )
+
     const handle_retranslate_sentence = useCallback( async ( { sentence_id } ) => {
         const result = await retranslate_sentence( { sentence_id } )
         if( !result ) return null
@@ -658,15 +687,6 @@ export default function ReaderPage() {
         }
     }, [ translation_selection ] )
 
-    useEffect( () => {
-        if( !selected_sentence || !selected_translation ) return
-
-        request_sentence_meaning( {
-            sentence_id: selected_sentence.id,
-            translated: selected_translation
-        } )
-    }, [ selected_sentence, selected_translation, request_sentence_meaning ] )
-
     const explain_selected_translation = useCallback( () => {
         if( !selected_sentence || !selected_translation ) return
 
@@ -696,10 +716,13 @@ export default function ReaderPage() {
     // Get level info for badge
     const level_info = LEVELS.find( l => l.code === last_level ) || DEFAULT_LEVEL
 
-    const current_chapter_translations = useMemo(
-        () => current_chapter_sentences.map( sentence => translations[sentence.id] ).filter( Boolean ),
+    const translated_sentence_count = useMemo(
+        () => current_chapter_sentences.filter( sentence => translations[sentence.id] ).length,
         [ current_chapter_sentences, translations ]
     )
+    const translation_sentence_count = current_chapter_sentences.length
+    const current_chapter_translating = is_translating
+        && translated_sentence_count < translation_sentence_count
 
     // --- Render helpers ---
 
@@ -877,27 +900,28 @@ export default function ReaderPage() {
 
         </ReadingArea>
 
-        { language_chosen && <ReaderVocabularyPanel
-            translated_texts={ current_chapter_translations }
-            source_language={ source_language }
-            target_language={ last_language }
-        /> }
-
         <ReaderDock ref={ reader_dock_ref } data-reader-dock>
             { translation_selection && selected_sentence && <TranslationInfoSheet
-                meaning={ meanings[selected_sentence.id] }
-                loading={ !!meaning_loading[selected_sentence.id] }
-                error={ !!meaning_errors[selected_sentence.id] }
+                key={ selected_sentence.id }
+                original={ selected_sentence.text }
                 word_by_word_segments={ word_by_word_segments }
                 word_by_word_loading={ word_by_word_loading }
                 on_close={ close_translation_sheet }
                 on_explain={ explain_selected_translation }
+                on_select_word={ select_word_by_word }
             /> }
 
             <BottomBar>
                 <StatusRow>
                     <LevelBadge cefr={ level_info.cefr } label={ level_info.label } />
-                    { is_translating && <TranslatingIndicator>Translating...</TranslatingIndicator> }
+                    { ( is_offline || current_chapter_translating ) && <TranslationStatus
+                        $active={ !is_offline && current_chapter_translating }
+                        aria-live="polite"
+                    >
+                        { is_offline
+                            ? `Offline · ${ translated_sentence_count }/${ translation_sentence_count } cached`
+                            : `Translating · ${ translated_sentence_count }/${ translation_sentence_count }` }
+                    </TranslationStatus> }
                     { ( token_usage.prompt_tokens > 0 || token_usage.completion_tokens > 0 ) && <TokenStats>
                         { format_tokens( token_usage.prompt_tokens + token_usage.completion_tokens ) } tokens
                         · { format_cost( estimate_cost( token_usage.prompt_tokens, token_usage.completion_tokens, model ) ) }

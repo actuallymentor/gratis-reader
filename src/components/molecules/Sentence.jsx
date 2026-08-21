@@ -16,6 +16,9 @@ const SelectableWord = styled.span`
     color: inherit;
     cursor: pointer;
     scroll-margin-bottom: calc(var(--reader-dock-height, 0px) + var(--space-m));
+    text-decoration-line: ${ p => p.$selected ? `underline` : `none` };
+    text-decoration-thickness: 2px;
+    text-underline-offset: 0.15em;
     touch-action: manipulation;
 
     &:focus-visible {
@@ -69,9 +72,8 @@ export default function Sentence( {
         select_word( word, e.currentTarget )
     }
 
-    const tooltip_content = !word_lookup?.can_lookup || word_lookup?.error
-        ? lookup_unavailable
-        : word_lookup?.content || `...`
+    const tooltip_content = word_lookup?.content
+        || ( !word_lookup?.can_lookup || word_lookup?.error ? lookup_unavailable : `...` )
 
     const rendered_segments = segment_translation_text( translated ).map( ( segment, index ) => {
         if( !segment.is_word ) return segment.text
@@ -81,11 +83,12 @@ export default function Sentence( {
         return <SelectableWord
             key={ `${ index }-${ segment.word_index }` }
             ref={ selected ? selected_word_ref : null }
+            $selected={ selected }
             role="button"
             tabIndex={ 0 }
             aria-pressed={ selected }
             aria-describedby={ selected ? tooltip_id : undefined }
-            aria-label={ `Translate ${ segment.text } and show its meaning and word-by-word translation` }
+            aria-label={ `Translate ${ segment.text } and show its word-by-word translation` }
             data-translation-word={ segment.text }
             data-translation-word-index={ segment.word_index }
             onClick={ e => activate_word( e, segment ) }
