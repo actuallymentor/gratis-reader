@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.20.0] - 2026-09-08
+
+### Changed
+- Prioritize word-by-word lookup with source and explanation actions
+- Link word-by-word selections to their words in the book text
+
+### Fixed
+- Show cached sentence counts offline and bound translation request time
+
+### Removed
+- Remove the common-words sidebar and its tally lookups
+
 ## [1.19.0] - 2026-08-02
 
 ### Added
