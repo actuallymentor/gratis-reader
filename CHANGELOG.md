@@ -1,5 +1,14 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- Add opt-in Turbo Mode in Settings, with cost confirmation and background word-by-word lookups for visible sentences
+
+### Changed
+- Include completed word lookups in per-book token usage and estimated cost
+- Document current OpenAI model costs and retain GPT-4o Mini as the default pending translation-quality evaluation
+
 ## [1.20.0] - 2026-09-08
 
 ### Changed

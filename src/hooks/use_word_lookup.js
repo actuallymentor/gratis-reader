@@ -10,6 +10,24 @@ const WORD_LOOKUP_MEMORY_LIMIT = 250
 const WORD_LOOKUP_CONCURRENCY = 3
 const LOOKUP_CANCELLED = Symbol( `lookup_cancelled` )
 
+// A tap can join a prefetch. One caller leaving must not abort work the other still needs.
+const wait_for_lookup = ( task, signal ) => {
+    const consumer = {}
+    task.consumers.add( consumer )
+    const unsubscribe = () => {
+        task.consumers.delete( consumer )
+        if( task.consumers.size || task.settled ) return
+        task.cancelled = true
+        task.controller?.abort()
+    }
+    signal?.addEventListener( `abort`, unsubscribe, { once: true } )
+
+    return task.promise.finally( () => {
+        signal?.removeEventListener( `abort`, unsubscribe )
+        task.consumers.delete( consumer )
+    } )
+}
+
 /**
  * Normalizes a visible word before dictionary lookup.
  * @param {string} word
@@ -41,14 +59,16 @@ export const word_cache_key = ( word, source_language, target_language, lookup_c
  * @param {string} options.sentence_context
  * @param {boolean} [options.cache_by_context] - Prevents ambiguous words sharing translations across fragments
  * @param {boolean} [options.is_online] - Allows cached lookup while suppressing offline requests
- * @returns {Object}
+ * @param {Function} [options.on_usage] - Records paid lookup usage, including background work
+ * @returns {Object} Lookups accept an optional context override for viewport preloading.
  */
 export const use_word_lookup = ( {
     source_language,
     target_language,
     sentence_context,
     cache_by_context = false,
-    is_online = typeof navigator === `undefined` || navigator.onLine
+    is_online = typeof navigator === `undefined` || navigator.onLine,
+    on_usage
 } ) => {
 
     const [ , set_lookup_version ] = useState( 0 )
@@ -65,6 +85,8 @@ export const use_word_lookup = ( {
     const model = use_settings_store( state => state.model )
     const { get_word_translation, cache_word_translation } = use_cache()
     const lookup_context = cache_by_context ? sentence_context : ``
+    const default_context_ref = useRef( sentence_context )
+    default_context_ref.current = sentence_context
 
     const refresh_lookup_state = useCallback( () => {
         if( mounted_ref.current ) set_lookup_version( version => version + 1 )
@@ -121,19 +143,20 @@ export const use_word_lookup = ( {
         } )
     }, [] )
 
-    const lookup_word = useCallback( async ( word, { retry = true, signal } = {} ) => {
+    const lookup_word = useCallback( async ( word, { retry = true, signal, context = default_context_ref.current } = {} ) => {
 
         const clean_word = clean_lookup_word( word )
         if( !clean_word || !api_key || !mounted_ref.current || signal?.aborted ) return
 
+        const lookup_context = cache_by_context ? context : ``
         const cache_key = word_cache_key( clean_word, source_language, target_language, lookup_context )
 
         if( word_translations_ref.current[cache_key] ) return
 
         if( loading_words_ref.current[cache_key] ) {
-            const result = await lookup_tasks_ref.current[cache_key]?.promise
+            const result = await wait_for_lookup( lookup_tasks_ref.current[cache_key], signal )
             if( result === LOOKUP_CANCELLED && !signal?.aborted ) {
-                return lookup_word( word, { retry, signal } )
+                return lookup_word( word, { retry, signal, context } )
             }
             return
         }
@@ -150,7 +173,7 @@ export const use_word_lookup = ( {
             loading_words_ref.current = next_loading_words
         }
 
-        const task = { cancelled: false, controller: null, promise: null }
+        const task = { cancelled: false, settled: false, consumers: new Set(), controller: null, promise: null }
         lookup_tasks_ref.current = { ...lookup_tasks_ref.current, [cache_key]: task }
 
         const run_lookup = async () => {
@@ -183,8 +206,8 @@ export const use_word_lookup = ( {
 
                 if( !is_online ) return
 
-                const { system, user } = build_word_lookup_prompt( clean_word, source_language, target_language, sentence_context )
-                const { content } = await chat_completion( {
+                const { system, user } = build_word_lookup_prompt( clean_word, source_language, target_language, context )
+                const { content, usage } = await chat_completion( {
                     api_key,
                     model,
                     system_prompt: system,
@@ -192,6 +215,9 @@ export const use_word_lookup = ( {
                     temperature: 0.1,
                     signal: controller.signal
                 } )
+
+                on_usage?.( usage )
+                if( task.cancelled || controller.signal.aborted ) return LOOKUP_CANCELLED
 
                 word_translations_ref.current = { ...word_translations_ref.current, [cache_key]: content }
                 remember_lookup_key( cache_key )
@@ -217,6 +243,7 @@ export const use_word_lookup = ( {
                 lookup_errors_ref.current = { ...lookup_errors_ref.current, [cache_key]: true }
                 remember_lookup_key( cache_key )
             } finally {
+                task.settled = true
                 if( word_abort_ref.current[cache_key] === task.controller ) {
                     const remaining_controllers = { ...word_abort_ref.current }
                     delete remaining_controllers[cache_key]
@@ -239,16 +266,16 @@ export const use_word_lookup = ( {
         }
 
         task.promise = run_lookup()
-        return task.promise
+        return wait_for_lookup( task, signal )
 
     }, [
         api_key,
         model,
         source_language,
         target_language,
-        sentence_context,
-        lookup_context,
+        cache_by_context,
         is_online,
+        on_usage,
         get_word_translation,
         cache_word_translation,
         remember_lookup_key,
@@ -268,6 +295,8 @@ export const use_word_lookup = ( {
             can_lookup: !!api_key && is_online
         }
     }, [ source_language, target_language, lookup_context, api_key, is_online ] )
+
+    useEffect( () => () => cancel_lookups(), [ api_key, model, source_language, target_language, cancel_lookups ] )
 
     useEffect( () => {
         if( !is_online ) cancel_lookups()

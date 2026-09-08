@@ -170,6 +170,27 @@ const KeyRow = styled.div`
     margin-bottom: var(--space-s);
 `
 
+const TurboDialog = styled.dialog`
+    width: calc(100% - 2rem);
+    max-width: 26rem;
+    margin: auto;
+    padding: var(--space-xl);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-s);
+    background: var(--bg-surface);
+    color: var(--text);
+
+    &::backdrop { background: rgba(0, 0, 0, 0.5); }
+
+    p { margin: var(--space-m) 0; }
+`
+
+const HelpText = styled.p`
+    color: var(--text-muted);
+    font-size: 0.85em;
+    margin-top: var(--space-s);
+`
+
 const KeyDisplay = styled.code`
     flex: 1;
     font-size: 0.85em;
@@ -248,6 +269,7 @@ export default function SettingsDrawer( { is_open, on_close, show_language = tru
         last_language, set_last_language,
         last_level, set_last_level,
         model, set_model,
+        turbo_mode, set_turbo_mode,
         clear_api_key
     } = use_settings_store()
 
@@ -256,12 +278,13 @@ export default function SettingsDrawer( { is_open, on_close, show_language = tru
     const [ validating_key, set_validating_key ] = useState( false )
     const [ forcing_update, set_forcing_update ] = useState( false )
     const force_update_reset_timer_ref = useRef( null )
+    const turbo_dialog_ref = useRef( null )
 
     // Close on Escape
     useEffect( () => {
         if( !is_open ) return
         const handle_key = ( e ) => {
-            if( e.key === `Escape` ) on_close()
+            if( e.key === `Escape` && !turbo_dialog_ref.current?.open ) on_close()
         }
         window.addEventListener( `keydown`, handle_key )
         return () => window.removeEventListener( `keydown`, handle_key )
@@ -407,6 +430,26 @@ export default function SettingsDrawer( { is_open, on_close, show_language = tru
                 </ThemeRow>
             </Section>
 
+            { /* Background Lookups */ }
+            <Section>
+                <Label id="turbo-mode-label">Turbo Mode</Label>
+                <ActionBtn
+                    role="switch"
+                    aria-checked={ turbo_mode }
+                    aria-labelledby="turbo-mode-label"
+                    aria-describedby="turbo-mode-help"
+                    onClick={ () => {
+                        if( turbo_mode ) set_turbo_mode( false )
+                        else turbo_dialog_ref.current.showModal()
+                    } }
+                >
+                    { turbo_mode ? `On` : `Off` }
+                </ActionBtn>
+                <HelpText id="turbo-mode-help">
+                    Preload word-by-word translations for text in view so word lookups are ready sooner. Uses extra API credits.
+                </HelpText>
+            </Section>
+
             { /* Model Selection */ }
             <Section>
                 <Label>LLM Model</Label>
@@ -487,6 +530,25 @@ export default function SettingsDrawer( { is_open, on_close, show_language = tru
             <VersionLine>Version: { APP_VERSION }</VersionLine>
 
         </Drawer>
+        <TurboDialog
+            ref={ turbo_dialog_ref }
+            aria-labelledby="turbo-confirm-title"
+            aria-describedby="turbo-confirm-description"
+        >
+            <Title id="turbo-confirm-title">Enable Turbo Mode?</Title>
+            <p id="turbo-confirm-description">
+                Turbo Mode costs more: it translates visible text word by word in the background,
+                including words you might never look up. This uses additional API credits.
+            </p>
+            <ThemeRow>
+                <ActionBtn autoFocus onClick={ () => turbo_dialog_ref.current.close() }>Cancel</ActionBtn>
+                <ActionBtn onClick={ () => {
+                    set_turbo_mode( true )
+                    turbo_dialog_ref.current.close()
+                } }
+                >Enable Turbo Mode</ActionBtn>
+            </ThemeRow>
+        </TurboDialog>
     </>
 
 }

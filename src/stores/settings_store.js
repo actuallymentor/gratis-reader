@@ -11,6 +11,7 @@ export const use_settings_store = create(
             // API
             api_key: null,
             model: `openai/gpt-4o-mini`,
+            turbo_mode: false,
 
             // Display
             font_size: 18,
@@ -24,6 +25,7 @@ export const use_settings_store = create(
             // Actions
             set_api_key: ( api_key ) => set( { api_key } ),
             set_model: ( model ) => set( { model } ),
+            set_turbo_mode: ( turbo_mode ) => set( { turbo_mode } ),
             set_font_size: ( font_size ) => set( { font_size } ),
             set_font_family: ( font_family ) => set( { font_family } ),
             set_theme: ( theme ) => {
@@ -40,6 +42,7 @@ export const use_settings_store = create(
             partialize: ( state ) => ( {
                 api_key: state.api_key,
                 model: state.model,
+                turbo_mode: state.turbo_mode,
                 font_size: state.font_size,
                 font_family: state.font_family,
                 theme: state.theme,

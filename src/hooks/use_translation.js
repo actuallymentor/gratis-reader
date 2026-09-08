@@ -78,7 +78,7 @@ export function is_nonsense( text ) {
  * @param {string} options.source_language
  * @param {string} [options.book_id] - For tracking per-book token usage
  * @param {boolean} [options.is_online] - Allows cached hydration while suppressing offline requests
- * @returns {{ translations, retranslate_sentence, is_translating, translation_progress, token_usage }}
+ * @returns {{ translations, retranslate_sentence, is_translating, translation_progress, token_usage, record_token_usage }}
  */
 export const use_translation = ( {
     all_sentences = [],
@@ -106,6 +106,16 @@ export const use_translation = ( {
     const mounted_ref = useRef( true )
     const api_key = use_settings_store( state => state.api_key )
     const model = use_settings_store( state => state.model )
+
+    // Sentence translations and word lookups share the same per-book usage total.
+    const record_token_usage = useCallback( ( { prompt_tokens = 0, completion_tokens = 0 } ) => {
+        if( !prompt_tokens && !completion_tokens ) return
+        set_token_usage( previous => ( {
+            prompt_tokens: previous.prompt_tokens + prompt_tokens,
+            completion_tokens: previous.completion_tokens + completion_tokens
+        } ) )
+        if( book_id ) add_token_usage( book_id, prompt_tokens, completion_tokens ).catch( () => {} )
+    }, [ book_id ] )
 
     // Get level info
     const level_info = LEVELS.find( l => l.code === level ) || DEFAULT_LEVEL
@@ -299,16 +309,7 @@ export const use_translation = ( {
                 Object.assign( batch_translations, new_translations )
             }
 
-            // Persist token usage for this chunk
-            if( chunk_prompt > 0 || chunk_completion > 0 ) {
-                set_token_usage( prev => ( {
-                    prompt_tokens: prev.prompt_tokens + chunk_prompt,
-                    completion_tokens: prev.completion_tokens + chunk_completion
-                } ) )
-                if( book_id ) {
-                    add_token_usage( book_id, chunk_prompt, chunk_completion ).catch( () => {} )
-                }
-            }
+            record_token_usage( { prompt_tokens: chunk_prompt, completion_tokens: chunk_completion } )
         }
 
         return batch_translations
@@ -318,7 +319,7 @@ export const use_translation = ( {
         target_language,
         level,
         level_info,
-        book_id,
+        record_token_usage,
         translate_sentence,
         forget_failed_sentence,
         remember_failed_sentence
@@ -544,7 +545,8 @@ export const use_translation = ( {
         retranslate_sentence,
         is_translating,
         translation_progress,
-        token_usage
+        token_usage,
+        record_token_usage
     }
 
 }

@@ -4,6 +4,7 @@ import styled from 'styled-components'
 import * as Throttle from 'promise-parallel-throttle'
 import { use_book } from '../../hooks/use_book.js'
 import { use_translation } from '../../hooks/use_translation.js'
+import { use_turbo_lookup } from '../../hooks/use_turbo_lookup.js'
 import { use_word_lookup } from '../../hooks/use_word_lookup.js'
 import { use_settings_store } from '../../stores/settings_store.js'
 import { save_progress, get_progress } from '../../modules/cache.js'
@@ -306,7 +307,7 @@ export default function ReaderPage() {
     } = use_book( book_id )
 
     // Settings
-    const { font_size, font_family, last_language, last_level, set_last_language, set_last_level, model } = use_settings_store()
+    const { font_size, font_family, last_language, last_level, set_last_language, set_last_level, model, turbo_mode } = use_settings_store()
 
     // UI state
     const [ settings_open, set_settings_open ] = useState( false )
@@ -381,7 +382,8 @@ export default function ReaderPage() {
         translations,
         retranslate_sentence,
         is_translating,
-        token_usage
+        token_usage,
+        record_token_usage
     } = use_translation( {
         all_sentences,
         target_language: language_chosen ? last_language : null,
@@ -400,11 +402,12 @@ export default function ReaderPage() {
     const selected_translation = selected_sentence
         ? translations[selected_sentence.id]
         : null
-    const { lookup_word, get_lookup_state, cancel_lookups } = use_word_lookup( {
+    const { lookup_word, get_lookup_state } = use_word_lookup( {
         source_language,
         target_language: last_language,
         sentence_context: selected_translation || ``,
         cache_by_context: true,
+        on_usage: record_token_usage,
         is_online: !is_offline
     } )
     const selected_translation_segments = useMemo(
@@ -475,7 +478,15 @@ export default function ReaderPage() {
         lookup_word
     ] )
 
-    useEffect( () => () => cancel_lookups(), [ selected_translation, cancel_lookups ] )
+    use_turbo_lookup( {
+        enabled: turbo_mode && language_chosen && !loading && !chapter_loading
+            && !is_offline && !settings_open && !explanation_data,
+        reading_area_ref,
+        reader_dock_ref,
+        translations,
+        content_key: current_chapter_content,
+        lookup_word
+    } )
 
     // Save progress on chapter change
     useEffect( () => {
