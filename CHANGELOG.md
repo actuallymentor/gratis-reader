@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [1.21.0] - 2026-09-08
 
 ### Added
 - Add opt-in Turbo Mode in Settings, with cost confirmation and background word-by-word lookups for visible sentences
