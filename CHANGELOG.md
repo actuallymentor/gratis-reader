@@ -7,6 +7,7 @@
 - Keep Turbo word lookups inside the budget, including long sentences
 - Fill read-ahead across chapter boundaries without translating whole chapters
 - Preserve in-flight translations when the reading window changes
+- Resume skipped translations when readers scroll away and back during a cache read
 
 ## [1.21.0] - 2026-09-08
 

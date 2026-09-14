@@ -344,6 +344,7 @@ export const use_translation = ( {
 
         let debounce_timer
         let running = false
+        let rerun = false
         let stopped = false
         const controller = new AbortController()
         const is_eligible = id => requested_ref.current.some( sentence => sentence.id === id )
@@ -376,9 +377,18 @@ export const use_translation = ( {
                 running = false
                 unregister_controller()
                 if( operation ) finish_translation( operation )
+                // Revisit cache reads skipped while their sentences were briefly outside the window.
+                if( rerun && !stopped ) {
+                    rerun = false
+                    schedule()
+                }
             }
         }
         const schedule = () => {
+            if( running ) {
+                rerun = true
+                return
+            }
             clearTimeout( debounce_timer )
             debounce_timer = setTimeout( run, 300 )
         }

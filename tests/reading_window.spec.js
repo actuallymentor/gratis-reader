@@ -183,6 +183,77 @@ test.describe( `Viewport translation budget`, () => {
         expect( lookups.filter( lookup => lookup.french ).every( lookup => lookup.context === french ) ).toBe( true )
     } )
 
+    test( `resumes a skipped cache miss when its window returns during another request`, async ( { page } ) => {
+        const calls = await mock_translations( page, true )
+        await page.addInitScript( () => {
+            const original_get = IDBObjectStore.prototype.get
+            const success = Object.getOwnPropertyDescriptor( IDBRequest.prototype, `onsuccess` )
+            // Delay one real cache response to reproduce navigation during IndexedDB I/O.
+            IDBObjectStore.prototype.get = function( ...args ) {
+                const request = original_get.apply( this, args )
+                if( this.name !== `translations` || window.translation_cache_delayed ) return request
+                window.translation_cache_delayed = true
+                Object.defineProperty( request, `onsuccess`, {
+                    set( callback ) {
+                        success.set.call( request, event => {
+                            window.release_translation_cache_read = () => callback.call( request, event )
+                        } )
+                    }
+                } )
+                return request
+            }
+        } )
+        // Share Vite's React instance with the production hook and renderer.
+        const hook_source = await ( await page.request.get( `/src/hooks/use_translation.js` ) ).text()
+        const [ , react_url ] = hook_source.match( /"([^" ]*\/react\.js\?[^" ]*)"/ )
+        const renderer_url = react_url.replace( `react.js`, `react-dom_client.js` )
+        // Isolate admission from layout observers: no incidental resize may rescue the queue.
+        await page.route( `**/__playwright/translation-race`, route => route.fulfill( {
+            contentType: `text/html`,
+            body: `<!doctype html><div id="root"></div><script type="module">
+                import React from '${ react_url }'
+                const { useState } = React
+                import ReactDOM from '${ renderer_url }'
+                const { createRoot } = ReactDOM
+                import { use_translation } from '/src/hooks/use_translation.js'
+                const sentences = [
+                    { id: 'first', text: 'First sentence to translate.' },
+                    { id: 'second', text: 'Second sentence to translate.' }
+                ]
+                function Reader() {
+                    const [ ids, set_ids ] = useState( [ 'first' ] )
+                    const { translations } = use_translation( {
+                        all_sentences: sentences, eligible_sentence_ids: ids,
+                        target_language: 'Spanish', source_language: 'en', level: 'a2',
+                        book_id: 'window-race', is_online: true
+                    } )
+                    return React.createElement( 'main', null,
+                        React.createElement( 'button', { onClick: () => set_ids( [ 'first' ] ) }, 'First window' ),
+                        React.createElement( 'button', { onClick: () => set_ids( [ 'second' ] ) }, 'Second window' ),
+                        React.createElement( 'output', { 'data-current-window': true }, ids[0] ),
+                        React.createElement( 'p', { 'data-first-translation': true }, translations.first || 'Pending' )
+                    )
+                }
+                createRoot( document.getElementById( 'root' ) ).render( React.createElement( Reader ) )
+            </script>`
+        } ) )
+        await page.goto( `/__playwright/translation-race` )
+        await expect.poll( () => page.evaluate( () => typeof window.release_translation_cache_read ) ).toBe( `function` )
+        await page.getByRole( `button`, { name: `Second window` } ).click()
+        await expect( page.locator( `[data-current-window]` ) ).toHaveText( `second` )
+        await page.clock.runFor( 600 )
+        await page.evaluate( () => window.release_translation_cache_read() )
+        await expect.poll( () => calls.sentences ).toEqual( [ `Second sentence to translate.` ] )
+
+        await page.getByRole( `button`, { name: `First window` } ).click()
+        await expect( page.locator( `[data-current-window]` ) ).toHaveText( `first` )
+        await page.clock.runFor( 600 )
+        calls.hold = false
+        await Promise.all( calls.held.splice( 0 ).map( fulfill => fulfill() ) )
+        await expect( page.locator( `[data-first-translation]` ) ).toHaveText( `First sentence to translate.` )
+        expect( calls.sentences ).toEqual( [ `Second sentence to translate.`, `First sentence to translate.` ] )
+    } )
+
     test( `keeps eligible requests alive while a smaller viewport drops queued read-ahead`, async ( { page } ) => {
         await seed_epub( page )
         const calls = await mock_translations( page, true )
