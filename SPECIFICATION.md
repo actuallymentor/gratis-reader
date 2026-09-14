@@ -114,10 +114,12 @@ The system prompt must:
 6. Output **only** the translated sentence — no explanations, no markup, no preamble
 
 #### Translation Strategy
-- Translate the **current page** + **2 pages ahead** (read-ahead buffer)
-- On page navigation (next, previous, jump), trigger translation of the new visible page + 2 ahead
+- Count **N visible word occurrences**; translate them plus the **next 2N words** in reading order, across chapter boundaries
+- Count cached/repeated words before deduplication; round sentence translation to enclosing sentence boundaries
+- Turbo preloads only admitted words, using their full translated sentence as context
+- Recalculate after scrolling, resizing, or translation reflow
 - Batch sentence translation requests where possible to reduce API overhead
-- Cancel in-flight requests when the user jumps to a different location
+- Drop queued work outside the window; retain useful in-flight results for cache reuse
 
 ### 6. Translation Cache
 
@@ -289,7 +291,7 @@ public/
 User navigates to page
         │
         ▼
-Determine visible sentences + 2 pages ahead
+Count N visible words + next 2N; select enclosing sentences
         │
         ▼
 Check IndexedDB cache for each sentence

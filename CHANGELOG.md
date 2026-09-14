@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.21.1] - 2026-09-14
+
+### Fixed
+- Bound translation to visible words plus twice that word count ahead
+- Keep Turbo word lookups inside the budget, including long sentences
+- Fill read-ahead across chapter boundaries without translating whole chapters
+- Preserve in-flight translations when the reading window changes
+
 ## [1.21.0] - 2026-09-08
 
 ### Added

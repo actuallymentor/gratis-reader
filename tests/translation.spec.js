@@ -23,12 +23,18 @@ const translation_cache_count = page => page.evaluate( async () => {
 } )
 
 const wait_for_mocked_translations = async page => {
-    const sentences = page.locator( `span[data-sentence-id]` )
-    const sentence_count = await sentences.count()
-    const translated_sentences = sentences.filter( { hasText: `[TRANSLATED]` } )
-
-    await expect( translated_sentences ).toHaveCount( sentence_count, { timeout: 15_000 } )
-    await expect.poll( () => translation_cache_count( page ) ).toBeGreaterThanOrEqual( sentence_count )
+    // Only the reading window needs translations; the rest of the chapter stays untouched.
+    await expect.poll( () => page.locator( `span[data-sentence-id]` ).evaluateAll( sentences => {
+        const top = document.querySelector( `header` ).getBoundingClientRect().bottom
+        const bottom = document.querySelector( `[data-reader-dock]` ).getBoundingClientRect().top
+        const visible = sentences.filter( sentence => [ ...sentence.getClientRects() ].some( rect =>
+            rect.height > 0 && rect.bottom > top && rect.top < bottom
+        ) )
+        return visible.length > 0 && visible.every( sentence => sentence.innerText.includes( `[TRANSLATED]` ) )
+    } ), { timeout: 15_000 } ).toBe( true )
+    await page.clock.runFor( 600 )
+    await expect( page.getByText( /^Translating · \d+\/\d+$/ ) ).not.toBeVisible()
+    await expect.poll( () => translation_cache_count( page ) ).toBeGreaterThan( 0 )
 }
 
 test.describe( `Translation (mocked)`, () => {
@@ -118,6 +124,7 @@ test.describe( `Translation (mocked)`, () => {
     test( `serves cached translations on second load (no API call)`, async ( { page } ) => {
 
         // First load — populate cache
+        await page.clock.install()
         await enter_reader( page )
         await wait_for_mocked_translations( page )
         const cached_entries = await get_current_translation_entries( page )
@@ -126,7 +133,6 @@ test.describe( `Translation (mocked)`, () => {
         // Go back to library
         await page.getByRole( `button`, { name: `Back to library` } ).click()
         await page.waitForURL( `**/library` )
-        await page.clock.install()
 
         // Any cache miss receives a distinctive response that would overwrite
         // the corresponding persisted current-chapter record.
@@ -143,12 +149,8 @@ test.describe( `Translation (mocked)`, () => {
         // Re-open the seeded book without repeating its setup path.
         await open_seeded_reader( page )
 
-        // Advance the translation debounce, then await the complete cache-check
-        // cycle before asserting that none of the cached sentences hit the API.
-        await page.clock.runFor( 300 )
-        const translating = page.getByText( `Translating...`, { exact: true } )
-        await expect( translating ).toBeVisible()
-        await expect( translating ).not.toBeVisible( { timeout: 30_000 } )
+        // Cache-only work can finish before a loading status is observable.
+        await wait_for_mocked_translations( page )
 
         // Should see [TRANSLATED] from cache, not [SECOND] from new API
         await expect( page.getByText( /\[TRANSLATED\]/ ).first() ).toBeVisible()

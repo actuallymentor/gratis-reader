@@ -542,7 +542,7 @@ test.describe( `Browser Walkthrough`, () => {
         } )
 
         // Offline banner should appear
-        await expect( page.getByText( /offline/i ) ).toBeVisible()
+        await expect( page.getByText( `Offline — showing cached translations`, { exact: true } ) ).toBeVisible()
     } )
 
     test( `BW45 offline banner disappears when back online`, async ( { page } ) => {
@@ -553,11 +553,11 @@ test.describe( `Browser Walkthrough`, () => {
 
         // Go offline
         await page.evaluate( () => window.dispatchEvent( new Event( `offline` ) ) )
-        await expect( page.getByText( /offline/i ) ).toBeVisible()
+        await expect( page.getByText( `Offline — showing cached translations`, { exact: true } ) ).toBeVisible()
 
         // Come back online
         await page.evaluate( () => window.dispatchEvent( new Event( `online` ) ) )
-        await expect( page.getByText( /offline/i ) ).not.toBeVisible()
+        await expect( page.getByText( `Offline — showing cached translations`, { exact: true } ) ).not.toBeVisible()
     } )
 
     // ── EXPLANATION POPOVER CONTENT ─────────────────────────

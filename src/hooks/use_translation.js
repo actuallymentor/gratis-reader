@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { log } from 'mentie'
 import { chat_completion } from '../modules/open_router.js'
 import {
@@ -73,6 +73,7 @@ export function is_nonsense( text ) {
  * Hook that manages translation of visible sentences with read-ahead
  * @param {Object} options
  * @param {Array} options.all_sentences - All sentences in current chapter [{ id, text, paragraph_context }]
+ * @param {Array<string>} [options.eligible_sentence_ids] - Word-window admission, including enclosing sentences
  * @param {string} options.target_language
  * @param {string} options.level - Level code e.g. 'a1', 'b2'
  * @param {string} options.source_language
@@ -82,6 +83,7 @@ export function is_nonsense( text ) {
  */
 export const use_translation = ( {
     all_sentences = [],
+    eligible_sentence_ids,
     target_language,
     level,
     source_language,
@@ -89,11 +91,20 @@ export const use_translation = ( {
     is_online = typeof navigator === `undefined` || navigator.onLine
 } ) => {
 
+    const requested_sentences = useMemo( () => {
+        if( !eligible_sentence_ids ) return all_sentences
+        const eligible = new Set( eligible_sentence_ids )
+        return all_sentences.filter( sentence => eligible.has( sentence.id ) )
+    }, [ all_sentences, eligible_sentence_ids ] )
+
+    const requested_ref = useRef( requested_sentences )
+    requested_ref.current = requested_sentences
+    const schedule_translation_ref = useRef( null )
+
     const [ translations, set_translations ] = useState( {} )
     const [ is_translating, set_is_translating ] = useState( false )
     const [ token_usage, set_token_usage ] = useState( { prompt_tokens: 0, completion_tokens: 0 } )
     const token_usage_loaded = useRef( false )
-    const abort_ref = useRef( null )
     const retry_abort_ref = useRef( null )
     const retranslate_abort_ref = useRef( null )
     const retry_running_ref = useRef( false )
@@ -196,6 +207,7 @@ export const use_translation = ( {
             if( cached ) return { id: sentence.id, translated: cached, from_cache: true }
         }
 
+        if( options.is_eligible && !options.is_eligible( sentence.id ) ) return { id: sentence.id, skipped: true }
         if( cache_only ) return { id: sentence.id, skipped: true }
 
         const user_message = build_translation_user_prompt( sentence.text, sentence.context || sentence.text )
@@ -305,6 +317,7 @@ export const use_translation = ( {
             } )
 
             if( Object.keys( new_translations ).length > 0 ) {
+                translations_ref.current = { ...translations_ref.current, ...new_translations }
                 set_translations( prev => ( { ...prev, ...new_translations } ) )
                 Object.assign( batch_translations, new_translations )
             }
@@ -325,77 +338,73 @@ export const use_translation = ( {
         remember_failed_sentence
     ] )
 
-    // Trigger translation when visible sentences or settings change (debounced)
+    // Follow the live admission window without restarting useful in-flight requests.
     useEffect( () => {
+        if( !target_language || !level ) return
 
-        if( !all_sentences.length || !target_language || !level ) return
+        let debounce_timer
+        let running = false
+        let stopped = false
+        const controller = new AbortController()
+        const is_eligible = id => requested_ref.current.some( sentence => sentence.id === id )
 
-        // Debounce to prevent rapid-fire requests during fast navigation
-        const debounce_timer = setTimeout( () => {
+        const run = async () => {
+            if( stopped || running ) return
+            running = true
+            const can_request = is_online && !!api_key
+            const operation = can_request ? begin_translation() : null
+            const unregister_controller = register_controller( controller )
+            const attempted = new Set()
 
-            // Cancel previous translation batch
-            if( abort_ref.current ) abort_ref.current.abort()
-            const controller = new AbortController()
-            abort_ref.current = controller
-
-            const run = async () => {
-                const to_translate = all_sentences.filter(
-                    sentence => !translations_ref.current[sentence.id]
-                )
-                if( to_translate.length === 0 ) return
-
-                const can_request = is_online && !!api_key
-                const operation = can_request ? begin_translation() : null
-                const unregister_controller = register_controller( controller )
-
-                try {
-                    // Always hydrate IndexedDB. Only cache misses reach the network while online.
-                    await translate_batch( to_translate, controller.signal, {
-                        cache_only: !can_request
+            try {
+                while( !controller.signal.aborted ) {
+                    // Re-read after every chunk: scrolling can remove or add queued work.
+                    const chunk = requested_ref.current.filter( sentence =>
+                        !translations_ref.current[sentence.id] && !attempted.has( sentence.id )
+                            && !failed_sentences_ref.current[sentence.id]
+                    ).slice( 0, MAX_CONCURRENT )
+                    if( !chunk.length ) break
+                    chunk.forEach( sentence => attempted.add( sentence.id ) )
+                    await translate_batch( chunk, controller.signal, {
+                        cache_only: !can_request,
+                        is_eligible
                     } )
-                } catch ( error ) {
-                    if( !is_abort_error( error ) ) {
-                        log.error( `Translation failed:`, error )
-                    }
-                } finally {
-                    unregister_controller()
-                    if( abort_ref.current === controller ) abort_ref.current = null
-                    if( operation ) finish_translation( operation )
                 }
-
+            } catch ( error ) {
+                if( !is_abort_error( error ) ) log.error( `Translation failed:`, error )
+            } finally {
+                running = false
+                unregister_controller()
+                if( operation ) finish_translation( operation )
             }
-
-            run()
-
-        }, 300 )
+        }
+        const schedule = () => {
+            clearTimeout( debounce_timer )
+            debounce_timer = setTimeout( run, 300 )
+        }
+        schedule_translation_ref.current = schedule
+        schedule()
 
         return () => {
+            stopped = true
             clearTimeout( debounce_timer )
-            if( abort_ref.current ) abort_ref.current.abort()
+            schedule_translation_ref.current = null
+            controller.abort()
         }
+    }, [ target_language, level, api_key, is_online, translate_batch, begin_translation, finish_translation, register_controller ] )
 
-    }, [
-        all_sentences,
-        target_language,
-        level,
-        api_key,
-        is_online,
-        translate_batch,
-        begin_translation,
-        finish_translation,
-        register_controller
-    ] )
+    useEffect( () => schedule_translation_ref.current?.(), [ requested_sentences ] )
 
     // Retry transient sentence failures without waiting for navigation or a settings change.
     useEffect( () => {
 
-        if( !all_sentences.length || !target_language || !level || !api_key || !is_online ) return
+        if( !target_language || !level || !api_key || !is_online ) return
 
         const retry_failed_translations = async () => {
             if( retry_running_ref.current ) return
 
             const now = Date.now()
-            const sentences_by_id = new Map( all_sentences.map( sentence => [ sentence.id, sentence ] ) )
+            const sentences_by_id = new Map( requested_ref.current.map( sentence => [ sentence.id, sentence ] ) )
             const sentences_to_retry = Object.values( failed_sentences_ref.current )
                 .filter( failure => failure.retry_after <= now )
                 .map( failure => sentences_by_id.get( failure.sentence.id ) )
@@ -410,7 +419,9 @@ export const use_translation = ( {
             const unregister_controller = register_controller( controller )
 
             try {
-                await translate_batch( sentences_to_retry, controller.signal )
+                await translate_batch( sentences_to_retry, controller.signal, {
+                    is_eligible: id => requested_ref.current.some( sentence => sentence.id === id )
+                } )
             } catch ( error ) {
                 if( !is_abort_error( error ) ) log.warn( `Translation retry failed:`, error?.message || error )
             } finally {
@@ -429,7 +440,6 @@ export const use_translation = ( {
         }
 
     }, [
-        all_sentences,
         target_language,
         level,
         api_key,

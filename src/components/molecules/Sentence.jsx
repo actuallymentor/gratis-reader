@@ -1,4 +1,4 @@
-import { useId, useRef } from 'react'
+import { memo, useId, useRef } from 'react'
 import styled from 'styled-components'
 import Skeleton from '../atoms/Skeleton.jsx'
 import ReaderWordTooltip from './ReaderWordTooltip.jsx'
@@ -38,7 +38,7 @@ const SelectableWord = styled.span`
  * @param {Function} [props.on_select_word] - Receives the selected fragment and word
  * @returns {JSX.Element}
  */
-export default function Sentence( {
+function Sentence( {
     sentence_id,
     original,
     translated,
@@ -51,7 +51,11 @@ export default function Sentence( {
     const selected_word_ref = useRef( null )
 
     if( !original ) return <Skeleton width="80%" height="1.2em" />
-    if( !translated ) return <SentenceSpan data-sentence-id={ sentence_id }>{ original }</SentenceSpan>
+    if( !translated ) return <SentenceSpan data-sentence-id={ sentence_id }>
+        { segment_translation_text( original ).map( ( segment, index ) => segment.is_word
+            ? <span key={ index } data-reading-word={ segment.text } data-reading-word-index={ segment.word_index }>{ segment.text }</span>
+            : segment.text ) }
+    </SentenceSpan>
 
     const select_word = ( word, element ) => {
         if( !on_select_word ) return
@@ -89,6 +93,8 @@ export default function Sentence( {
             aria-pressed={ selected }
             aria-describedby={ selected ? tooltip_id : undefined }
             aria-label={ `Translate ${ segment.text } and show its word-by-word translation` }
+            data-reading-word={ segment.text }
+            data-reading-word-index={ segment.word_index }
             data-translation-word={ segment.text }
             data-translation-word-index={ segment.word_index }
             onClick={ e => activate_word( e, segment ) }
@@ -109,3 +115,6 @@ export default function Sentence( {
     </SentenceSpan>
 
 }
+
+// Turbo cache updates must not rebuild every word span in the chapter.
+export default memo( Sentence )

@@ -169,9 +169,9 @@ test.describe( `Pass 37 — Reader resilience`, () => {
         } )
 
         await open_reader( page )
-        await expect( page.getByText( `Translating...` ) ).toBeVisible()
+        await expect( page.locator( `[aria-live="polite"]` ).filter( { hasText: /^Translating ·/ } ) ).toBeVisible()
         release_errors()
-        await expect( page.getByText( `Translating...`, { exact: true } ) )
+        await expect( page.locator( `[aria-live="polite"]` ).filter( { hasText: /^Translating ·/ } ) )
             .not.toBeVisible( { timeout: 30_000 } )
 
         // Page should still render original text (no crash)
@@ -207,7 +207,7 @@ test.describe( `Pass 37 — Reader resilience`, () => {
         await expect(
             page.locator( `span[data-sentence-id] [data-translation-word-index]` ).first()
         ).toBeVisible( { timeout: 15_000 } )
-        await expect( page.getByText( `Translating...`, { exact: true } ) )
+        await expect( page.locator( `[aria-live="polite"]` ).filter( { hasText: /^Translating ·/ } ) )
             .not.toBeVisible( { timeout: 30_000 } )
 
         // Tap a sentence
@@ -230,7 +230,7 @@ test.describe( `Pass 37 — Reader resilience`, () => {
         await open_reader( page )
 
         // Progress text should show chapter position
-        const progress = page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` )
+        const progress = page.locator( `text=/^\\d+\\s*\\/\\s*\\d+\\s*·\\s*\\d+%$/` )
         await expect( progress ).toBeVisible( { timeout: 3000 } )
     } )
 

@@ -137,7 +137,7 @@ test.describe( `Pass 38 — Reader core flows`, () => {
         await open_reader( page )
 
         // Get progress text before navigation
-        const progress = page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` )
+        const progress = page.locator( `text=/^\\d+\\s*\\/\\s*\\d+\\s*·\\s*\\d+%$/` )
         await expect( progress ).toBeVisible()
         const progress_before = await progress.textContent()
 
@@ -293,7 +293,7 @@ test.describe( `Pass 38 — Edge cases`, () => {
         await expect(
             page.locator( `span[data-sentence-id] [data-translation-word-index]` ).first()
         ).toBeVisible( { timeout: 15_000 } )
-        await expect( page.getByText( `Translating...`, { exact: true } ) )
+        await expect( page.locator( `[aria-live="polite"]` ).filter( { hasText: /^Translating ·/ } ) )
             .not.toBeVisible( { timeout: 30_000 } )
 
         expect( errors ).toEqual( [] )

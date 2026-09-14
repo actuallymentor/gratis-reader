@@ -133,7 +133,7 @@ test.describe( `Pass 39 — Multi-step state transitions`, () => {
         test( `BW193 arrow keys do not navigate while settings open`, async ( { page } ) => {
             await open_seeded_reader( page )
 
-            const progress = page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` )
+            const progress = page.locator( `text=/^\\d+\\s*\\/\\s*\\d+\\s*·\\s*\\d+%$/` )
             const progress_before = await progress.textContent()
 
             // Open settings
@@ -200,7 +200,7 @@ test.describe( `Pass 39 — Multi-step state transitions`, () => {
             await page.keyboard.press( `ArrowRight` )
             await expect( first_sentence ).not.toHaveAttribute( `data-sentence-id`, chapter_two_id )
 
-            const progress = page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` )
+            const progress = page.locator( `text=/^\\d+\\s*\\/\\s*\\d+\\s*·\\s*\\d+%$/` )
             const progress_at_ch3 = await progress.textContent()
             await expect.poll( () => get_saved_chapter_index( page ) ).toBe( 2 )
 
@@ -241,7 +241,7 @@ test.describe( `Pass 39 — Multi-step state transitions`, () => {
             await open_reader( page )
 
             // Navigate a chapter
-            const progress = page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` )
+            const progress = page.locator( `text=/^\\d+\\s*\\/\\s*\\d+\\s*·\\s*\\d+%$/` )
             const progress_before = await progress.textContent()
             await page.keyboard.press( `ArrowRight` )
             await expect( progress ).not.toHaveText( progress_before )
@@ -286,7 +286,7 @@ test.describe( `Pass 39 — Multi-step state transitions`, () => {
         test( `BW198 TOC select navigates to chosen chapter`, async ( { page } ) => {
             await open_seeded_reader( page )
 
-            const progress = page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` )
+            const progress = page.locator( `text=/^\\d+\\s*\\/\\s*\\d+\\s*·\\s*\\d+%$/` )
             const progress_before = await progress.textContent()
 
             // Find and use the TOC select

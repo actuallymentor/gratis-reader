@@ -56,7 +56,7 @@ test.describe( `Pass 34 — Walkthrough`, () => {
             } )
         } )
         await expect.poll( read_cache_count, { timeout: 15_000 } ).toBeGreaterThan( 0 )
-        await expect( page.getByText( `Translating...`, { exact: true } ) )
+        await expect( page.locator( `[aria-live="polite"]` ).filter( { hasText: /^Translating ·/ } ) )
             .not.toBeVisible( { timeout: 30_000 } )
         const cache_count = await read_cache_count()
         expect( cache_count ).toBeGreaterThan( 0 )
@@ -136,7 +136,7 @@ test.describe( `Pass 34 — Walkthrough`, () => {
 
         await upload_demo_book( page )
         await open_reader( page )
-        await expect( page.getByText( `Translating...` ) ).toBeVisible()
+        await expect( page.locator( `[aria-live="polite"]` ).filter( { hasText: /^Translating ·/ } ) ).toBeVisible()
         release_responses()
 
         // Translations should eventually appear
@@ -269,9 +269,9 @@ test.describe( `Pass 34 — Walkthrough`, () => {
 
         await upload_demo_book( page )
         await open_reader( page )
-        await expect( page.getByText( `Translating...` ) ).toBeVisible()
+        await expect( page.locator( `[aria-live="polite"]` ).filter( { hasText: /^Translating ·/ } ) ).toBeVisible()
         release_errors()
-        await expect( page.getByText( `Translating...`, { exact: true } ) )
+        await expect( page.locator( `[aria-live="polite"]` ).filter( { hasText: /^Translating ·/ } ) )
             .not.toBeVisible( { timeout: 30_000 } )
 
         // App should not crash — sentences should be visible (untranslated)

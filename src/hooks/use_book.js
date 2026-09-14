@@ -1,24 +1,52 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { log } from 'mentie'
 import { get_book, save_book, delete_book } from '../modules/cache.js'
 import { parse_epub, extract_chapter_content, hash_buffer } from '../modules/epub_parser.js'
+import { segment_translation_text } from '../modules/translation_alignment.js'
+
+const EMPTY_CHAPTERS = []
 
 /**
  * Hook that loads a book from IndexedDB and provides navigation
  * @param {string} book_id
+ * @param {number} ahead_word_budget - Source words needed beyond the current chapter
  * @returns {{ book_meta, chapters, current_chapter, current_chapter_content, go_to_chapter, next_chapter, prev_chapter, progress, loading, book_hash }}
  */
-export const use_book = ( book_id ) => {
+export const use_book = ( book_id, ahead_word_budget = 0 ) => {
 
     const [ book_meta, set_book_meta ] = useState( null )
     const [ epub_data, set_epub_data ] = useState( null )
     const [ current_chapter, set_current_chapter ] = useState( 0 )
     const [ current_chapter_content, set_current_chapter_content ] = useState( null )
-    const [ ahead_chapters_content, set_ahead_chapters_content ] = useState( [] )
+    const [ ahead_content, set_ahead_content ] = useState( null )
     const [ loading, set_loading ] = useState( true )
     const [ chapter_loading, set_chapter_loading ] = useState( false )
     const [ chapter_error, set_chapter_error ] = useState( null )
     const book_hash_ref = useRef( null )
+
+    // Share pending/resolved parses across navigation and changing viewport budgets.
+    const chapter_cache = useMemo( () => new Map(), [ epub_data ] )
+    const load_chapter_content = useCallback( index => {
+
+        if( !chapter_cache.has( index ) ) {
+            const pending = extract_chapter_content(
+                epub_data.book, epub_data.spine[index], book_hash_ref.current, index
+            ).catch( error => {
+                chapter_cache.delete( index )
+                throw error
+            } )
+            chapter_cache.set( index, pending )
+        }
+
+        return chapter_cache.get( index )
+
+    }, [ epub_data, chapter_cache ] )
+
+    // Never expose read-ahead from the previous chapter during navigation.
+    const ahead_chapters_content = ahead_content?.epub_data === epub_data
+        && ahead_content?.chapter === current_chapter && ahead_word_budget > 0
+        ? ahead_content.content
+        : EMPTY_CHAPTERS
 
     // Load and parse the book
     useEffect( () => {
@@ -141,9 +169,7 @@ export const use_book = ( book_id ) => {
                     return
                 }
 
-                const content = await extract_chapter_content(
-                    epub_data.book, spine_item, book_hash_ref.current, current_chapter
-                )
+                const content = await load_chapter_content( current_chapter )
                 if( cancelled ) return
 
                 set_current_chapter_content( content )
@@ -163,9 +189,9 @@ export const use_book = ( book_id ) => {
             cancelled = true 
         }
 
-    }, [ epub_data, current_chapter ] )
+    }, [ epub_data, current_chapter, load_chapter_content ] )
 
-    // Pre-fetch next 2 chapters for translation read-ahead
+    // Parse only enough following chapters to cover the viewport's source-word deficit.
     useEffect( () => {
 
         if( !epub_data ) return
@@ -174,24 +200,29 @@ export const use_book = ( book_id ) => {
 
         const prefetch_ahead = async () => {
             const ahead = []
-            const max_ahead = Math.min( current_chapter + 3, epub_data.spine.length )
+            let word_count = 0
 
-            for( let i = current_chapter + 1; i < max_ahead; i++ ) {
+            // Empty/tiny chapters must not truncate the requested read-ahead window.
+            for( let i = current_chapter + 1; i < epub_data.spine.length && word_count < ahead_word_budget && !cancelled; i++ ) {
                 try {
                     const spine_item = epub_data.spine[i]
                     if( !spine_item ) continue
 
-                    const content = await extract_chapter_content(
-                        epub_data.book, spine_item, book_hash_ref.current, i
-                    )
+                    const content = await load_chapter_content( i )
                     if( cancelled ) return
                     ahead.push( content )
+                    const sentences = content.elements.flatMap( element =>
+                        element.sentences || element.items?.flatMap( item => item.sentences ) || []
+                    )
+                    word_count += sentences.reduce( ( count, sentence ) =>
+                        count + segment_translation_text( sentence.text ).filter( segment => segment.is_word ).length, 0
+                    )
                 } catch ( error ) {
                     log.debug( `Read-ahead chapter ${ i } failed:`, error.message )
                 }
             }
 
-            if( !cancelled ) set_ahead_chapters_content( ahead )
+            if( !cancelled ) set_ahead_content( { epub_data, chapter: current_chapter, content: ahead } )
         }
 
         prefetch_ahead()
@@ -199,7 +230,7 @@ export const use_book = ( book_id ) => {
             cancelled = true
         }
 
-    }, [ epub_data, current_chapter ] )
+    }, [ epub_data, current_chapter, ahead_word_budget, load_chapter_content ] )
 
     // Navigation
     const go_to_chapter = useCallback( ( index ) => {

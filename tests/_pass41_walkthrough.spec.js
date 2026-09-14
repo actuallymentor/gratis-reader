@@ -434,7 +434,7 @@ test.describe( `Gratis Reader — Full Walkthrough`, () => {
         await expect( page.locator( `text=/tokens/` ) ).toBeVisible( { timeout: 30_000 } )
 
         // Finish the initial read-ahead batch before taking the persisted baseline.
-        await expect( page.getByText( `Translating...`, { exact: true } ) ).not.toBeVisible( { timeout: 30_000 } )
+        await expect( page.locator( `[aria-live="polite"]` ).filter( { hasText: /^Translating ·/ } ) ).not.toBeVisible( { timeout: 30_000 } )
         const initial_token_total = await get_token_total( page )
 
         // Navigate to next chapter
@@ -629,8 +629,8 @@ test.describe( `Gratis Reader — Full Walkthrough`, () => {
         await expect( page.getByText( `Translation Explanation` ) ).toBeVisible( { timeout: 5000 } )
 
         // Should show Original and Translation blocks
-        await expect( page.getByText( `Original`, { exact: true } ) ).toBeVisible()
-        await expect( page.getByText( `Translation`, { exact: true } ) ).toBeVisible()
+        await expect( page.getByRole( `dialog`, { name: `Translation Explanation` } ).getByText( `Original`, { exact: true } ) ).toBeVisible()
+        await expect( page.getByRole( `dialog`, { name: `Translation Explanation` } ).getByText( `Translation`, { exact: true } ) ).toBeVisible()
     } )
 
     test( `6C: Escape returns to library from reader`, async ( { page } ) => {

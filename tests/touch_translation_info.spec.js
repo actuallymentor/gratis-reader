@@ -3,11 +3,6 @@ import { test, expect, open_seeded_reader } from './helpers/app_fixture.js'
 const CHAT_URL = `**/openrouter.ai/api/v1/chat/completions`
 const READER_WORD_TOOLTIP = `[data-reader-word-tooltip]`
 
-const adapted_translation_from = ( prompt ) => {
-    const match = prompt.match( /Adapted translation:\n(.+?)(?:\n\n|$)/s )
-    return match ? match[1].trim() : `Unknown translation`
-}
-
 const translated_sentence_from = ( prompt ) => {
     const match = prompt.match( /Translate this sentence:\n(.+)/s )
     return match ? match[1].trim() : `unknown`
@@ -46,7 +41,7 @@ const install_translation_mock = async ( page, {
             content = custom_response ?? word_lookup_content ?? `Source ${ word }`
         } else if( user_msg.includes( `Adapted translation:` ) ) {
             calls.meaning += 1
-            content = `Simplified ${ calls.meaning } ${ adapted_translation_from( user_msg ) }`
+            content = `Unexpected retired meaning request`
         } else {
             content = translated_content ?? `Target ${ translated_sentence_from( user_msg ) }`
         }
@@ -99,13 +94,22 @@ test.describe( `Touch translation information`, () => {
         const first_direct_word = sheet.locator( `[data-direct-translation-word-index="0"]` )
         const second_direct_word = sheet.locator( `[data-direct-translation-word-index="1"]` )
         await expect( sheet ).toBeVisible()
-        await expect( sheet ).toContainText( `Simplified 1 Target` )
-        await expect( sheet.getByRole( `heading`, { name: `Meaning` } ) ).toBeVisible()
         await expect( sheet.getByRole( `heading`, { name: `Word by word` } ) ).toBeVisible()
+        const original_button = sheet.getByRole( `button`, { name: `Original`, exact: true } )
+        await expect( original_button ).toHaveAttribute( `aria-expanded`, `false` )
+        await expect( sheet.locator( `[data-original-sentence]` ) ).not.toBeVisible()
+        await original_button.tap()
+        await expect( original_button ).toHaveAttribute( `aria-expanded`, `true` )
+        await expect( sheet.locator( `[data-original-sentence]` ) ).toContainText(
+            ( await sentence.textContent() ).replace( /^Target /, `` )
+        )
+        await original_button.tap()
+        await expect( sheet.locator( `[data-original-sentence]` ) ).not.toBeVisible()
+        await expect( sheet.getByRole( `button`, { name: `Explain`, exact: true } ) ).toBeVisible()
         await expect( first_direct_word ).toHaveCSS( `text-decoration-line`, `underline` )
         await expect( second_direct_word ).toHaveCSS( `text-decoration-line`, `none` )
         await expect( first_word ).toHaveAttribute( `aria-pressed`, `true` )
-        await expect( first_word ).toHaveCSS( `text-decoration-line`, `none` )
+        await expect( first_word ).toHaveCSS( `text-decoration-line`, `underline` )
         await expect( page.locator( READER_WORD_TOOLTIP ) ).toHaveText(
             `Source ${ await first_word.getAttribute( `data-translation-word` ) }`
         )
@@ -119,8 +123,9 @@ test.describe( `Touch translation information`, () => {
         await expect( sheet ).toHaveCount( 1 )
         expect( await sheet.evaluate( element => element === window.__translation_info_sheet ) ).toBe( true )
         await expect( first_word ).toHaveAttribute( `aria-pressed`, `false` )
+        await expect( first_word ).toHaveCSS( `text-decoration-line`, `none` )
         await expect( second_word ).toHaveAttribute( `aria-pressed`, `true` )
-        await expect( second_word ).toHaveCSS( `text-decoration-line`, `none` )
+        await expect( second_word ).toHaveCSS( `text-decoration-line`, `underline` )
         await expect( first_direct_word ).toHaveCSS( `text-decoration-line`, `none` )
         await expect( second_direct_word ).toHaveCSS( `text-decoration-line`, `underline` )
         await expect( page.locator( READER_WORD_TOOLTIP ) ).toHaveCount( 1 )
@@ -138,8 +143,8 @@ test.describe( `Touch translation information`, () => {
         expect( tooltip_box.x ).toBeGreaterThanOrEqual( 0 )
         expect( tooltip_box.x + tooltip_box.width ).toBeLessThanOrEqual( 390 )
         await expect( sheet.locator( `[data-word-by-word-translation]` ) ).toHaveAttribute( `aria-busy`, `false` )
-        await expect( sheet ).toHaveAttribute( `aria-busy`, `false` )
-        expect( calls.meaning ).toBe( 1 )
+        await expect( sheet ).not.toHaveAttribute( `aria-busy` )
+        expect( calls.meaning ).toBe( 0 )
         expect( calls.explanation ).toBe( 0 )
         expect( calls.word_lookup ).toBe( expected_lookup_count )
 
@@ -171,8 +176,9 @@ test.describe( `Touch translation information`, () => {
         const sheet = page.locator( `[data-translation-info-sheet]` )
         const direct_translation = sheet.locator( `[data-word-by-word-translation]` )
         const selected_direct_word = direct_translation.locator( `[data-direct-translation-word-index="0"]` )
-        await expect( sheet ).toContainText( `Simplified 1` )
-        await expect( sheet ).toHaveAttribute( `aria-busy`, `false` )
+        await expect( sheet.getByRole( `heading`, { name: `Word by word` } ) ).toBeVisible()
+        expect( calls.meaning ).toBe( 0 )
+        await expect( sheet ).not.toHaveAttribute( `aria-busy` )
         await expect( direct_translation ).toHaveAttribute( `aria-busy`, `true` )
         await expect( direct_translation ).not.toHaveAttribute( `aria-live` )
         await expect( direct_translation ).not.toContainText( `Translation unavailable` )
@@ -250,16 +256,25 @@ test.describe( `Touch translation information`, () => {
         const sheet = page.locator( `[data-translation-info-sheet]` )
 
         await first_word.tap()
-        await expect( sheet ).not.toHaveAttribute( `aria-busy`, `true` )
-        const first_meaning = await sheet.textContent()
+        await expect( sheet.locator( `[data-word-by-word-translation]` ) ).toHaveAttribute( `aria-busy`, `false` )
+        await sheet.getByRole( `button`, { name: `Original`, exact: true } ).tap()
+        const original_sentence = sheet.locator( `[data-original-sentence]` )
+        await expect( original_sentence ).toContainText( first_text.replace( /^Target /, `` ) )
+        const first_original = await original_sentence.textContent()
 
         await second_fragment_word.tap()
 
         await expect( sheet ).toHaveCount( 1 )
         await expect( second_fragment_word ).toHaveAttribute( `aria-pressed`, `true` )
         await expect( first_word ).toHaveAttribute( `aria-pressed`, `false` )
-        await expect.poll( () => sheet.textContent() ).not.toBe( first_meaning )
-        expect( calls.meaning ).toBeGreaterThanOrEqual( 2 )
+        const original_button = sheet.getByRole( `button`, { name: `Original`, exact: true } )
+        await expect( original_button ).toHaveAttribute( `aria-expanded`, `false` )
+        await original_button.tap()
+        await expect( original_sentence ).toContainText(
+            ( await sentences.nth( different_fragment_index ).textContent() ).replace( /^Target /, `` )
+        )
+        await expect( original_sentence ).not.toHaveText( first_original )
+        expect( calls.meaning ).toBe( 0 )
         expect( calls.word_lookup ).toBeGreaterThanOrEqual( 2 )
 
     } )
@@ -277,7 +292,22 @@ test.describe( `Touch translation information`, () => {
         await expect( sheet ).toBeVisible()
         await expect( page.locator( READER_WORD_TOOLTIP ) ).toBeVisible()
 
-        await page.locator( `main` ).tap( { position: { x: 195, y: 4 } } )
+        // Tap actual visible whitespace; the scrolled main element's top may be offscreen.
+        const outside_point = await page.evaluate( () => {
+            const top = document.querySelector( `header` ).getBoundingClientRect().bottom
+            const bottom = document.querySelector( `[data-reader-dock]` ).getBoundingClientRect().top
+            for( let y = top + 8; y < bottom - 8; y += 8 ) {
+                for( let x = innerWidth * 0.3; x < innerWidth * 0.7; x += 8 ) {
+                    const element = document.elementFromPoint( x, y )
+                    if( element?.closest( `main` ) && !element.closest( `[data-sentence-id], button, a` ) ) {
+                        return { x, y }
+                    }
+                }
+            }
+            return null
+        } )
+        expect( outside_point ).not.toBeNull()
+        await page.touchscreen.tap( outside_point.x, outside_point.y )
         await expect( sheet ).toBeVisible()
         await expect( page.locator( READER_WORD_TOOLTIP ) ).toBeVisible()
 
@@ -336,23 +366,27 @@ test.describe( `Touch translation information`, () => {
         await expect( footer ).toBeVisible()
         await expect( page.getByRole( `button`, { name: /next/i } ) ).toBeVisible()
 
-        const [ sheet_box, footer_box, close_box, explain_box ] = await Promise.all( [
-            sheet.boundingBox(),
-            footer.boundingBox(),
-            close_button.boundingBox(),
-            explain_button.boundingBox()
-        ] )
+        // Sheet entrance and lookup reflow can still be animating after visibility resolves.
+        await expect( async () => {
+            const [ sheet_box, footer_box, close_box, explain_box ] = await Promise.all( [
+                sheet.boundingBox(),
+                footer.boundingBox(),
+                close_button.boundingBox(),
+                explain_button.boundingBox()
+            ] )
 
-        expect( sheet_box ).not.toBeNull()
-        expect( footer_box ).not.toBeNull()
-        expect( close_box ).not.toBeNull()
-        expect( explain_box ).not.toBeNull()
-        expect( sheet_box.x ).toBeGreaterThanOrEqual( 0 )
-        expect( sheet_box.x + sheet_box.width ).toBeLessThanOrEqual( 320 )
-        expect( sheet_box.y + sheet_box.height ).toBeLessThanOrEqual( footer_box.y + 1 )
-        expect( close_box.x + close_box.width ).toBeLessThanOrEqual( 320 )
-        expect( explain_box.x + explain_box.width ).toBeLessThanOrEqual( 320 )
-        expect( explain_box.y + explain_box.height ).toBeLessThanOrEqual( 568 )
+            expect( sheet_box ).not.toBeNull()
+            expect( footer_box ).not.toBeNull()
+            expect( close_box ).not.toBeNull()
+            expect( explain_box ).not.toBeNull()
+            expect( sheet_box.x ).toBeGreaterThanOrEqual( 0 )
+            expect( sheet_box.x + sheet_box.width ).toBeLessThanOrEqual( 320 )
+            expect( sheet_box.y + sheet_box.height ).toBeLessThanOrEqual( footer_box.y + 1 )
+            expect( close_box.x + close_box.width ).toBeLessThanOrEqual( 320 )
+            expect( explain_box.x + explain_box.width ).toBeLessThanOrEqual( 320 )
+            expect( explain_box.y + explain_box.height ).toBeLessThanOrEqual( 568 )
+        } ).toPass()
+
 
     } )
 

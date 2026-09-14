@@ -1,12 +1,12 @@
 /**
  * Pass 40 — Read-ahead stress tests and regression checks
  */
-import { test, expect, open_seeded_reader } from './helpers/app_fixture.js'
+import { test, expect, open_seeded_reader, SEEDED_BOOK_ID } from './helpers/app_fixture.js'
 import { mock_auth } from './helpers/setup.js'
 
 const wait_for_translations = async ( page ) => {
 
-    const translating = page.getByText( `Translating...`, { exact: true } )
+    const translating = page.locator( `[aria-live="polite"]` ).filter( { hasText: /^Translating ·/ } )
     await expect( translating ).toBeVisible( { timeout: 5_000 } )
     await expect( translating ).not.toBeVisible( { timeout: 30_000 } )
 
@@ -16,16 +16,20 @@ test.describe( `Pass 40 — Read-ahead buffer`, () => {
 
     test.use( { app_state: `reader` } )
 
-    test( `BW201 read-ahead translates sentences from next chapters`, async ( { page } ) => {
-        // Track which sentence IDs are translated (by chapter index in the ID)
-        const translated_ids = new Set()
+    test( `BW201 read-ahead translates beyond the viewport without translating the whole chapter`, async ( { page } ) => {
+        // This chapter is much longer than the viewport budget; short front matter can fit entirely.
+        await page.evaluate( async book_id => {
+            const { save_progress } = await import( `/src/modules/cache.js` )
+            await save_progress( { book_id, chapter_index: 2, scroll_position: 0, last_read_at: new Date().toISOString() } )
+        }, SEEDED_BOOK_ID )
+        const translated_sentences = new Set()
 
         await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
             const body = JSON.parse( route.request().postData() )
             const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
             const sentence = user_msg.match( /Translate this sentence:\n(.+)/s )?.[1]?.trim() || ``
 
-            translated_ids.add( sentence )
+            translated_sentences.add( sentence )
 
             await route.fulfill( {
                 contentType: `application/json`,
@@ -40,10 +44,17 @@ test.describe( `Pass 40 — Read-ahead buffer`, () => {
 
         await wait_for_translations( page )
 
-        // Total unique sentences translated should be > sentences on screen
-        // because read-ahead pre-translates next 2 chapters
-        const visible_count = await page.locator( `span[data-sentence-id]` ).count()
-        expect( translated_ids.size ).toBeGreaterThan( visible_count )
+        // The occurrence budget includes offscreen read-ahead, not the entire chapter.
+        const visible_count = await page.locator( `span[data-sentence-id]` ).evaluateAll( sentences => {
+            const top = document.querySelector( `header` ).getBoundingClientRect().bottom
+            const bottom = document.querySelector( `[data-reader-dock]` ).getBoundingClientRect().top
+            return sentences.filter( sentence => [ ...sentence.getClientRects() ].some( rect =>
+                rect.bottom > top && rect.top < bottom
+            ) ).length
+        } )
+        const chapter_count = await page.locator( `span[data-sentence-id]` ).count()
+        expect( translated_sentences.size ).toBeGreaterThan( visible_count )
+        expect( translated_sentences.size ).toBeLessThan( chapter_count )
     } )
 
     test( `BW202 navigating forward shows pre-cached translations instantly`, async ( { page } ) => {
@@ -64,6 +75,16 @@ test.describe( `Pass 40 — Read-ahead buffer`, () => {
         await open_seeded_reader( page )
 
         await wait_for_translations( page )
+
+        // Near the chapter boundary the word window reaches into the next chapter.
+        await page.locator( `span[data-sentence-id]` ).last().scrollIntoViewIfNeeded()
+        await expect.poll( () => page.evaluate( async () => {
+            const { get_translation } = await import( `/src/modules/cache.js` )
+            const { use_settings_store } = await import( `/src/stores/settings_store.js` )
+            const { last_language, last_level } = use_settings_store.getState()
+            const [ hash, chapter ] = document.querySelector( `[data-sentence-id]` ).dataset.sentenceId.split( `:` )
+            return !!await get_translation( `${ hash }:${ Number( chapter ) + 1 }:0:0:${ last_language }:${ last_level }` )
+        } ), { timeout: 30_000 } ).toBe( true )
 
         // Block successful API responses after read-ahead so chapter 2 can only use its cache.
         await page.unroute( `**/openrouter.ai/api/v1/chat/completions` )
@@ -192,7 +213,7 @@ test.describe( `Pass 40 — Read-ahead buffer`, () => {
 
         // More translations should have been triggered
         await expect.poll( () => translation_count, { timeout: 30_000 } ).toBeGreaterThan( count_after_load )
-        await expect( page.getByText( `Translating...`, { exact: true } ) ).not.toBeVisible( { timeout: 30_000 } )
+        await expect( page.locator( `[aria-live="polite"]` ).filter( { hasText: /^Translating ·/ } ) ).not.toBeVisible( { timeout: 30_000 } )
     } )
 
     test( `BW206 token usage and cost displayed in footer`, async ( { page } ) => {

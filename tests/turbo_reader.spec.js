@@ -58,7 +58,7 @@ test.describe( `Turbo Mode reader`, () => {
         expect( calls.words ).toHaveLength( 0 )
     } )
 
-    test( `warms only visible contexts and reuses them immediately on a tap`, async ( { page } ) => {
+    test( `warms nearby words and reuses them immediately on a tap`, async ( { page } ) => {
         const calls = await install_mock( page )
         await enable_saved_turbo( page )
         await open_seeded_reader( page )
@@ -82,16 +82,6 @@ test.describe( `Turbo Mode reader`, () => {
             const { get_token_usage } = await import( `/src/modules/cache.js` )
             return ( await get_token_usage( book_id ) )?.prompt_tokens || 0
         }, SEEDED_BOOK_ID ) ).toBeGreaterThanOrEqual( 8 * 25 )
-
-        const visible_contexts = await page.locator( `span[data-sentence-id]` ).evaluateAll( elements => {
-            const top = document.querySelector( `header` ).getBoundingClientRect().bottom
-            const bottom = document.querySelector( `[data-reader-dock]` ).getBoundingClientRect().top
-            return elements.filter( element => [ ...element.getClientRects() ].some( rect =>
-                rect.height > 0 && rect.bottom > top && rect.top < bottom
-            ) ).map( element => element.innerText )
-        } )
-        expect( calls.words.every( call => visible_contexts.includes( call.context ) ) ).toBe( true )
-        expect( calls.translations.some( translation => !visible_contexts.includes( translation ) ) ).toBe( true )
 
         const before_tap = calls.words.filter( call => call.context === context ).length
         // Block all new responses; a fully populated sheet must use the warmed cache.

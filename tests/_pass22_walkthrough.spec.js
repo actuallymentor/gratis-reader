@@ -74,7 +74,7 @@ test.describe( `Pass 22 — Bug Fixes & Edge Cases`, () => {
         await expect( page.getByText( /\[TRANSLATED\]/ ).first() ).toBeVisible( { timeout: 15_000 } )
 
         // Note the chapter indicator
-        const progress_before = await page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` ).first().textContent()
+        const progress_before = await page.locator( `text=/^\\d+\\s*\\/\\s*\\d+\\s*·\\s*\\d+%$/` ).first().textContent()
 
         // Open settings drawer
         await page.getByLabel( `Settings` ).click()
@@ -89,7 +89,7 @@ test.describe( `Pass 22 — Bug Fixes & Edge Cases`, () => {
         await expect( page.getByText( `Font Size` ) ).not.toBeVisible()
 
         // Chapter should not have changed
-        await expect( page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` ).first() ).toHaveText( progress_before )
+        await expect( page.locator( `text=/^\\d+\\s*\\/\\s*\\d+\\s*·\\s*\\d+%$/` ).first() ).toHaveText( progress_before )
     } )
 
     test( `P22-02 arrow keys do NOT navigate when explanation popover is open`, async ( { page } ) => {
@@ -98,7 +98,7 @@ test.describe( `Pass 22 — Bug Fixes & Edge Cases`, () => {
         await enter_reader( page )
         await expect( page.getByText( /\[TRANSLATED\]/ ).first() ).toBeVisible( { timeout: 15_000 } )
 
-        const progress_before = await page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` ).first().textContent()
+        const progress_before = await page.locator( `text=/^\\d+\\s*\\/\\s*\\d+\\s*·\\s*\\d+%$/` ).first().textContent()
 
         // Select a word, then use the sheet's explicit Explain action.
         const sentence = page.locator( `span[data-sentence-id]` ).first()
@@ -114,7 +114,7 @@ test.describe( `Pass 22 — Bug Fixes & Edge Cases`, () => {
         await page.keyboard.press( `Escape` )
         await expect( page.getByText( `Translation Explanation` ) ).not.toBeVisible()
 
-        await expect( page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` ).first() ).toHaveText( progress_before )
+        await expect( page.locator( `text=/^\\d+\\s*\\/\\s*\\d+\\s*·\\s*\\d+%$/` ).first() ).toHaveText( progress_before )
     } )
 
     test( `P22-03 Escape key does NOT go to library when settings is open`, async ( { page } ) => {
@@ -254,11 +254,11 @@ test.describe( `Pass 22 — Bug Fixes & Edge Cases`, () => {
         await enter_reader( page )
         await expect( page.getByText( /\[TRANSLATED\]/ ).first() ).toBeVisible( { timeout: 15_000 } )
 
-        const initial = await page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` ).first().textContent()
+        const initial = await page.locator( `text=/^\\d+\\s*\\/\\s*\\d+\\s*·\\s*\\d+%$/` ).first().textContent()
 
         // Click Next
         await page.getByRole( `button`, { name: /Next/ } ).click()
-        const progress = page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` ).first()
+        const progress = page.locator( `text=/^\\d+\\s*\\/\\s*\\d+\\s*·\\s*\\d+%$/` ).first()
         await expect( progress ).not.toHaveText( initial )
 
         // Click Prev
@@ -272,11 +272,11 @@ test.describe( `Pass 22 — Bug Fixes & Edge Cases`, () => {
         await enter_reader( page )
         await expect( page.getByText( /\[TRANSLATED\]/ ).first() ).toBeVisible( { timeout: 15_000 } )
 
-        const initial = await page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` ).first().textContent()
+        const initial = await page.locator( `text=/^\\d+\\s*\\/\\s*\\d+\\s*·\\s*\\d+%$/` ).first().textContent()
 
         // Arrow right should navigate
         await page.keyboard.press( `ArrowRight` )
-        await expect( page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` ).first() ).not.toHaveText( initial )
+        await expect( page.locator( `text=/^\\d+\\s*\\/\\s*\\d+\\s*·\\s*\\d+%$/` ).first() ).not.toHaveText( initial )
     } )
 
     test( `P22-11 Escape goes to library when nothing is open`, async ( { page } ) => {
@@ -325,8 +325,8 @@ test.describe( `Pass 22 — Bug Fixes & Edge Cases`, () => {
         await page.locator( `[data-translation-info-sheet]` ).getByRole( `button`, { name: `Explain` } ).click()
 
         await expect( page.getByText( `Translation Explanation` ) ).toBeVisible( { timeout: 5000 } )
-        await expect( page.getByText( `Original` ) ).toBeVisible()
-        await expect( page.getByText( `Translation`, { exact: true } ) ).toBeVisible()
+        await expect( page.getByRole( `dialog`, { name: `Translation Explanation` } ).getByText( `Original`, { exact: true } ) ).toBeVisible()
+        await expect( page.getByRole( `dialog`, { name: `Translation Explanation` } ).getByText( `Translation`, { exact: true } ) ).toBeVisible()
     } )
 
     // ── REGRESSION: Language modal on first book open ────────────

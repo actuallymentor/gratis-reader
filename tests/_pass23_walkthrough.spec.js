@@ -287,7 +287,7 @@ test.describe( `Pass 23 — Edge Cases & Error States`, () => {
         await select.selectOption( { index: 3 } )
 
         // Progress should show chapter 4
-        await expect( page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` ).first() ).toContainText( `4` )
+        await expect( page.locator( `text=/^\\d+\\s*\\/\\s*\\d+\\s*·\\s*\\d+%$/` ).first() ).toContainText( `4` )
     } )
 
     // ── TRANSLATION FEATURES ────────────────────────────────────
@@ -358,14 +358,14 @@ test.describe( `Pass 23 — Edge Cases & Error States`, () => {
             window.dispatchEvent( new Event( `offline` ) )
         } )
 
-        await expect( page.getByText( /offline/i ) ).toBeVisible()
+        await expect( page.getByText( `Offline — showing cached translations`, { exact: true } ) ).toBeVisible()
 
         // Go back online
         await page.evaluate( () => {
             window.dispatchEvent( new Event( `online` ) )
         } )
 
-        await expect( page.getByText( /offline/i ) ).not.toBeVisible()
+        await expect( page.getByText( `Offline — showing cached translations`, { exact: true } ) ).not.toBeVisible()
     } )
 
     // ── READING PROGRESS ────────────────────────────────────────
@@ -377,7 +377,7 @@ test.describe( `Pass 23 — Edge Cases & Error States`, () => {
         await expect( page.getByText( /\[TRANSLATED\]/ ).first() ).toBeVisible( { timeout: 15_000 } )
 
         // Navigate to chapter 3
-        const progress = page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` ).first()
+        const progress = page.locator( `text=/^\\d+\\s*\\/\\s*\\d+\\s*·\\s*\\d+%$/` ).first()
         const first_progress = await progress.textContent()
         await page.getByRole( `button`, { name: /Next/ } ).click()
         await expect( progress ).not.toHaveText( first_progress )
@@ -398,7 +398,7 @@ test.describe( `Pass 23 — Edge Cases & Error States`, () => {
         // Should restore position (no language modal since we're returning)
         await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible( { timeout: 10_000 } )
 
-        const progress_after = await page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` ).first().textContent()
+        const progress_after = await page.locator( `text=/^\\d+\\s*\\/\\s*\\d+\\s*·\\s*\\d+%$/` ).first().textContent()
         expect( progress_after ).toBe( progress_before )
     } )
 
@@ -440,7 +440,7 @@ test.describe( `Pass 23 — Edge Cases & Error States`, () => {
         await enter_reader( page )
 
         // The "Translating..." indicator should appear while translations load
-        await expect( page.getByText( `Translating...` ) ).toBeVisible( { timeout: 5000 } )
+        await expect( page.locator( `[aria-live="polite"]` ).filter( { hasText: /^Translating ·/ } ) ).toBeVisible( { timeout: 5000 } )
 
         // Eventually translations should complete
         release_translations()

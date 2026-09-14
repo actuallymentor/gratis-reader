@@ -130,7 +130,7 @@ test.describe( `Pass 29 — Walkthrough`, () => {
         page.on( `pageerror`, e => errors.push( e.message ) )
 
         await open_reader( page )
-        const progress = page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` ).first()
+        const progress = page.locator( `text=/^\\d+\\s*\\/\\s*\\d+\\s*·\\s*\\d+%$/` ).first()
         const progress_before = await progress.textContent()
 
         // Navigate forward

@@ -47,7 +47,7 @@ test.describe( `API Key Management`, () => {
         await expect( input ).toBeVisible()
 
         // Cancel
-        await page.getByText( `Cancel`, { exact: true } ).click()
+        await page.getByRole( `button`, { name: `Cancel`, exact: true } ).click()
         await expect( input ).not.toBeVisible()
 
         // Input should be gone, masked key should be back

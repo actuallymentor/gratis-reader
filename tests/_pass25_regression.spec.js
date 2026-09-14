@@ -209,7 +209,7 @@ test.describe( `Pass 25 — Regression & Coverage`, () => {
         await upload_and_read( page )
 
         // Generate some reading progress by navigating
-        const progress = page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` ).first()
+        const progress = page.locator( `text=/^\\d+\\s*\\/\\s*\\d+\\s*·\\s*\\d+%$/` ).first()
         const progress_before = await progress.textContent()
         await page.keyboard.press( `ArrowRight` )
         await expect( progress ).not.toHaveText( progress_before )
@@ -256,7 +256,7 @@ test.describe( `Pass 25 — Regression & Coverage`, () => {
         await expect( page.getByText( /font size/i ) ).toBeVisible( { timeout: 3000 } )
 
         // Get the current chapter indicator.
-        const progress = page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` ).first()
+        const progress = page.locator( `text=/^\\d+\\s*\\/\\s*\\d+\\s*·\\s*\\d+%$/` ).first()
         const progress_before = await progress.textContent()
 
         // Press arrow keys while settings is open

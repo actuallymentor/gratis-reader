@@ -262,7 +262,7 @@ test.describe( `Pass 27 — Coverage Expansion`, () => {
         await page.evaluate( () => window.dispatchEvent( new Event( `offline` ) ) )
 
         // Check for offline banner
-        const offline_text = page.getByText( /offline/i )
+        const offline_text = page.getByText( `Offline — showing cached translations`, { exact: true } )
         await expect( offline_text ).toBeVisible( { timeout: 3000 } )
 
         // Simulate coming back online
@@ -328,7 +328,7 @@ test.describe( `Pass 27 — Coverage Expansion`, () => {
         await open_reader( page )
 
         // Get the initial chapter position.
-        const progress = page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` ).first()
+        const progress = page.locator( `text=/^\\d+\\s*\\/\\s*\\d+\\s*·\\s*\\d+%$/` ).first()
         const initial_progress = await progress.textContent()
 
         // Simulate swipe left (next chapter) - touch at center, drag left

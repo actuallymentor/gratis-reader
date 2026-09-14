@@ -1,25 +1,21 @@
 import { useEffect, useRef } from 'react'
-import { segment_translation_text } from '../modules/translation_alignment.js'
 
 const SCROLL_SETTLE_MS = 150
 const BACKGROUND_CONCURRENCY = 2
 
 /**
- * Warms the shared word cache for visible translated sentences after scrolling settles.
- * Whole visible sentences are needed because a tap opens their complete word-by-word sheet.
+ * Warms translated words admitted by the shared occurrence window.
+ * Dictionary requests deduplicate only after the viewport budget has been applied.
  * @param {Object} options
- * @param {boolean} options.enabled - Confirmed opt-in, with the reader available and online
- * @param {Object} options.reading_area_ref
- * @param {Object} options.reader_dock_ref
- * @param {Object} options.translations - Sentence ID to translated text
- * @param {*} options.content_key - Changes when rendered chapter content changes
- * @param {Function} options.lookup_word - Shared, context-aware foreground lookup
+ * @param {boolean} options.enabled - Opt-in, reader available and online
+ * @param {Array} options.words - Ordered window words with their translated sentence context
+ * @param {Function} options.lookup_word - Shared context-aware foreground lookup
  */
-export const use_turbo_lookup = ( { enabled, reading_area_ref, reader_dock_ref, translations, content_key, lookup_word } ) => {
+export const use_turbo_lookup = ( { enabled, words, lookup_word } ) => {
 
-    const translations_ref = useRef( translations )
-    translations_ref.current = translations
-    const schedule_scan_ref = useRef( null )
+    const words_ref = useRef( words )
+    words_ref.current = words
+    const refresh_ref = useRef( null )
 
     useEffect( () => {
         if( !enabled ) return
@@ -27,26 +23,27 @@ export const use_turbo_lookup = ( { enabled, reading_area_ref, reader_dock_ref, 
         const jobs = new Map()
         let active = 0
         let stopped = false
-        let scan_pending = false
-        let scan_timer
+        let settling = false
+        let timer
+
+        const all_jobs = () => [ ...jobs.values() ].flatMap( context_jobs => [ ...context_jobs.values() ] )
 
         const cancel_jobs = () => {
-            jobs.forEach( job => job.controller.abort() )
+            all_jobs().forEach( job => job.controller.abort() )
             jobs.clear()
         }
 
         const pump = () => {
-            if( stopped || scan_pending || document.hidden ) return
+            if( stopped || settling || document.hidden ) return
 
-            // Leave room under the shared three-request ceiling for a tapped word.
+            // Reserve a slot under the shared three-request ceiling for foreground taps.
             while( active < BACKGROUND_CONCURRENCY ) {
-                const job = [ ...jobs.values() ].find( candidate => candidate.words.length )
+                const job = all_jobs().find( candidate => !candidate.started )
                 if( !job ) return
-
-                const word = job.words.shift()
+                job.started = true
                 active += 1
-                lookup_word( word, {
-                    context: job.context,
+                lookup_word( job.word.text, {
+                    context: job.word.context,
                     retry: false,
                     signal: job.controller.signal
                 } ).catch( () => {} ).finally( () => {
@@ -56,87 +53,53 @@ export const use_turbo_lookup = ( { enabled, reading_area_ref, reader_dock_ref, 
             }
         }
 
-        const scan = () => {
-            scan_timer = null
-            scan_pending = false
-            if( stopped ) return
-            if( document.hidden ) {
-                cancel_jobs()
-                return
-            }
-
-            const area = reading_area_ref.current
-            const header = area?.closest( `main` )?.querySelector( `header` )
-                || document.querySelector( `header` )
-            const top = Math.max( 0, header?.getBoundingClientRect().bottom || 0 )
-            const bottom = Math.min( window.innerHeight, reader_dock_ref.current?.getBoundingClientRect().top ?? window.innerHeight )
-            const contexts = new Set()
-
-            area?.querySelectorAll( `[data-sentence-id]` ).forEach( element => {
-                const context = translations_ref.current[element.dataset.sentenceId]
-                if( !context ) return
-
-                // Inline fragments can wrap; a union bounding box includes blank space.
-                const visible = [ ...element.getClientRects() ].some( rect =>
-                    rect.width > 0 && rect.height > 0 && rect.bottom > top && rect.top < bottom
-                        && rect.right > 0 && rect.left < window.innerWidth
-                )
-                if( visible ) contexts.add( context )
+        const refresh = () => {
+            if( document.hidden ) return cancel_jobs()
+            // Store a long sentence context once, rather than duplicating it in every word key.
+            const selected = new Map()
+            words_ref.current.filter( word => word.context ).forEach( word => {
+                if( !selected.has( word.context ) ) selected.set( word.context, new Map() )
+                const key = word.text.toLowerCase()
+                if( selected.get( word.context ).has( key ) ) return
+                const job = jobs.get( word.context )?.get( key )
+                    || { word, controller: new AbortController(), started: false }
+                selected.get( word.context ).set( key, job )
             } )
-
-            jobs.forEach( ( job, context ) => {
-                if( contexts.has( context ) ) return
-                job.controller.abort()
-                jobs.delete( context )
-            } )
-
-            contexts.forEach( context => {
-                if( jobs.has( context ) ) return
-                const words = segment_translation_text( context )
-                    .filter( segment => segment.is_word )
-                    .map( segment => segment.text )
-                // Deduplicate case-insensitively, but preserve casing in the dictionary prompt.
-                const unique_words = [ ...new Map( words.map( word => [ word.toLowerCase(), word ] ) ).values() ]
-                jobs.set( context, { context, words: unique_words, controller: new AbortController() } )
-            } )
-
+            jobs.forEach( ( context_jobs, context ) => context_jobs.forEach( ( job, key ) => {
+                if( !selected.get( context )?.has( key ) ) job.controller.abort()
+            } ) )
+            // Reorder surviving jobs as well: newly visible words take priority after scrolling back.
+            jobs.clear()
+            selected.forEach( ( context_jobs, context ) => jobs.set( context, context_jobs ) )
             pump()
         }
+        refresh_ref.current = refresh
+        refresh()
 
-        const schedule_scan = () => {
-            // Stop dequeuing immediately during scrolling; keep in-flight results reusable.
-            scan_pending = true
-            clearTimeout( scan_timer )
-            scan_timer = setTimeout( scan, SCROLL_SETTLE_MS )
+        const pause = () => {
+            settling = true
+            clearTimeout( timer )
+            // The window scanner runs first; defer pumping until its React update has committed.
+            timer = setTimeout( () => {
+                settling = false
+                refresh()
+            }, SCROLL_SETTLE_MS + 50 )
         }
-        // Translation/layout updates must not postpone work indefinitely while a chapter streams in.
-        const request_scan = () => {
-            if( !scan_timer ) schedule_scan()
-        }
-        const visibility_changed = () => document.hidden ? cancel_jobs() : request_scan()
-        schedule_scan_ref.current = request_scan
-        request_scan()
-
-        const observer = new ResizeObserver( request_scan )
-        if( reading_area_ref.current ) observer.observe( reading_area_ref.current )
-        if( reader_dock_ref.current ) observer.observe( reader_dock_ref.current )
-        window.addEventListener( `scroll`, schedule_scan, true )
-        window.addEventListener( `resize`, schedule_scan )
-        document.addEventListener( `visibilitychange`, visibility_changed )
+        window.addEventListener( `scroll`, pause, true )
+        window.addEventListener( `resize`, pause )
+        document.addEventListener( `visibilitychange`, refresh )
 
         return () => {
             stopped = true
-            clearTimeout( scan_timer )
-            schedule_scan_ref.current = null
+            clearTimeout( timer )
+            refresh_ref.current = null
             cancel_jobs()
-            observer.disconnect()
-            window.removeEventListener( `scroll`, schedule_scan, true )
-            window.removeEventListener( `resize`, schedule_scan )
-            document.removeEventListener( `visibilitychange`, visibility_changed )
+            window.removeEventListener( `scroll`, pause, true )
+            window.removeEventListener( `resize`, pause )
+            document.removeEventListener( `visibilitychange`, refresh )
         }
-    }, [ enabled, reading_area_ref, reader_dock_ref, lookup_word ] )
+    }, [ enabled, lookup_word ] )
 
-    // Newly translated sentences join the current queue without restarting paid work.
-    useEffect( () => schedule_scan_ref.current?.(), [ translations, content_key ] )
+    useEffect( () => refresh_ref.current?.(), [ words ] )
 
 }

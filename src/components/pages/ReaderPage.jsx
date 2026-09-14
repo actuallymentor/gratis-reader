@@ -4,6 +4,7 @@ import styled from 'styled-components'
 import * as Throttle from 'promise-parallel-throttle'
 import { use_book } from '../../hooks/use_book.js'
 import { use_translation } from '../../hooks/use_translation.js'
+import { use_reading_window } from '../../hooks/use_reading_window.js'
 import { use_turbo_lookup } from '../../hooks/use_turbo_lookup.js'
 import { use_word_lookup } from '../../hooks/use_word_lookup.js'
 import { use_settings_store } from '../../stores/settings_store.js'
@@ -82,6 +83,8 @@ const GearBtn = styled.button`
 
     &:hover { background: var(--bg-hover); color: var(--text); }
 `
+
+const EMPTY_READING_WINDOW = { sentence_ids: [], words: [], ahead_word_budget: 0 }
 
 const ReadingArea = styled.main`
     flex: 1;
@@ -298,16 +301,22 @@ export default function ReaderPage() {
     const { book_id } = useParams()
     const navigate = useNavigate()
 
+    const [ reading_window, set_reading_window ] = useState( EMPTY_READING_WINDOW )
+
     // Book loading
     const {
         book_meta, chapters, spine, current_chapter, current_chapter_content,
         ahead_chapters_content,
         go_to_chapter, next_chapter, prev_chapter, progress,
         loading, chapter_loading, chapter_error, source_language
-    } = use_book( book_id )
+    } = use_book( book_id, reading_window.ahead_word_budget )
 
     // Settings
     const { font_size, font_family, last_language, last_level, set_last_language, set_last_level, model, turbo_mode } = use_settings_store()
+
+    // A previous chapter/language window must never authorize lookups in the new context.
+    const window_key = JSON.stringify( [ book_id, current_chapter, source_language, last_language, last_level ] )
+    const active_window = reading_window.content_key === window_key ? reading_window : EMPTY_READING_WINDOW
 
     // UI state
     const [ settings_open, set_settings_open ] = useState( false )
@@ -371,7 +380,7 @@ export default function ReaderPage() {
         [ current_chapter_content ]
     )
 
-    // Flatten current chapter + 2 ahead chapters for translation read-ahead
+    // Parsing supplies possible read-ahead; only the measured word window authorizes translation.
     const all_sentences = useMemo( () => {
         const ahead = ahead_chapters_content.flatMap( extract_sentences )
         return [ ...current_chapter_sentences, ...ahead ]
@@ -386,6 +395,7 @@ export default function ReaderPage() {
         record_token_usage
     } = use_translation( {
         all_sentences,
+        eligible_sentence_ids: active_window.sentence_ids,
         target_language: language_chosen ? last_language : null,
         level: language_chosen ? last_level : null,
         source_language,
@@ -478,13 +488,20 @@ export default function ReaderPage() {
         lookup_word
     ] )
 
+    use_reading_window( {
+        content_key: window_key,
+        enabled: language_chosen && !loading && !chapter_loading,
+        reading_area_ref,
+        reader_dock_ref,
+        all_sentences,
+        translations,
+        on_change: set_reading_window
+    } )
+
     use_turbo_lookup( {
         enabled: turbo_mode && language_chosen && !loading && !chapter_loading
             && !is_offline && !settings_open && !explanation_data,
-        reading_area_ref,
-        reader_dock_ref,
-        translations,
-        content_key: current_chapter_content,
+        words: active_window.words,
         lookup_word
     } )
 

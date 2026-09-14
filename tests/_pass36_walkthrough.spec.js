@@ -21,13 +21,13 @@ test.describe( `Pass 36 — Walkthrough`, () => {
         await page.context().setOffline( true )
 
         // Offline banner should appear
-        await expect( page.getByText( /offline/i ) ).toBeVisible()
+        await expect( page.getByText( `Offline — showing cached library`, { exact: true } ) ).toBeVisible()
 
         // Go back online
         await page.context().setOffline( false )
 
         // Banner should disappear
-        await expect( page.getByText( /offline.*cached/i ) ).not.toBeVisible()
+        await expect( page.getByText( `Offline — showing cached library`, { exact: true } ) ).not.toBeVisible()
     } )
 
     // ── 2. Reader page offline banner still works ──
@@ -38,11 +38,11 @@ test.describe( `Pass 36 — Walkthrough`, () => {
 
         await page.context().setOffline( true )
 
-        await expect( page.getByText( /offline/i ) ).toBeVisible()
+        await expect( page.getByText( `Offline — showing cached translations`, { exact: true } ) ).toBeVisible()
 
         await page.context().setOffline( false )
 
-        await expect( page.getByText( /offline.*cached/i ) ).not.toBeVisible()
+        await expect( page.getByText( `Offline — showing cached translations`, { exact: true } ) ).not.toBeVisible()
     } )
 
     // ── 3. Book.epub not in production build ──

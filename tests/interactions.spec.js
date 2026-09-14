@@ -35,7 +35,7 @@ test.describe( `Sentence Interactions`, () => {
 
     test.use( { app_state: `reader` } )
 
-    test( `click on a translated word opens its contextual tooltip and the simplified-fragment sheet`, async ( { page } ) => {
+    test( `click on a translated word opens its contextual tooltip and the word-by-word sheet`, async ( { page } ) => {
 
         await enter_reader_with_translations( page )
 
@@ -55,98 +55,16 @@ test.describe( `Sentence Interactions`, () => {
         const sheet = page.locator( INFO_SHEET )
         const direct_word = sheet.locator( `[data-direct-translation-word-index="0"]` )
         await expect( sheet ).toBeVisible()
-        await expect( sheet ).toContainText( `[MEANING]`, { timeout: 5000 } )
-        await expect( sheet.getByRole( `heading`, { name: `Meaning` } ) ).toBeVisible()
         await expect( sheet.getByRole( `heading`, { name: `Word by word` } ) ).toBeVisible()
         await expect( direct_word ).toContainText( `[WORD] definition of the word` )
         await expect( direct_word ).toContainText( `Selected word:` )
         await expect( direct_word ).toHaveCSS( `text-decoration-line`, `underline` )
         await expect( sheet.locator( `[data-word-by-word-translation]` ) ).toHaveAttribute( `aria-busy`, `false` )
-        await expect( sheet ).toHaveAttribute( `aria-busy`, `false` )
         await expect( word ).toHaveAttribute( `aria-pressed`, `true` )
-        await expect( word ).toHaveCSS( `text-decoration-line`, `none` )
+        await expect( word ).toHaveCSS( `text-decoration-line`, `underline` )
         await expect( page.locator( READER_WORD_TOOLTIP ) ).toHaveText( `[WORD] definition of the word` )
         await expect( page.getByRole( `dialog`, { name: `Translation Explanation` } ) ).not.toBeVisible()
         expect( word_lookup_calls ).toBe( expected_lookup_count )
-
-    } )
-
-    test( `failed meaning requests stop until the user makes a new selection`, async ( { page } ) => {
-
-        await page.clock.install()
-        let meaning_calls = 0
-
-        await page.route( CHAT_URL, async route => {
-            const body = JSON.parse( route.request().postData() )
-            const user_msg = body.messages?.find( message => message.role === `user` )?.content || ``
-
-            if( user_msg.includes( `Adapted translation:` ) ) {
-                meaning_calls += 1
-                await route.fulfill( { status: 500, body: `Meaning unavailable` } )
-                return
-            }
-
-            const sentence_match = user_msg.match( /Translate this sentence:\n(.+)/s )
-            const sentence = sentence_match ? sentence_match[1].trim() : `unknown`
-            await route.fulfill( {
-                contentType: `application/json`,
-                body: JSON.stringify( { choices: [ { message: { content: `[TRANSLATED] ${ sentence }` } } ] } )
-            } )
-        } )
-
-        await open_seeded_reader( page )
-
-        const word = page.locator( READER_WORD ).first()
-        await expect( word ).toBeVisible( { timeout: 15_000 } )
-        await word.click()
-
-        await expect( page.locator( INFO_SHEET ) ).toContainText( `Meaning unavailable`, { timeout: 5000 } )
-        await page.clock.runFor( 1000 )
-        expect( meaning_calls ).toBe( 1 )
-
-    } )
-
-    test( `cached meanings stay readable without another API request`, async ( { page } ) => {
-
-        let meaning_calls = 0
-
-        await page.route( CHAT_URL, async route => {
-            const body = JSON.parse( route.request().postData() )
-            const user_msg = body.messages?.find( message => message.role === `user` )?.content || ``
-
-            if( user_msg.includes( `Adapted translation:` ) ) {
-                meaning_calls += 1
-                await route.fulfill( {
-                    contentType: `application/json`,
-                    body: JSON.stringify( {
-                        choices: [ { message: { content: `Readable unaligned meaning.` } } ]
-                    } )
-                } )
-                return
-            }
-
-            const sentence_match = user_msg.match( /Translate this sentence:\n(.+)/s )
-            const sentence = sentence_match ? sentence_match[1].trim() : `unknown`
-            await route.fulfill( {
-                contentType: `application/json`,
-                body: JSON.stringify( { choices: [ { message: { content: `[TRANSLATED] ${ sentence }` } } ] } )
-            } )
-        } )
-
-        await open_seeded_reader( page )
-
-        const first_word = page.locator( READER_WORD ).first()
-        await expect( first_word ).toBeVisible( { timeout: 15_000 } )
-        await first_word.click()
-        await expect( page.locator( INFO_SHEET ) ).toContainText( `Readable unaligned meaning.` )
-
-        await page.getByLabel( `Back to library` ).click()
-        await page.waitForURL( /\/library/ )
-        await open_seeded_reader( page )
-
-        await page.locator( READER_WORD ).first().click()
-        await expect( page.locator( INFO_SHEET ) ).toContainText( `Readable unaligned meaning.` )
-        expect( meaning_calls ).toBe( 1 )
 
     } )
 
@@ -210,13 +128,10 @@ test.describe( `Sentence Interactions`, () => {
         await page.route( CHAT_URL, async route => {
             const body = JSON.parse( route.request().postData() )
             const user_msg = body.messages?.find( message => message.role === `user` )?.content || ``
-            const is_meaning = user_msg.includes( `Adapted translation:` )
             const word_match = user_msg.match( /Word:\s*(.+)$/ )
             const content = word_match
                 ? `source:${ word_match[1].trim() }`
-                : is_meaning
-                    ? `Translated word`
-                    : `Translated 123 alpha`
+                : `Translated 123 alpha`
 
             await route.fulfill( {
                 contentType: `application/json`,
@@ -242,65 +157,6 @@ test.describe( `Sentence Interactions`, () => {
 
     } )
 
-    test( `vocabulary panel lists common translated words for the viewport height`, async ( { page } ) => {
-
-        await page.setViewportSize( { width: 1280, height: 900 } )
-
-        const translated_sentence = `猫が猫を見た。犬が走る。猫は寝る。 alpha alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi omicron pi rho sigma tau`
-
-        await page.route( CHAT_URL, async route => {
-            const body = JSON.parse( route.request().postData() )
-            const user_msg = body.messages?.find( message => message.role === `user` )?.content || ``
-            const word_match = user_msg.match( /Word:\s*(.+)$/ )
-
-            if( word_match ) {
-                const word = word_match[1].trim()
-
-                await route.fulfill( {
-                    contentType: `application/json`,
-                    body: JSON.stringify( {
-                        choices: [ { message: { content: `source:${ word }` } } ]
-                    } )
-                } )
-                return
-            }
-
-            await route.fulfill( {
-                contentType: `application/json`,
-                body: JSON.stringify( {
-                    choices: [ { message: { content: translated_sentence } } ],
-                    usage: { prompt_tokens: 25, completion_tokens: 15, total_tokens: 40 }
-                } )
-            } )
-        } )
-
-        await open_seeded_reader( page )
-
-        await page.setViewportSize( { width: 1280, height: 500 } )
-        await expect( page.getByText( /alpha alpha beta/ ).first() ).toBeVisible( { timeout: 15_000 } )
-
-        const panel = page.locator( `#reader-vocabulary-panel` )
-        await expect( panel ).toHaveAttribute( `aria-hidden`, `true` )
-        await expect( panel ).toHaveAttribute( `inert`, `` )
-
-        await page.getByRole( `button`, { name: `Expand vocabulary list` } ).click()
-
-        const rows = page.locator( `[data-reader-vocabulary-row]` )
-        await expect.poll( () => rows.count() ).toBe( 7 )
-        await expect( panel ).toHaveAttribute( `aria-hidden`, `false` )
-        await expect( panel ).not.toHaveAttribute( `inert`, `` )
-        await expect( rows.first() ).toContainText( /猫 - source:猫 \(\d+x\)/, { timeout: 5000 } )
-
-        await page.setViewportSize( { width: 1280, height: 900 } )
-
-        await expect.poll( () => rows.count() ).toBe( 18 )
-        await page.getByRole( `button`, { name: `Collapse vocabulary list` } ).click()
-        await expect( page.getByRole( `button`, { name: `Expand vocabulary list` } ) ).toBeVisible()
-        await expect( panel ).toHaveAttribute( `aria-hidden`, `true` )
-        await expect( panel ).toHaveAttribute( `inert`, `` )
-
-    } )
-
     test( `double click leaves translated text visible and keeps one sheet`, async ( { page } ) => {
 
         await enter_reader_with_translations( page )
@@ -316,11 +172,9 @@ test.describe( `Sentence Interactions`, () => {
 
     } )
 
-    test( `sheet meaning stays separate from translated text and Explain opens the modal`, async ( { page } ) => {
+    test( `word-by-word lookups preserve translated text and Explain opens the modal`, async ( { page } ) => {
 
         const adapted_sentence = `Big work. Smart way.`
-        const source_meaning = `Big work. Smart path.`
-        let meaning_prompt = ``
         let word_lookup_calls = 0
 
         await page.route( CHAT_URL, async route => {
@@ -328,7 +182,6 @@ test.describe( `Sentence Interactions`, () => {
             const user_msg = body.messages?.find( message => message.role === `user` )?.content || ``
             const is_explanation = user_msg.includes( `Explain this translation` )
             const is_word_lookup = user_msg.includes( `Word:` )
-            const is_sentence_meaning = user_msg.includes( `Adapted translation:` )
 
             let content
             if( is_explanation ) {
@@ -337,9 +190,6 @@ test.describe( `Sentence Interactions`, () => {
                 word_lookup_calls += 1
                 const word_match = user_msg.match( /Word:\s*(.+)$/ )
                 content = `source:${ word_match ? word_match[1].trim() : `word` }`
-            } else if( is_sentence_meaning ) {
-                meaning_prompt = user_msg
-                content = source_meaning
             } else {
                 content = adapted_sentence
             }
@@ -364,7 +214,6 @@ test.describe( `Sentence Interactions`, () => {
         const sheet = page.locator( INFO_SHEET )
         const direct_translation = sheet.locator( `[data-word-by-word-translation]` )
         const selected_direct_word = direct_translation.locator( `[data-direct-translation-word-index="1"]` )
-        await expect( sheet ).toContainText( source_meaning, { timeout: 5000 } )
         await expect( direct_translation ).toContainText( `source:Big` )
         await expect( direct_translation ).toContainText( `source:work` )
         await expect( direct_translation ).toContainText( `source:Smart` )
@@ -377,7 +226,6 @@ test.describe( `Sentence Interactions`, () => {
         await expect( direct_translation ).toHaveAttribute( `aria-busy`, `false` )
         await expect( page.locator( READER_WORD_TOOLTIP ) ).toHaveText( `source:work` )
         await expect( sentence ).toContainText( adapted_sentence )
-        expect( meaning_prompt ).toContain( adapted_sentence )
         expect( word_lookup_calls ).toBe( 4 )
 
         await sheet.getByRole( `button`, { name: `Explain` } ).click()
@@ -411,7 +259,6 @@ test.describe( `Sentence Interactions`, () => {
             const user_msg = body.messages?.find( message => message.role === `user` )?.content || ``
             const is_explanation = user_msg.includes( `Explain this translation` )
             const is_word_lookup = user_msg.includes( `Word:` )
-            const is_sentence_meaning = user_msg.includes( `Adapted translation:` )
 
             if( is_explanation ) {
                 const translation_match = user_msg.match( /Translation: "(.+?)"/s )
@@ -431,16 +278,6 @@ test.describe( `Sentence Interactions`, () => {
                     contentType: `application/json`,
                     body: JSON.stringify( {
                         choices: [ { message: { content: `[WORD] definition of the word` } } ]
-                    } )
-                } )
-                return
-            }
-
-            if( is_sentence_meaning ) {
-                await route.fulfill( {
-                    contentType: `application/json`,
-                    body: JSON.stringify( {
-                        choices: [ { message: { content: `Sentence meaning` } } ]
                     } )
                 } )
                 return
@@ -531,17 +368,18 @@ test.describe( `Sentence Interactions`, () => {
 
     } )
 
-    test( `clicking the simplified meaning does not dismiss the sheet`, async ( { page } ) => {
+    test( `clicking a word-by-word translation keeps the sheet open`, async ( { page } ) => {
 
         await enter_reader_with_translations( page )
 
         await page.locator( READER_WORD ).first().click()
         const sheet = page.locator( INFO_SHEET )
-        await expect( sheet ).toContainText( `[MEANING]`, { timeout: 5000 } )
 
-        await sheet.locator( `[data-translation-meaning]` ).click()
+        const direct_word = sheet.locator( `[data-direct-translation-word-index="0"]` )
+        await direct_word.click()
         await expect( sheet ).toBeVisible()
-        await expect( page.locator( READER_WORD_TOOLTIP ) ).toBeVisible()
+        await expect( direct_word ).toHaveAttribute( `aria-pressed`, `true` )
+        await expect( page.locator( READER_WORD ).first() ).toHaveAttribute( `aria-pressed`, `true` )
 
     } )
 

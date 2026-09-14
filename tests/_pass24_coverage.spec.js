@@ -270,7 +270,7 @@ test.describe( `Pass 24 — Coverage Gaps`, () => {
         await open_reader( page )
         await expect( page.getByText( /\[TR\]/ ).first() ).toBeVisible()
         await expect.poll( () => api_call_count ).toBeGreaterThan( 0 )
-        await expect( page.getByText( `Translating...`, { exact: true } ) )
+        await expect( page.locator( `[aria-live="polite"]` ).filter( { hasText: /^Translating ·/ } ) )
             .not.toBeVisible( { timeout: 30_000 } )
         const first_load_calls = api_call_count
         const cached_entries = await get_current_translation_entries( page )
@@ -285,11 +285,10 @@ test.describe( `Pass 24 — Coverage Gaps`, () => {
         response_prefix = `SECOND`
         await open_reader( page )
 
-        // Let the returning reader's debounced cache pass run to completion so
-        // the negative API assertion covers the whole current-chapter cycle.
-        await page.clock.runFor( 300 )
-        const translating = page.getByText( `Translating...`, { exact: true } )
-        await expect( translating ).toBeVisible()
+        // Advance both viewport measurement and the translation debounce before
+        // checking cache hydration; cached work need not show a transient spinner.
+        await page.clock.runFor( 1_000 )
+        const translating = page.locator( `[aria-live="polite"]` ).filter( { hasText: /^Translating ·/ } )
         await expect( translating ).not.toBeVisible()
 
         // The current chapter should retain its first-load translation even if

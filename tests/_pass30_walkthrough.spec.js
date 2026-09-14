@@ -106,7 +106,7 @@ test.describe( `Pass 30 — Walkthrough`, () => {
         page.on( `pageerror`, e => errors.push( e.message ) )
 
         await open_reader( page )
-        const progress = page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` ).first()
+        const progress = page.locator( `text=/^\\d+\\s*\\/\\s*\\d+\\s*·\\s*\\d+%$/` ).first()
         const progress_before = await progress.textContent()
 
         // Rapidly navigate chapters
@@ -130,7 +130,7 @@ test.describe( `Pass 30 — Walkthrough`, () => {
         await expect( toc ).toBeVisible()
         expect( await toc.locator( `option` ).count() ).toBeGreaterThan( 1 )
 
-        const progress = page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` ).first()
+        const progress = page.locator( `text=/^\\d+\\s*\\/\\s*\\d+\\s*·\\s*\\d+%$/` ).first()
         const progress_before = await progress.textContent()
 
         // Select the last chapter
@@ -195,7 +195,7 @@ test.describe( `Pass 30 — Walkthrough`, () => {
 
         // Navigate to chapter 2
         const next_btn = page.getByRole( `button`, { name: /next/i } )
-        const progress = page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` ).first()
+        const progress = page.locator( `text=/^\\d+\\s*\\/\\s*\\d+\\s*·\\s*\\d+%$/` ).first()
         const initial_progress = await progress.textContent()
         await expect( next_btn ).toBeEnabled()
         await next_btn.click()
@@ -223,7 +223,7 @@ test.describe( `Pass 30 — Walkthrough`, () => {
         await open_reader( page )
 
         // Get current chapter indicator
-        const progress = page.locator( `text=/\\d+\\s*\\/\\s*\\d+/` ).first()
+        const progress = page.locator( `text=/^\\d+\\s*\\/\\s*\\d+\\s*·\\s*\\d+%$/` ).first()
         const progress_before = await progress.textContent()
 
         // Open settings

@@ -446,7 +446,7 @@ export default function SettingsDrawer( { is_open, on_close, show_language = tru
                     { turbo_mode ? `On` : `Off` }
                 </ActionBtn>
                 <HelpText id="turbo-mode-help">
-                    Preload word-by-word translations for text in view so word lookups are ready sooner. Uses extra API credits.
+                    Preload visible words plus twice that word count ahead so word lookups are ready sooner. Uses extra API credits.
                 </HelpText>
             </Section>
 
@@ -537,7 +537,7 @@ export default function SettingsDrawer( { is_open, on_close, show_language = tru
         >
             <Title id="turbo-confirm-title">Enable Turbo Mode?</Title>
             <p id="turbo-confirm-description">
-                Turbo Mode costs more: it translates visible text word by word in the background,
+                Turbo Mode costs more: it translates visible words plus twice that word count ahead in the background,
                 including words you might never look up. This uses additional API credits.
             </p>
             <ThemeRow>
