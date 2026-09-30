@@ -57,7 +57,7 @@ test.describe( `Pass 27 — Coverage Expansion`, () => {
 
     // ── Spec §5: Default model ──
 
-    test( `P27-03 default LLM model is openai/gpt-4o-mini`, async ( { page } ) => {
+    test( `P27-03 default LLM model is openai/gpt-6-luna`, async ( { page } ) => {
         await upload_demo_book( page )
         await open_reader( page )
         await open_settings( page )
@@ -65,7 +65,7 @@ test.describe( `Pass 27 — Coverage Expansion`, () => {
         // Find the model select/dropdown
         const model_select = page.locator( `select` ).last()
         const selected = await model_select.inputValue()
-        expect( selected ).toBe( `openai/gpt-4o-mini` )
+        expect( selected ).toBe( `openai/gpt-6-luna` )
     } )
 
     // ── Spec §5: Level-specific prompt rules ──

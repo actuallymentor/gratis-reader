@@ -190,8 +190,8 @@ test.describe( `Pass 22 — Bug Fixes & Edge Cases`, () => {
         await expect( page.getByText( `LLM Model` ) ).toBeVisible()
 
         const model_select = page.locator( `select` ).last()
-        await model_select.selectOption( `anthropic/claude-sonnet-4-6` )
-        await expect( model_select ).toHaveValue( `anthropic/claude-sonnet-4-6` )
+        await model_select.selectOption( `anthropic/claude-sonnet-4.6` )
+        await expect( model_select ).toHaveValue( `anthropic/claude-sonnet-4.6` )
 
         // Close settings
         await page.keyboard.press( `Escape` )

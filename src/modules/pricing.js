@@ -5,12 +5,17 @@
  * Updated periodically — these are rough estimates for display only
  */
 
-// Default fallback: assume a cheap model (~GPT-4o-mini pricing)
-const DEFAULT_INPUT_PER_M = 0.15
-const DEFAULT_OUTPUT_PER_M = 0.60
+// Default fallback: assume the reader's default GPT-6 Luna pricing.
+const DEFAULT_INPUT_PER_M = 0.10
+const DEFAULT_OUTPUT_PER_M = 0.50
 
 // Known model pricing (per 1M tokens)
 const MODEL_PRICING = {
+    'openai/gpt-6-luna': { input: 0.10, output: 0.50 },
+    'google/gemini-3.8-flash': { input: 0.75, output: 3.75 },
+    'anthropic/claude-sonnet-5.5': { input: 2.00, output: 10.00 },
+    'anthropic/claude-sonnet-4.6': { input: 3.00, output: 15.00 },
+    'anthropic/claude-haiku-4.5': { input: 1.00, output: 5.00 },
     'openai/gpt-4o-mini': { input: 0.15, output: 0.60 },
     'openai/gpt-4o': { input: 2.50, output: 10.00 },
     'openai/gpt-4.1-mini': { input: 0.40, output: 1.60 },

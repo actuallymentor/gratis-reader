@@ -192,8 +192,8 @@ test.describe( `Pass 24 — Coverage Gaps`, () => {
         const options = await model_select.locator( `option` ).count()
         expect( options ).toBeGreaterThanOrEqual( 3 )
 
-        // Should include the default gpt-4o-mini
-        const has_default = await model_select.locator( `option[value="openai/gpt-4o-mini"]` ).count()
+        // Should include the default gpt-6-luna
+        const has_default = await model_select.locator( `option[value="openai/gpt-6-luna"]` ).count()
         expect( has_default ).toBe( 1 )
     } )
 

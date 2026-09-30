@@ -452,13 +452,15 @@ export default function SettingsDrawer( { is_open, on_close, show_language = tru
 
             { /* Model Selection */ }
             <Section>
-                <Label>LLM Model</Label>
-                <Select value={ model } onChange={ ( e ) => set_model( e.target.value ) }>
+                <Label htmlFor="llm-model">LLM Model</Label>
+                <Select id="llm-model" value={ model } onChange={ ( e ) => set_model( e.target.value ) }>
+                    <option value="openai/gpt-6-luna">GPT-6 Luna (default)</option>
+                    <option value="google/gemini-3.8-flash">Gemini 3.8 Flash</option>
+                    <option value="anthropic/claude-sonnet-5.5">Claude Sonnet 5.5</option>
                     <option value="openai/gpt-4o-mini">GPT-4o Mini (fast, cheap)</option>
                     <option value="openai/gpt-4o">GPT-4o (better quality)</option>
-                    <option value="anthropic/claude-sonnet-4-6">Claude Sonnet 4.6</option>
-                    <option value="anthropic/claude-haiku-4-5-20251001">Claude Haiku 4.5 (fast)</option>
-                    <option value="google/gemini-2.0-flash-001">Gemini 2.0 Flash</option>
+                    <option value="anthropic/claude-sonnet-4.6">Claude Sonnet 4.6</option>
+                    <option value="anthropic/claude-haiku-4.5">Claude Haiku 4.5 (fast)</option>
                 </Select>
             </Section>
 

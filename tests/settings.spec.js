@@ -20,6 +20,56 @@ test.describe( `Settings`, () => {
 
     test.use( { app_state: `authenticated` } )
 
+    test( `Luna is the default and current model choices survive reloads`, async ( { page } ) => {
+
+        // Several full reloads verify persistence rather than only in-memory state.
+        test.setTimeout( 90_000 )
+
+        await page.goto( `/library`, { waitUntil: `domcontentloaded` } )
+        await page.getByRole( `button`, { name: `Settings` } ).click()
+        await expect( page.getByLabel( `LLM Model` ) ).toHaveValue( `openai/gpt-6-luna` )
+
+        for( const model of [ `google/gemini-3.8-flash`, `anthropic/claude-sonnet-5.5`, `openai/gpt-6-luna` ] ) {
+            await page.getByLabel( `LLM Model` ).selectOption( model )
+            await page.reload( { waitUntil: `domcontentloaded` } )
+            await page.getByRole( `button`, { name: `Settings` } ).click()
+            await expect( page.getByLabel( `LLM Model` ) ).toHaveValue( model )
+        }
+
+    } )
+
+    for( const [ saved_model, expected_model ] of [
+        [ `anthropic/claude-sonnet-4-6`, `anthropic/claude-sonnet-4.6` ],
+        [ `anthropic/claude-haiku-4-5-20251001`, `anthropic/claude-haiku-4.5` ],
+        [ `google/gemini-2.0-flash-001`, `google/gemini-3.8-flash` ],
+        [ `openai/gpt-4o-mini`, `openai/gpt-4o-mini` ],
+    ] ) {
+        test( `saved ${ saved_model } restores as ${ expected_model }`, async ( { page } ) => {
+
+            test.setTimeout( 60_000 )
+
+            await page.goto( `/library`, { waitUntil: `domcontentloaded` } )
+            await page.evaluate( model => {
+                const saved = JSON.parse( localStorage.getItem( `settings-storage` ) )
+                saved.version = 0
+                saved.state.model = model
+                saved.state.font_size = 24
+                localStorage.setItem( `settings-storage`, JSON.stringify( saved ) )
+            }, saved_model )
+
+            await page.reload( { waitUntil: `domcontentloaded` } )
+            await page.getByRole( `button`, { name: `Settings` } ).click()
+            await expect( page.getByLabel( `LLM Model` ) ).toHaveValue( expected_model )
+            await expect( page.locator( `input[type="range"]` ) ).toHaveValue( `24` )
+
+            // The repaired selection must also survive subsequent hydration.
+            await page.reload( { waitUntil: `domcontentloaded` } )
+            await page.getByRole( `button`, { name: `Settings` } ).click()
+            await expect( page.getByLabel( `LLM Model` ) ).toHaveValue( expected_model )
+
+        } )
+    }
+
     test( `settings drawer opens from gear icon on library`, async ( { page } ) => {
 
         await page.goto( `/library` )

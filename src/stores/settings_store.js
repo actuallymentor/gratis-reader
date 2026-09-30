@@ -10,7 +10,7 @@ export const use_settings_store = create(
 
             // API
             api_key: null,
-            model: `openai/gpt-4o-mini`,
+            model: `openai/gpt-6-luna`,
             turbo_mode: false,
 
             // Display
@@ -39,6 +39,17 @@ export const use_settings_store = create(
         } ),
         {
             name: `settings-storage`,
+            version: 1,
+            migrate: ( state ) => {
+                // Repair retired/invalid IDs without resetting a reader's saved choice.
+                const model_updates = {
+                    'anthropic/claude-sonnet-4-6': `anthropic/claude-sonnet-4.6`,
+                    'anthropic/claude-haiku-4-5-20251001': `anthropic/claude-haiku-4.5`,
+                    'google/gemini-2.0-flash-001': `google/gemini-3.8-flash`,
+                }
+
+                return { ...state, model: model_updates[state.model] || state.model || `openai/gpt-6-luna` }
+            },
             partialize: ( state ) => ( {
                 api_key: state.api_key,
                 model: state.model,

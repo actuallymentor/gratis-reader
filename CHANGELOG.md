@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.22.0] - 2026-09-30
+
+### Added
+- Add GPT-6 Luna, Gemini 3.8 Flash, and Claude Sonnet 5.5 to Settings
+
+### Changed
+- Default new settings to GPT-6 Luna; preserve saved model choices
+- Refresh cost estimates for current models
+
+### Fixed
+- Repair obsolete saved Claude and Gemini model IDs
+
 ## [1.21.1] - 2026-09-14
 
 ### Fixed
