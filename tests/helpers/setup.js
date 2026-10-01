@@ -1,4 +1,5 @@
 import { expect } from '@playwright/test'
+import { CHAT_URL, parse_chat_request, fulfil_chat, answer_request } from './openrouter_mock.js'
 
 /**
  * Injects API key into localStorage so the app thinks we're authenticated.
@@ -11,7 +12,7 @@ export const setup_api_key = async ( page ) => {
     await page.goto( `/` )
     await page.evaluate( ( key ) => {
         const store = JSON.parse( localStorage.getItem( `settings-storage` ) || `{}` )
-        store.state = { ...( store.state || {} ), api_key: key }
+        store.state = { ... store.state || {} , api_key: key }
         localStorage.setItem( `settings-storage`, JSON.stringify( store ) )
     }, api_key )
 
@@ -100,40 +101,9 @@ export const get_current_translation_entries = page => page.evaluate( async () =
  */
 export const mock_openrouter = async ( page ) => {
 
-    await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
-
-        const body = JSON.parse( route.request().postData() )
-        const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
-
-        // Detect request type by distinctive markers in the user message
-        const is_explanation = user_msg.includes( `Explain this translation` )
-        const is_word_lookup = user_msg.includes( `Word:` )
-        const is_sentence_meaning = user_msg.includes( `Adapted translation:` )
-
-        let content
-        if( is_explanation ) {
-            content = `[EXPLANATION] This sentence means something interesting. The original uses formal language that was simplified for the target level.`
-        } else if( is_word_lookup ) {
-            content = `[WORD] definition of the word`
-        } else if( is_sentence_meaning ) {
-            const sentence_match = user_msg.match( /Adapted translation:\n(.+?)(?:\n\n|$)/s )
-            const sentence = sentence_match ? sentence_match[1].trim() : `unknown`
-            content = `[MEANING] ${ sentence }`
-        } else {
-            // Translation — extract the sentence from prompt
-            const sentence_match = user_msg.match( /Translate this sentence:\n(.+)/s )
-            const sentence = sentence_match ? sentence_match[1].trim() : `unknown`
-            content = `[TRANSLATED] ${ sentence }`
-        }
-
-        await route.fulfill( {
-            contentType: `application/json`,
-            body: JSON.stringify( {
-                choices: [ { message: { content } } ],
-                usage: { prompt_tokens: 25, completion_tokens: 15, total_tokens: 40 }
-            } )
-        } )
-
+    await page.route( CHAT_URL, async route => {
+        const request = parse_chat_request( route.request().postDataJSON() )
+        await fulfil_chat( route, answer_request( request ) )
     } )
 
 }

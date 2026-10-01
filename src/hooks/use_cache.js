@@ -1,10 +1,10 @@
 import { useRef, useCallback } from 'react'
-import { get_translation, save_translation } from '../modules/cache.js'
+import { get_translation, get_translations, save_translation } from '../modules/cache.js'
 import { log } from 'mentie'
 
 /**
  * Hook for word-level translation cache operations
- * @returns {{ get_word_translation, cache_word_translation }}
+ * @returns {{ get_word_translation, get_word_translations, cache_word_translation }}
  */
 export const use_cache = () => {
 
@@ -27,6 +27,30 @@ export const use_cache = () => {
         }
 
         return null
+
+    }, [] )
+
+    // Resolve many words at once: memory first, then one IndexedDB read for the rest
+    const get_word_translations = useCallback( async ( words, source_lang, target_lang, lookup_context = `` ) => {
+
+        const context_suffix = lookup_context ? `:${ encodeURIComponent( lookup_context ) }` : ``
+        const keys_by_word = new Map( words.map( word => [ word, `word:${ word.toLowerCase() }:${ source_lang }:${ target_lang }${ context_suffix }` ] ) )
+        const found = {}
+        const missing = []
+
+        keys_by_word.forEach( ( key, word ) => {
+            if( word_cache_ref.current[key] ) found[word] = word_cache_ref.current[key]
+            else missing.push( key )
+        } )
+
+        const stored = missing.length ? await get_translations( missing ).catch( () => ( {} ) ) : {}
+        keys_by_word.forEach( ( key, word ) => {
+            if( !stored[key] ) return
+            word_cache_ref.current[key] = stored[key]
+            found[word] = stored[key]
+        } )
+
+        return found
 
     }, [] )
 
@@ -58,6 +82,6 @@ export const use_cache = () => {
 
     }, [] )
 
-    return { get_word_translation, cache_word_translation }
+    return { get_word_translation, get_word_translations, cache_word_translation }
 
 }

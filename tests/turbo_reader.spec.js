@@ -1,34 +1,37 @@
 import { test, expect, open_seeded_reader, SEEDED_BOOK_ID } from './helpers/app_fixture.js'
+import { CHAT_URL, parse_chat_request, fulfil_chat, answer_request } from './helpers/openrouter_mock.js'
 
-const CHAT_URL = `**/openrouter.ai/api/v1/chat/completions`
 const WORDS = `One two three four five six seven eight`
 
+// Word glosses echo `Source x` so assertions can read them back
+const answer_words = request => answer_request( request, { word: text => `Source ${ text.toLowerCase() }` } )
+
 const install_mock = async ( page, { hold_words = false } = {} ) => {
-    const calls = { words: [], translations: [], hold_words }
+    // words: one entry per looked-up word; requests: one entry per word HTTP request
+    const calls = { words: [], requests: [], translations: [], hold_words }
 
     await page.route( CHAT_URL, async route => {
-        const body = route.request().postDataJSON()
-        const prompt = body.messages.find( message => message.role === `user` ).content
-        const word_match = prompt.match( /Sentence: "([\s\S]*)"\n\nWord: (.+)$/ )
-        let content
+        const request = parse_chat_request( route.request().postDataJSON() )
+        const is_word = request.words.length > 0
+        let answer
 
-        if( word_match ) {
-            const [ , context, word ] = word_match
-            calls.words.push( { context, word, route } )
+        if( is_word ) {
+            calls.requests.push( { context: request.sentence, words: request.words, request, route } )
+            request.words.forEach( word => calls.words.push( { context: request.sentence, word, route } ) )
             if( calls.hold_words ) return
-            content = `Source ${ word.toLowerCase() }`
+            answer = answer_words( request )
         } else {
-            content = `${ Array( 8 ).fill( WORDS ).join( ` ` ) } ${ calls.translations.length + 1 }.`
-            calls.translations.push( content )
+            const translate = () => {
+                const content = `${ Array( 8 ).fill( WORDS ).join( ` ` ) } ${ calls.translations.length + 1 }.`
+                calls.translations.push( content )
+                return content
+            }
+            answer = answer_request( request, { sentence: translate } )
         }
 
-        await route.fulfill( {
-            contentType: `application/json`,
-            body: JSON.stringify( {
-                choices: [ { message: { content } } ],
-                usage: { prompt_tokens: word_match ? 25 : 0, completion_tokens: word_match ? 15 : 0 }
-            } )
-        } )
+        // Usage scales per word, so batched glosses report the same tokens as single lookups
+        const tokens = is_word ? request.words.length : 0
+        await fulfil_chat( route, answer, { prompt_tokens: tokens * 25, completion_tokens: tokens * 15 } )
     } )
 
     return calls
@@ -103,7 +106,7 @@ test.describe( `Turbo Mode reader`, () => {
         const calls = await install_mock( page, { hold_words: true } )
         await enable_saved_turbo( page )
         await open_seeded_reader( page )
-        await expect.poll( () => calls.words.length ).toBe( 2 )
+        await expect.poll( () => calls.requests.length ).toBe( 2 )
 
         const selected_request = calls.words[0]
         const cancelled_requests = []
@@ -113,7 +116,10 @@ test.describe( `Turbo Mode reader`, () => {
         const sheet = page.locator( `[data-translation-info-sheet]` )
         await expect( sheet ).toBeVisible()
         await expect( sheet.locator( `[data-word-by-word-translation]` ) ).toHaveAttribute( `aria-busy`, `true` )
-        await expect.poll( () => calls.words.length ).toBe( 3 )
+        // The tapped word and the rest of its sentence already ride an in-flight batch, so no third request starts
+        const selected_context = await sentence.innerText()
+        expect( calls.requests ).toHaveLength( 2 )
+        expect( calls.words.filter( call => call.context === selected_context && call.word === `One` ) ).toHaveLength( 1 )
 
         // Headless Chromium has no real tab-hiding action. Dispatch the browser
         // visibility signal while preserving the user's selected foreground word.
@@ -123,10 +129,7 @@ test.describe( `Turbo Mode reader`, () => {
         } )
 
         calls.hold_words = false
-        await Promise.all( calls.words.map( ( { word, route } ) => route.fulfill( {
-            contentType: `application/json`,
-            body: JSON.stringify( { choices: [ { message: { content: `Source ${ word.toLowerCase() }` } } ] } )
-        } ) ) )
+        await Promise.all( calls.requests.map( ( { request, route } ) => fulfil_chat( route, answer_words( request ) ) ) )
 
         await expect( page.locator( `[data-reader-word-tooltip]` ) ).toHaveText( `Source one` )
         await expect( sheet.locator( `[data-word-by-word-translation]` ) ).toHaveAttribute( `aria-busy`, `false` )
@@ -142,13 +145,13 @@ test.describe( `Turbo Mode reader`, () => {
             const calls = await install_mock( page, { hold_words: true } )
             await enable_saved_turbo( page )
             await open_seeded_reader( page )
-            await expect.poll( () => calls.words.length ).toBe( 2 )
+            await expect.poll( () => calls.requests.length ).toBe( 2 )
             await settle_scans( page )
-            expect( calls.words ).toHaveLength( 2 )
+            expect( calls.requests ).toHaveLength( 2 )
 
             const cancelled = []
             page.on( `requestfailed`, request => {
-                if( calls.words.some( call => call.route.request() === request ) ) cancelled.push( request )
+                if( calls.requests.some( call => call.route.request() === request ) ) cancelled.push( request )
             } )
 
             if( stop_action === `disable` ) {
@@ -165,7 +168,7 @@ test.describe( `Turbo Mode reader`, () => {
 
             await expect.poll( () => cancelled.length ).toBe( 2 )
             await page.clock.runFor( 1_000 )
-            expect( calls.words ).toHaveLength( 2 )
+            expect( calls.requests ).toHaveLength( 2 )
         } )
     }
 

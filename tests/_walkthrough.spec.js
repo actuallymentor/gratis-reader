@@ -4,6 +4,7 @@
  */
 import { test, expect } from '@playwright/test'
 import { open_reader } from './helpers/setup.js'
+import { CHAT_URL, parse_chat_request, fulfil_chat, answer_request } from './helpers/openrouter_mock.js'
 
 const DEMO_BOOK = `./tests/fixtures/book.epub`
 
@@ -19,15 +20,9 @@ const clear_all = async ( page ) => {
 }
 
 const mock_api = async ( page ) => {
-    await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
-        const body = JSON.parse( route.request().postData() )
-        const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
-        const match = user_msg.match( /Translate this sentence:\n(.+)/s )
-        const sentence = match ? match[1].trim() : `unknown`
-        await route.fulfill( {
-            contentType: `application/json`,
-            body: JSON.stringify( { choices: [ { message: { content: `[TRANSLATED] ${ sentence }` } } ] } )
-        } )
+    await page.route( CHAT_URL, async route => {
+        const request = parse_chat_request( route.request().postDataJSON() )
+        await fulfil_chat( route, answer_request( request ) )
     } )
     await page.route( `**/openrouter.ai/api/v1/auth/key`, async route => {
         await route.fulfill( {
@@ -462,13 +457,11 @@ test.describe( `Browser Walkthrough`, () => {
     test( `BW36 system prompt matches spec (teacher role)`, async ( { page } ) => {
         // Verify the system prompt contains the correct role
         let system_prompt = ``
-        await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
-            const body = JSON.parse( route.request().postData() )
-            system_prompt = body.messages?.find( m => m.role === `system` )?.content || ``
-            await route.fulfill( {
-                contentType: `application/json`,
-                body: JSON.stringify( { choices: [ { message: { content: `[T] test` } } ] } )
-            } )
+        await page.route( CHAT_URL, async route => {
+            const request = parse_chat_request( route.request().postDataJSON() )
+            system_prompt = request.system
+            const answer = () => `[T] test`
+            await fulfil_chat( route, answer_request( request, { sentence: answer, word: answer, explanation: answer, meaning: answer } ) )
         } )
         await setup_key( page )
         await upload_book( page )
@@ -569,19 +562,16 @@ test.describe( `Browser Walkthrough`, () => {
         await expect( page.getByText( /\[TRANSLATED\]/ ).first() ).toBeVisible( { timeout: 15_000 } )
 
         // Override mock: explanation requests return unique text, translation requests still work
-        await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
-            const body = JSON.parse( route.request().postData() )
-            const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
-            const is_explanation = user_msg.includes( `Explain this translation` )
+        await page.route( CHAT_URL, async route => {
+            const request = parse_chat_request( route.request().postDataJSON() )
+            const answer = () => `[TRANSLATED] sentence`
 
-            await route.fulfill( {
-                contentType: `application/json`,
-                body: JSON.stringify( { choices: [ { message: {
-                    content: is_explanation
-                        ? `UNIQUE_EXPLAIN_42: Grammar note here.`
-                        : `[TRANSLATED] sentence`
-                } } ] } )
-            } )
+            await fulfil_chat( route, answer_request( request, {
+                sentence: answer,
+                word: answer,
+                meaning: answer,
+                explanation: () => `UNIQUE_EXPLAIN_42: Grammar note here.`
+            } ) )
         } )
 
         // Select a translated word and explicitly open its explanation.
@@ -691,7 +681,7 @@ test.describe( `Browser Walkthrough`, () => {
 
     // ── EDGE CASES (continued) ──────────────────────────────
 
-    test( `BW52 deleting book cleans up translation cache entries`, async ( { page } ) => {
+    test( `BW52 deleting book keeps translation cache entries for re-import`, async ( { page } ) => {
         await setup_key( page )
         await upload_book( page )
         await enter_reader( page )
@@ -714,8 +704,9 @@ test.describe( `Browser Walkthrough`, () => {
             () => page.getByRole( `button`, { name: /remove/i } ).click()
         )
 
-        // Translation cache should be empty after deletion
-        await expect.poll( () => get_store_count( page, `translations` ) ).toBe( 0 )
+        // The book is gone; its translations are deliberately kept (expensive, reusable on re-import)
+        await expect.poll( () => get_store_count( page, `books` ) ).toBe( 0 )
+        expect( await get_store_count( page, `translations` ) ).toBeGreaterThan( 0 )
     } )
 
     test( `BW53 word lookup abort — fast clicks don't crash`, async ( { page } ) => {

@@ -1,7 +1,6 @@
 import { test, expect, open_seeded_reader } from './helpers/app_fixture.js'
 import { mock_openrouter } from './helpers/setup.js'
-
-const CHAT_URL = `**/openrouter.ai/api/v1/chat/completions`
+import { CHAT_URL, parse_chat_request, fulfil_chat, answer_request } from './helpers/openrouter_mock.js'
 
 const system_prompt_from = request => {
     const body = request.postDataJSON()
@@ -38,14 +37,8 @@ test.describe( `Level & Language Changes`, () => {
             }
 
             api_calls_after_change++
-            const body = request.postDataJSON()
-            const msg = body.messages?.find( m => m.role === `user` )?.content || ``
-            await route.fulfill( {
-                contentType: `application/json`,
-                body: JSON.stringify( {
-                    choices: [ { message: { content: `[LEVEL-CHANGED] ${ msg.slice( 0, 30 ) }` } } ]
-                } )
-            } )
+            const parsed = parse_chat_request( request.postDataJSON() )
+            await fulfil_chat( route, answer_request( parsed, { sentence: text => `[LEVEL-CHANGED] ${ text.slice( 0, 30 ) }` } ) )
         } )
 
         // Open settings and change level
@@ -90,12 +83,8 @@ test.describe( `Level & Language Changes`, () => {
             }
 
             new_calls++
-            await route.fulfill( {
-                contentType: `application/json`,
-                body: JSON.stringify( {
-                    choices: [ { message: { content: `[LANG-CHANGED]` } } ]
-                } )
-            } )
+            const request = parse_chat_request( route.request().postDataJSON() )
+            await fulfil_chat( route, answer_request( request, { sentence: () => `[LANG-CHANGED]` } ) )
         } )
 
         // Open settings

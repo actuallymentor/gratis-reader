@@ -5,6 +5,7 @@
  */
 import { test, expect } from '@playwright/test'
 import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth } from './helpers/setup.js'
+import { CHAT_URL, parse_chat_request, fulfil_chat, answer_request } from './helpers/openrouter_mock.js'
 
 // Helper to open settings from reader
 const open_settings = async ( page ) => {
@@ -27,18 +28,17 @@ test.describe( `Pass 30 — Walkthrough`, () => {
 
         let request_count = 0
 
-        await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
+        await page.route( CHAT_URL, async route => {
             request_count++
-            // First 2 requests succeed, rest fail
+            // First 2 HTTP requests succeed (batched or single), rest fail
             if( request_count <= 2 ) {
-                const body = JSON.parse( route.request().postData() )
-                const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
-                const match = user_msg.match( /Translate this sentence:\n(.+)/s )
-                const sentence = match ? match[1].trim() : `unknown`
-                await route.fulfill( {
-                    contentType: `application/json`,
-                    body: JSON.stringify( { choices: [ { message: { content: `[TR] ${ sentence }` } } ] } )
-                } )
+                const request = parse_chat_request( route.request().postDataJSON() )
+                await fulfil_chat( route, answer_request( request, {
+                    sentence: text => `[TR] ${ text }`,
+                    word: () => `[TR] unknown`,
+                    explanation: () => `[TR] unknown`,
+                    meaning: () => `[TR] unknown`
+                } ) )
             } else {
                 await route.fulfill( { status: 500, body: `Internal Server Error` } )
             }
@@ -69,22 +69,14 @@ test.describe( `Pass 30 — Walkthrough`, () => {
         // Set mobile viewport
         await page.setViewportSize( { width: 320, height: 568 } )
 
-        await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
-            const body = JSON.parse( route.request().postData() )
-            const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
-            if( user_msg.includes( `Translate this sentence` ) ) {
-                const match = user_msg.match( /Translate this sentence:\n(.+)/s )
-                const sentence = match ? match[1].trim() : `unknown`
-                await route.fulfill( {
-                    contentType: `application/json`,
-                    body: JSON.stringify( { choices: [ { message: { content: `[TR] ${ sentence }` } } ] } )
-                } )
-            } else {
-                await route.fulfill( {
-                    contentType: `application/json`,
-                    body: JSON.stringify( { choices: [ { message: { content: `translation result` } } ] } )
-                } )
-            }
+        await page.route( CHAT_URL, async route => {
+            const request = parse_chat_request( route.request().postDataJSON() )
+            await fulfil_chat( route, answer_request( request, {
+                sentence: text => `[TR] ${ text }`,
+                word: () => `translation result`,
+                explanation: () => `translation result`,
+                meaning: () => `translation result`
+            } ) )
         } )
 
         await open_reader( page )
@@ -260,7 +252,9 @@ test.describe( `Pass 30 — Walkthrough`, () => {
                 const req = indexedDB.open( `gratis_reader` )
                 req.onsuccess = () => {
                     const db = req.result
-                    if( !db.objectStoreNames.contains( `progress` ) ) { r(); return }
+                    if( !db.objectStoreNames.contains( `progress` ) ) {
+                        r(); return 
+                    }
                     const tx = db.transaction( `progress`, `readwrite` )
                     tx.objectStore( `progress` ).clear()
                     tx.oncomplete = r; tx.onerror = r

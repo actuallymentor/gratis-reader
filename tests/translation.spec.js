@@ -5,8 +5,7 @@ import {
     mock_openrouter,
     get_current_translation_entries
 } from './helpers/setup.js'
-
-const CHAT_URL = `**/openrouter.ai/api/v1/chat/completions`
+import { CHAT_URL, parse_chat_request, fulfil_chat, answer_request } from './helpers/openrouter_mock.js'
 
 const translation_cache_count = page => page.evaluate( async () => {
     return new Promise( ( resolve ) => {
@@ -62,25 +61,20 @@ test.describe( `Translation (mocked)`, () => {
         const attempts_by_sentence = {}
 
         await page.route( CHAT_URL, async route => {
-            const body = JSON.parse( route.request().postData() )
-            const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
-            const sentence_match = user_msg.match( /Translate this sentence:\n(.+)/s )
-            const sentence = sentence_match ? sentence_match[1].trim() : `unknown`
+            const request = parse_chat_request( route.request().postDataJSON() )
 
-            attempts_by_sentence[sentence] = ( attempts_by_sentence[sentence] || 0 ) + 1
+            // A batch fails as a whole when any of its sentences is on its first attempt
+            const attempts = request.sentences.map( sentence => {
+                attempts_by_sentence[sentence] = ( attempts_by_sentence[sentence] || 0 ) + 1
+                return attempts_by_sentence[sentence]
+            } )
 
-            if( attempts_by_sentence[sentence] === 1 ) {
+            if( attempts.includes( 1 ) ) {
                 await route.fulfill( { status: 500, body: `Temporary translation failure` } )
                 return
             }
 
-            await route.fulfill( {
-                contentType: `application/json`,
-                body: JSON.stringify( {
-                    choices: [ { message: { content: `[RETRIED] ${ sentence }` } } ],
-                    usage: { prompt_tokens: 25, completion_tokens: 15, total_tokens: 40 }
-                } )
-            } )
+            await fulfil_chat( route, answer_request( request, { sentence: text => `[RETRIED] ${ text }` } ) )
         } )
 
         await open_seeded_reader( page )
@@ -92,25 +86,18 @@ test.describe( `Translation (mocked)`, () => {
 
     test( `requests translation from OpenRouter when page loads`, async ( { page } ) => {
 
-        await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
-            const body = JSON.parse( route.request().postData() )
-            const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
-            const match = user_msg.match( /Translate this sentence:\n(.+)/s )
-            const sentence = match ? match[1].trim() : `unknown`
-            await route.fulfill( {
-                contentType: `application/json`,
-                body: JSON.stringify( {
-                    choices: [ { message: { content: `[MOCK] ${ sentence }` } } ],
-                    usage: { prompt_tokens: 25, completion_tokens: 15, total_tokens: 40 }
-                } )
-            } )
+        await page.route( CHAT_URL, async route => {
+            const request = parse_chat_request( route.request().postDataJSON() )
+            await fulfil_chat( route, answer_request( request, { sentence: text => `[MOCK] ${ text }` } ) )
         } )
 
         const translation_request = page.waitForRequest( CHAT_URL )
         await open_seeded_reader( page )
-        const request = await translation_request
+        const request = parse_chat_request( ( await translation_request ).postDataJSON() )
 
-        expect( request.postData() ).toContain( `Translate this sentence:` )
+        // Sentences of one paragraph now share a batch request, so either sentence prompt shape counts
+        expect( [ `sentence`, `sentence_batch` ] ).toContain( request.kind )
+        expect( request.sentences.length ).toBeGreaterThan( 0 )
 
     } )
 
@@ -136,14 +123,10 @@ test.describe( `Translation (mocked)`, () => {
 
         // Any cache miss receives a distinctive response that would overwrite
         // the corresponding persisted current-chapter record.
-        await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
-            await route.fulfill( {
-                contentType: `application/json`,
-                body: JSON.stringify( {
-                    choices: [ { message: { content: `[SECOND]` } } ],
-                    usage: { prompt_tokens: 25, completion_tokens: 15, total_tokens: 40 }
-                } )
-            } )
+        await page.route( CHAT_URL, async route => {
+            const request = parse_chat_request( route.request().postDataJSON() )
+            const answer = () => `[SECOND]`
+            await fulfil_chat( route, answer_request( request, { sentence: answer, word: answer, explanation: answer, meaning: answer } ) )
         } )
 
         // Re-open the seeded book without repeating its setup path.

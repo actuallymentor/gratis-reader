@@ -3,6 +3,7 @@
  */
 import { test, expect } from '@playwright/test'
 import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth } from './helpers/setup.js'
+import { CHAT_URL, parse_chat_request, fulfil_chat, answer_request } from './helpers/openrouter_mock.js'
 
 test.describe( `Pass 35 — Walkthrough`, () => {
 
@@ -42,16 +43,10 @@ test.describe( `Pass 35 — Walkthrough`, () => {
     test( `BW139 translation API requests have correct Authorization header`, async ( { page } ) => {
         let captured_headers = null
 
-        await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
+        await page.route( CHAT_URL, async route => {
             captured_headers = route.request().headers()
-            const body = JSON.parse( route.request().postData() )
-            const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
-            const match = user_msg.match( /Translate this sentence:\n(.+)/s )
-            const sentence = match ? match[1].trim() : `unknown`
-            await route.fulfill( {
-                contentType: `application/json`,
-                body: JSON.stringify( { choices: [ { message: { content: `[TR] ${ sentence }` } } ] } )
-            } )
+            const request = parse_chat_request( route.request().postDataJSON() )
+            await fulfil_chat( route, answer_request( request, { sentence: text => `[TR] ${ text }` } ) )
         } )
 
         await upload_demo_book( page )
@@ -68,15 +63,10 @@ test.describe( `Pass 35 — Walkthrough`, () => {
     test( `BW140 translation API request body has model and messages array`, async ( { page } ) => {
         let captured_body = null
 
-        await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
-            captured_body = JSON.parse( route.request().postData() )
-            const user_msg = captured_body.messages?.find( m => m.role === `user` )?.content || ``
-            const match = user_msg.match( /Translate this sentence:\n(.+)/s )
-            const sentence = match ? match[1].trim() : `unknown`
-            await route.fulfill( {
-                contentType: `application/json`,
-                body: JSON.stringify( { choices: [ { message: { content: `[TR] ${ sentence }` } } ] } )
-            } )
+        await page.route( CHAT_URL, async route => {
+            captured_body = route.request().postDataJSON()
+            const request = parse_chat_request( captured_body )
+            await fulfil_chat( route, answer_request( request, { sentence: text => `[TR] ${ text }` } ) )
         } )
 
         await upload_demo_book( page )
@@ -159,16 +149,10 @@ test.describe( `Pass 35 — Walkthrough`, () => {
     test( `BW143 cached translations served on second visit`, async ( { page } ) => {
         let api_call_count = 0
 
-        await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
+        await page.route( CHAT_URL, async route => {
             api_call_count++
-            const body = JSON.parse( route.request().postData() )
-            const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
-            const match = user_msg.match( /Translate this sentence:\n(.+)/s )
-            const sentence = match ? match[1].trim() : `unknown`
-            await route.fulfill( {
-                contentType: `application/json`,
-                body: JSON.stringify( { choices: [ { message: { content: `[CACHED] ${ sentence }` } } ] } )
-            } )
+            const request = parse_chat_request( route.request().postDataJSON() )
+            await fulfil_chat( route, answer_request( request, { sentence: text => `[CACHED] ${ text }` } ) )
         } )
 
         // First visit — translations fetched from API

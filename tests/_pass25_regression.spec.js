@@ -5,6 +5,7 @@
  */
 import { test, expect } from '@playwright/test'
 import { open_reader } from './helpers/setup.js'
+import { CHAT_URL, parse_chat_request, fulfil_chat, answer_request } from './helpers/openrouter_mock.js'
 
 const DEMO_BOOK = `./tests/fixtures/book.epub`
 
@@ -22,23 +23,14 @@ const clear_all = async ( page ) => {
 }
 
 const mock_api = async ( page ) => {
-    await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
-        const body = JSON.parse( route.request().postData() )
-        const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
-
-        if( user_msg.includes( `Word:` ) || user_msg.includes( `word or phrase` ) || user_msg.includes( `Explain the word` ) ) {
-            await route.fulfill( {
-                contentType: `application/json`,
-                body: JSON.stringify( { choices: [ { message: { content: `**Meaning:** test\n**Grammar:** noun` } } ] } )
-            } )
-        } else {
-            const match = user_msg.match( /Translate this sentence:\n(.+)/s )
-            const sentence = match ? match[1].trim() : `unknown`
-            await route.fulfill( {
-                contentType: `application/json`,
-                body: JSON.stringify( { choices: [ { message: { content: `[TR] ${ sentence }` } } ] } )
-            } )
-        }
+    await page.route( CHAT_URL, async route => {
+        const request = parse_chat_request( route.request().postDataJSON() )
+        await fulfil_chat( route, answer_request( request, {
+            sentence: text => `[TR] ${ text }`,
+            word: () => `**Meaning:** test\n**Grammar:** noun`,
+            explanation: () => `[TR] unknown`,
+            meaning: () => `[TR] unknown`
+        } ) )
     } )
     await page.route( `**/openrouter.ai/api/v1/auth/key`, async route => {
         await route.fulfill( {
@@ -54,7 +46,7 @@ const setup = async ( page ) => {
     await page.goto( `/` )
     await page.evaluate( () => {
         const store = JSON.parse( localStorage.getItem( `settings-storage` ) || `{}` )
-        store.state = { ...( store.state || {} ), api_key: `sk-or-test-fake-key` }
+        store.state = { ... store.state || {} , api_key: `sk-or-test-fake-key` }
         localStorage.setItem( `settings-storage`, JSON.stringify( store ) )
     } )
 }
@@ -126,17 +118,22 @@ test.describe( `Pass 25 — Regression & Coverage`, () => {
 
     test( `P25-06 API timeout does not crash the app`, async ( { page } ) => {
         let release_response
-        const response_gate = new Promise( resolve => { release_response = resolve } )
+        const response_gate = new Promise( resolve => {
+            release_response = resolve 
+        } )
 
         // Override the mock to simulate a very slow response
-        await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
+        await page.route( CHAT_URL, async route => {
             // Don't respond — simulate timeout
-            // The app should handle this gracefully
+            // The app should handle this gracefully; a batch holds all its sentences
             await response_gate
-            await route.fulfill( {
-                contentType: `application/json`,
-                body: JSON.stringify( { choices: [ { message: { content: `[TR] late` } } ] } )
-            } )
+            const request = parse_chat_request( route.request().postDataJSON() )
+            await fulfil_chat( route, answer_request( request, {
+                sentence: () => `[TR] late`,
+                word: () => `[TR] late`,
+                explanation: () => `[TR] late`,
+                meaning: () => `[TR] late`
+            } ) )
         } )
 
         const pending_request = page.waitForRequest( request =>
@@ -155,7 +152,7 @@ test.describe( `Pass 25 — Regression & Coverage`, () => {
     } )
 
     test( `P25-07 malformed JSON response does not crash`, async ( { page } ) => {
-        await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
+        await page.route( CHAT_URL, async route => {
             await route.fulfill( {
                 contentType: `text/html`,
                 body: `<html><body>Service Unavailable</body></html>`
@@ -178,20 +175,15 @@ test.describe( `Pass 25 — Regression & Coverage`, () => {
         await upload_and_read( page )
 
         // Mock word lookup with a very long response
-        await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
-            const body = JSON.parse( route.request().postData() )
-            const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
-            if( user_msg.includes( `Word:` ) || user_msg.includes( `word or phrase` ) || user_msg.includes( `Explain` ) ) {
-                await route.fulfill( {
-                    contentType: `application/json`,
-                    body: JSON.stringify( { choices: [ { message: { content: `A very long explanation that goes on and on and should stay bounded by the sheet` } } ] } )
-                } )
-            } else {
-                await route.fulfill( {
-                    contentType: `application/json`,
-                    body: JSON.stringify( { choices: [ { message: { content: `[TR] test` } } ] } )
-                } )
-            }
+        await page.route( CHAT_URL, async route => {
+            const long_text = `A very long explanation that goes on and on and should stay bounded by the sheet`
+            const request = parse_chat_request( route.request().postDataJSON() )
+            await fulfil_chat( route, answer_request( request, {
+                sentence: () => `[TR] test`,
+                word: () => long_text,
+                explanation: () => long_text,
+                meaning: () => `[TR] test`
+            } ) )
         } )
 
         // Tap a word span

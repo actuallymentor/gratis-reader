@@ -4,6 +4,7 @@
  */
 import { test, expect } from '@playwright/test'
 import { open_reader } from './helpers/setup.js'
+import { CHAT_URL, parse_chat_request, fulfil_chat, answer_request } from './helpers/openrouter_mock.js'
 
 const DEMO_BOOK = `./tests/fixtures/book.epub`
 
@@ -19,15 +20,9 @@ const clear_all = async ( page ) => {
 }
 
 const mock_api = async ( page ) => {
-    await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
-        const body = JSON.parse( route.request().postData() )
-        const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
-        const match = user_msg.match( /Translate this sentence:\n(.+)/s )
-        const sentence = match ? match[1].trim() : `unknown`
-        await route.fulfill( {
-            contentType: `application/json`,
-            body: JSON.stringify( { choices: [ { message: { content: `[TRANSLATED] ${ sentence }` } } ] } )
-        } )
+    await page.route( CHAT_URL, async route => {
+        const request = parse_chat_request( route.request().postDataJSON() )
+        await fulfil_chat( route, answer_request( request ) )
     } )
     await page.route( `**/openrouter.ai/api/v1/auth/key`, async route => {
         await route.fulfill( {
@@ -41,7 +36,7 @@ const setup_key = async ( page ) => {
     await page.goto( `/` )
     await page.evaluate( () => {
         const store = JSON.parse( localStorage.getItem( `settings-storage` ) || `{}` )
-        store.state = { ...( store.state || {} ), api_key: `sk-or-test-fake-key` }
+        store.state = { ... store.state || {} , api_key: `sk-or-test-fake-key` }
         localStorage.setItem( `settings-storage`, JSON.stringify( store ) )
     } )
 }

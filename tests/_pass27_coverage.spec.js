@@ -5,7 +5,19 @@
  * offline banner, cover extraction, MOBI rejection, PWA config.
  */
 import { test, expect } from '@playwright/test'
-import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth, clear_storage } from './helpers/setup.js'
+import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth } from './helpers/setup.js'
+import { CHAT_URL, parse_chat_request, fulfil_chat, answer_request } from './helpers/openrouter_mock.js'
+
+// Echoes `[TR] <sentence>` for single and batched requests alike
+const echo_tr = route => {
+    const request = parse_chat_request( route.request().postDataJSON() )
+    return fulfil_chat( route, answer_request( request, { sentence: text => `[TR] ${ text }` } ) )
+}
+
+// Sentence translations arrive as single or batched requests
+const is_translation_request = request =>
+    request.url().includes( `openrouter.ai/api/v1/chat/completions` ) &&
+    [ `sentence`, `sentence_batch` ].includes( parse_chat_request( request.postDataJSON() ).kind )
 
 // Helper to open settings from reader
 const open_settings = async ( page ) => {
@@ -72,29 +84,17 @@ test.describe( `Pass 27 — Coverage Expansion`, () => {
 
     test( `P27-04a A0 translation prompt allows caveman simplification`, async ( { page } ) => {
 
-        await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
-            const body = JSON.parse( route.request().postData() )
-            const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
-            const match = user_msg.match( /Translate this sentence:\n(.+)/s )
-            const sentence = match ? match[1].trim() : `unknown`
-            await route.fulfill( {
-                contentType: `application/json`,
-                body: JSON.stringify( { choices: [ { message: { content: `[TR] ${ sentence }` } } ] } )
-            } )
-        } )
+        await page.route( CHAT_URL, echo_tr )
 
         // Set level to A0 before opening
         await page.evaluate( () => {
             const store = JSON.parse( localStorage.getItem( `settings-storage` ) || `{}` )
-            store.state = { ...( store.state || {} ), last_level: `a0` }
+            store.state = { ... store.state || {} , last_level: `a0` }
             localStorage.setItem( `settings-storage`, JSON.stringify( store ) )
         } )
 
         await upload_demo_book( page )
-        const translation_request = page.waitForRequest( request =>
-            request.url().includes( `openrouter.ai/api/v1/chat/completions` ) &&
-            request.postData()?.includes( `Translate this sentence` )
-        )
+        const translation_request = page.waitForRequest( is_translation_request )
         await open_reader( page )
         const body = ( await translation_request ).postDataJSON()
         const captured_system = body.messages?.find( m => m.role === `system` )?.content || ``
@@ -106,29 +106,17 @@ test.describe( `Pass 27 — Coverage Expansion`, () => {
 
     test( `P27-04 A1 translation prompt includes strict simplification rules`, async ( { page } ) => {
 
-        await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
-            const body = JSON.parse( route.request().postData() )
-            const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
-            const match = user_msg.match( /Translate this sentence:\n(.+)/s )
-            const sentence = match ? match[1].trim() : `unknown`
-            await route.fulfill( {
-                contentType: `application/json`,
-                body: JSON.stringify( { choices: [ { message: { content: `[TR] ${ sentence }` } } ] } )
-            } )
-        } )
+        await page.route( CHAT_URL, echo_tr )
 
         // Set level to A1 before opening
         await page.evaluate( () => {
             const store = JSON.parse( localStorage.getItem( `settings-storage` ) || `{}` )
-            store.state = { ...( store.state || {} ), last_level: `a1` }
+            store.state = { ... store.state || {} , last_level: `a1` }
             localStorage.setItem( `settings-storage`, JSON.stringify( store ) )
         } )
 
         await upload_demo_book( page )
-        const translation_request = page.waitForRequest( request =>
-            request.url().includes( `openrouter.ai/api/v1/chat/completions` ) &&
-            request.postData()?.includes( `Translate this sentence` )
-        )
+        const translation_request = page.waitForRequest( is_translation_request )
         await open_reader( page )
         const body = ( await translation_request ).postDataJSON()
         const captured_system = body.messages?.find( m => m.role === `system` )?.content || ``
@@ -140,29 +128,17 @@ test.describe( `Pass 27 — Coverage Expansion`, () => {
 
     test( `P27-05 C1-C2 translation prompt preserves style and nuance`, async ( { page } ) => {
 
-        await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
-            const body = JSON.parse( route.request().postData() )
-            const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
-            const match = user_msg.match( /Translate this sentence:\n(.+)/s )
-            const sentence = match ? match[1].trim() : `unknown`
-            await route.fulfill( {
-                contentType: `application/json`,
-                body: JSON.stringify( { choices: [ { message: { content: `[TR] ${ sentence }` } } ] } )
-            } )
-        } )
+        await page.route( CHAT_URL, echo_tr )
 
         // Set level to C1-C2
         await page.evaluate( () => {
             const store = JSON.parse( localStorage.getItem( `settings-storage` ) || `{}` )
-            store.state = { ...( store.state || {} ), last_level: `c1-c2` }
+            store.state = { ... store.state || {} , last_level: `c1-c2` }
             localStorage.setItem( `settings-storage`, JSON.stringify( store ) )
         } )
 
         await upload_demo_book( page )
-        const translation_request = page.waitForRequest( request =>
-            request.url().includes( `openrouter.ai/api/v1/chat/completions` ) &&
-            request.postData()?.includes( `Translate this sentence` )
-        )
+        const translation_request = page.waitForRequest( is_translation_request )
         await open_reader( page )
         const body = ( await translation_request ).postDataJSON()
         const captured_system = body.messages?.find( m => m.role === `system` )?.content || ``
@@ -215,22 +191,13 @@ test.describe( `Pass 27 — Coverage Expansion`, () => {
     test( `P27-07 explanation popover shows original and translated sentences`, async ( { page } ) => {
 
         // Mock explanation response
-        await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
-            const body = JSON.parse( route.request().postData() )
-            const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
+        await page.route( CHAT_URL, async route => {
+            const request = parse_chat_request( route.request().postDataJSON() )
 
-            if( user_msg.includes( `Explain this translation` ) || user_msg.includes( `breakdown` ) || user_msg.includes( `word-by-word` ) || user_msg.includes( `phrase-by-phrase` ) ) {
-                await route.fulfill( {
-                    contentType: `application/json`,
-                    body: JSON.stringify( { choices: [ { message: { content: `## Breakdown\n- "Hello" → "Hola" (greeting)\n- "world" → "mundo" (noun)\n\n**Grammar:** Simple subject-object.` } } ] } )
-                } )
+            if( request.kind === `explanation` ) {
+                await fulfil_chat( route, `## Breakdown\n- "Hello" → "Hola" (greeting)\n- "world" → "mundo" (noun)\n\n**Grammar:** Simple subject-object.` )
             } else {
-                const match = user_msg.match( /Translate this sentence:\n(.+)/s )
-                const sentence = match ? match[1].trim() : `unknown`
-                await route.fulfill( {
-                    contentType: `application/json`,
-                    body: JSON.stringify( { choices: [ { message: { content: `[TR] ${ sentence }` } } ] } )
-                } )
+                await echo_tr( route )
             }
         } )
 
@@ -412,22 +379,10 @@ test.describe( `Pass 27 — Coverage Expansion`, () => {
 
     test( `P27-14 system prompt instructs output ONLY translated sentence`, async ( { page } ) => {
 
-        await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
-            const body = JSON.parse( route.request().postData() )
-            const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
-            const match = user_msg.match( /Translate this sentence:\n(.+)/s )
-            const sentence = match ? match[1].trim() : `unknown`
-            await route.fulfill( {
-                contentType: `application/json`,
-                body: JSON.stringify( { choices: [ { message: { content: `[TR] ${ sentence }` } } ] } )
-            } )
-        } )
+        await page.route( CHAT_URL, echo_tr )
 
         await upload_demo_book( page )
-        const translation_request = page.waitForRequest( request =>
-            request.url().includes( `openrouter.ai/api/v1/chat/completions` ) &&
-            request.postData()?.includes( `Translate this sentence` )
-        )
+        const translation_request = page.waitForRequest( is_translation_request )
         await open_reader( page )
         const body = ( await translation_request ).postDataJSON()
         const captured_system = body.messages?.find( m => m.role === `system` )?.content || ``

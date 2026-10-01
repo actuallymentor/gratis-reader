@@ -7,11 +7,23 @@ import {
     mock_auth,
     get_current_translation_entries
 } from './helpers/setup.js'
+import { CHAT_URL, parse_chat_request, fulfil_chat, answer_request } from './helpers/openrouter_mock.js'
 
 /**
  * Pass 24 — Coverage gap tests
  * Targets specific spec requirements that had no explicit E2E test coverage.
  */
+
+// Echoes `[<prefix>] <sentence>` for single and batched requests alike
+const echo_tr = ( route, prefix = `TR` ) => {
+    const request = parse_chat_request( route.request().postDataJSON() )
+    return fulfil_chat( route, answer_request( request, { sentence: text => `[${ prefix }] ${ text }` } ) )
+}
+
+// Sentence translations arrive as single or batched requests
+const is_translation_request = request =>
+    request.url().includes( `openrouter.ai/api/v1/chat/completions` ) &&
+    [ `sentence`, `sentence_batch` ].includes( parse_chat_request( request.postDataJSON() ).kind )
 
 // Helper to open settings from reader
 const open_settings = async ( page ) => {
@@ -49,27 +61,16 @@ test.describe( `Pass 24 — Coverage Gaps`, () => {
 
     test( `P24-02 translation API request includes paragraph context`, async ( { page } ) => {
 
-        await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
-            const body = JSON.parse( route.request().postData() )
-            const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
-            const sentence_match = user_msg.match( /Translate this sentence:\n(.+)/s )
-            const sentence = sentence_match ? sentence_match[1].trim() : `unknown`
-            await route.fulfill( {
-                contentType: `application/json`,
-                body: JSON.stringify( { choices: [ { message: { content: `[TR] ${ sentence }` } } ] } )
-            } )
-        } )
+        await page.route( CHAT_URL, route => echo_tr( route ) )
 
-        const translation_request = page.waitForRequest( request =>
-            request.url().includes( `openrouter.ai/api/v1/chat/completions` ) &&
-            request.postData()?.includes( `Translate this sentence` )
-        )
+        const translation_request = page.waitForRequest( is_translation_request )
         await open_reader( page )
         const captured_body = ( await translation_request ).postDataJSON()
 
         const user_msg = captured_body.messages?.find( m => m.role === `user` )?.content || ``
         expect( user_msg ).toContain( `Context` )
-        expect( user_msg ).toContain( `Translate this sentence` )
+        // Paragraph sentences may share one batched request
+        expect( user_msg ).toMatch( /Translate (this sentence|these sentences)/ )
 
         const system_msg = captured_body.messages?.find( m => m.role === `system` )?.content || ``
         expect( system_msg ).toContain( `language teacher` )
@@ -84,21 +85,14 @@ test.describe( `Pass 24 — Coverage Gaps`, () => {
             release_explanation = resolve
         } )
 
-        await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
-            const body = JSON.parse( route.request().postData() )
-            const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
+        await page.route( CHAT_URL, async route => {
+            const request = parse_chat_request( route.request().postDataJSON() )
 
-            if( user_msg.includes( `Explain this translation` ) ) {
+            if( request.kind === `explanation` ) {
                 await explanation_gate
-                await route.fulfill( { contentType: `application/json`, body: JSON.stringify( {
-                    choices: [ { message: { content: `Explanation content here.` } } ]
-                } ) } )
+                await fulfil_chat( route, `Explanation content here.` )
             } else {
-                const sentence_match = user_msg.match( /Translate this sentence:\n(.+)/s )
-                const sentence = sentence_match ? sentence_match[1].trim() : `unknown`
-                await route.fulfill( { contentType: `application/json`, body: JSON.stringify( {
-                    choices: [ { message: { content: `[TR] ${ sentence }` } } ]
-                } ) } )
+                await echo_tr( route )
             }
         } )
 
@@ -210,15 +204,10 @@ test.describe( `Pass 24 — Coverage Gaps`, () => {
             error_occurred = true
         } )
 
-        await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
+        await page.route( CHAT_URL, async route => {
+            // Held per HTTP request; a batch holds all its sentences
             await translation_gate
-            const body = JSON.parse( route.request().postData() )
-            const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
-            const sentence_match = user_msg.match( /Translate this sentence:\n(.+)/s )
-            const sentence = sentence_match ? sentence_match[1].trim() : `unknown`
-            await route.fulfill( { contentType: `application/json`, body: JSON.stringify( {
-                choices: [ { message: { content: `[TR] ${ sentence }` } } ]
-            } ) } ).catch( () => {} )
+            await echo_tr( route ).catch( () => {} )
         } )
 
         await open_reader( page )
@@ -256,15 +245,9 @@ test.describe( `Pass 24 — Coverage Gaps`, () => {
         let api_call_count = 0
         let response_prefix = `TR`
 
-        await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
+        await page.route( CHAT_URL, route => {
             api_call_count++
-            const body = JSON.parse( route.request().postData() )
-            const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
-            const sentence_match = user_msg.match( /Translate this sentence:\n(.+)/s )
-            const sentence = sentence_match ? sentence_match[1].trim() : `unknown`
-            await route.fulfill( { contentType: `application/json`, body: JSON.stringify( {
-                choices: [ { message: { content: `[${ response_prefix }] ${ sentence }` } } ]
-            } ) } )
+            return echo_tr( route, response_prefix )
         } )
 
         await open_reader( page )
@@ -371,20 +354,9 @@ test.describe( `Pass 24 — Coverage Gaps`, () => {
 
     test( `P24-15 system prompt includes level-specific behavior rules`, async ( { page } ) => {
 
-        await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
-            const body = JSON.parse( route.request().postData() )
-            const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
-            const sentence_match = user_msg.match( /Translate this sentence:\n(.+)/s )
-            const sentence = sentence_match ? sentence_match[1].trim() : `unknown`
-            await route.fulfill( { contentType: `application/json`, body: JSON.stringify( {
-                choices: [ { message: { content: `[TR] ${ sentence }` } } ]
-            } ) } )
-        } )
+        await page.route( CHAT_URL, route => echo_tr( route ) )
 
-        const translation_request = page.waitForRequest( request =>
-            request.url().includes( `openrouter.ai/api/v1/chat/completions` ) &&
-            request.postData()?.includes( `Translate this sentence` )
-        )
+        const translation_request = page.waitForRequest( is_translation_request )
         await open_reader( page )
         const body = ( await translation_request ).postDataJSON()
         const system_message = body.messages?.find( m => m.role === `system` )?.content || ``

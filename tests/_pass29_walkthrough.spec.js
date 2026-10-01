@@ -7,6 +7,7 @@
  */
 import { test, expect } from '@playwright/test'
 import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth } from './helpers/setup.js'
+import { CHAT_URL, parse_chat_request, fulfil_chat, answer_request } from './helpers/openrouter_mock.js'
 
 // Helper to open settings from reader
 const open_settings = async ( page ) => {
@@ -41,24 +42,16 @@ test.describe( `Pass 29 — Walkthrough`, () => {
         page.on( `pageerror`, error => errors.push( error.message ) )
 
         // Override mock to handle word lookups
-        await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
-            const body = JSON.parse( route.request().postData() )
-            const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
+        await page.route( CHAT_URL, async route => {
+            const request = parse_chat_request( route.request().postDataJSON() )
 
-            if( user_msg.includes( `Translate this sentence` ) ) {
-                const match = user_msg.match( /Translate this sentence:\n(.+)/s )
-                const sentence = match ? match[1].trim() : `unknown`
-                await route.fulfill( {
-                    contentType: `application/json`,
-                    body: JSON.stringify( { choices: [ { message: { content: `[TR] ${ sentence }` } } ] } )
-                } )
-            } else {
-                // Word lookup
-                await route.fulfill( {
-                    contentType: `application/json`,
-                    body: JSON.stringify( { choices: [ { message: { content: `test-word` } } ] } )
-                } )
-            }
+            // Sentences echo with a prefix; every other request answers `test-word`
+            await fulfil_chat( route, answer_request( request, {
+                sentence: text => `[TR] ${ text }`,
+                word: () => `test-word`,
+                explanation: () => `test-word`,
+                meaning: () => `test-word`
+            } ) )
         } )
 
         await open_reader( page )
@@ -193,23 +186,13 @@ test.describe( `Pass 29 — Walkthrough`, () => {
 
     test( `BW73 sheet Explain opens explanation popover`, async ( { page } ) => {
 
-        await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
-            const body = JSON.parse( route.request().postData() )
-            const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
-
-            if( user_msg.includes( `Explain` ) || user_msg.includes( `phrase-by-phrase` ) ) {
-                await route.fulfill( {
-                    contentType: `application/json`,
-                    body: JSON.stringify( { choices: [ { message: { content: `**Word breakdown:** hello → hola` } } ] } )
-                } )
-            } else {
-                const match = user_msg.match( /Translate this sentence:\n(.+)/s )
-                const sentence = match ? match[1].trim() : `unknown`
-                await route.fulfill( {
-                    contentType: `application/json`,
-                    body: JSON.stringify( { choices: [ { message: { content: `[TR] ${ sentence }` } } ] } )
-                } )
-            }
+        await page.route( CHAT_URL, async route => {
+            const request = parse_chat_request( route.request().postDataJSON() )
+            await fulfil_chat( route, answer_request( request, {
+                sentence: text => `[TR] ${ text }`,
+                word: () => `[TR] unknown`,
+                explanation: () => `**Word breakdown:** hello → hola`
+            } ) )
         } )
 
         await open_reader( page )

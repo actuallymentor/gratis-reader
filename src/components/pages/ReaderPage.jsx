@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
-import * as Throttle from 'promise-parallel-throttle'
 import { use_book } from '../../hooks/use_book.js'
 import { use_translation } from '../../hooks/use_translation.js'
 import { use_reading_window } from '../../hooks/use_reading_window.js'
@@ -380,7 +379,7 @@ export default function ReaderPage() {
     const selected_translation = selected_sentence
         ? translations[selected_sentence.id]
         : null
-    const { lookup_word, get_lookup_state } = use_word_lookup( {
+    const { lookup_word, lookup_words, get_lookup_state } = use_word_lookup( {
         source_language,
         target_language: last_language,
         sentence_context: selected_translation || ``,
@@ -434,34 +433,17 @@ export default function ReaderPage() {
 
         const queue_controller = new AbortController()
         const word_segments = selected_translation_segments.filter( segment => segment.is_word )
-        const unique_segments = word_segments.filter( ( segment, index ) =>
-            word_segments.findIndex( candidate =>
-                candidate.text.toLowerCase() === segment.text.toLowerCase()
-            ) === index
-        )
-        const lookup_tasks = unique_segments.map( segment => async () => {
-            if( queue_controller.signal.aborted ) return
-            await lookup_word( segment.text, {
-                retry: false,
-                signal: queue_controller.signal
-            } )
-        } )
 
-        // Keep the direct translation responsive without bursting one API
-        // request per word. The tapped-word effect runs first and shares this
-        // hook's three-request ceiling with the background queue.
-        Throttle.all( lookup_tasks, {
-            maxInProgress: 3,
-            failFast: false,
-            nextCheck: async () => !queue_controller.signal.aborted
-        } ).catch( () => {} )
+        // The tapped-word effect runs first; the rest of the sentence arrives in one request.
+        lookup_words( word_segments.map( segment => segment.text ), { signal: queue_controller.signal } )
+            .catch( () => {} )
 
         return () => queue_controller.abort()
     }, [
         selected_sentence,
         selected_translation,
         selected_translation_segments,
-        lookup_word
+        lookup_words
     ] )
 
     use_reading_window( {
@@ -478,7 +460,7 @@ export default function ReaderPage() {
         enabled: turbo_mode && language_chosen && !loading && !chapter_loading
             && !is_offline && !settings_open && !explanation_data,
         words: active_window.words,
-        lookup_word
+        lookup_words
     } )
 
     // Save progress on chapter change

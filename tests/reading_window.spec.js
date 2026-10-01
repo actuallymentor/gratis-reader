@@ -1,7 +1,6 @@
 import JSZip from 'jszip'
 import { test, expect, open_seeded_reader, SEEDED_BOOK_ID } from './helpers/app_fixture.js'
-
-const CHAT_URL = `**/openrouter.ai/api/v1/chat/completions`
+import { CHAT_URL, parse_chat_request, fulfil_chat, answer_request } from './helpers/openrouter_mock.js'
 const chapters = [ 12, 48, 48 ].map( ( count, chapter ) => Array.from( { length: count }, ( _, sentence ) =>
     Array.from( { length: 12 }, ( _, word ) => `word${ chapter }x${ sentence }x${ word }` ).join( ` ` ) + `.`
 ) )
@@ -27,12 +26,12 @@ const seed_epub = async ( page, content = chapters, turbo = false ) => {
 const mock_translations = async ( page, hold = false ) => {
     const calls = { sentences: [], words: [], held: [], hold }
     await page.route( CHAT_URL, async route => {
-        const prompt = route.request().postDataJSON().messages.find( message => message.role === `user` ).content
-        const word_match = prompt.match( /Sentence: "([\s\S]*)"\n\nWord: (.+)$/ )
-        const content = word_match ? `Source ${ word_match[2] }` : prompt.match( /Translate this sentence:\n([\s\S]*)/ )[1].trim()
-        if( word_match ) calls.words.push( { context: word_match[1], word: word_match[2] } )
-        else calls.sentences.push( content )
-        const fulfill = () => route.fulfill( { contentType: `application/json`, body: JSON.stringify( { choices: [ { message: { content } } ] } ) } )
+        const request = parse_chat_request( route.request().postDataJSON() )
+
+        // Flatten batches: assertions track requested words and sentences, not HTTP calls
+        request.words.forEach( word => calls.words.push( { context: request.sentence, word } ) )
+        calls.sentences.push( ...request.sentences )
+        const fulfill = () => fulfil_chat( route, answer_request( request, { sentence: text => text, word: text => `Source ${ text }` } ) )
         if( calls.hold ) calls.held.push( fulfill )
         else await fulfill()
     } )
@@ -149,15 +148,14 @@ test.describe( `Viewport translation budget`, () => {
         const lookups = []
         const held_french = []
         await page.route( CHAT_URL, async route => {
-            const { messages } = route.request().postDataJSON()
-            const system = messages.find( message => message.role === `system` ).content
-            const prompt = messages.find( message => message.role === `user` ).content
-            const word_match = prompt.match( /Sentence: "([\s\S]*)"\n\nWord: (.+)$/ )
-            const is_french = system.includes( `French` )
-            const content = word_match ? `Source ${ word_match[2] }` : is_french ? french : spanish
-            const fulfill = () => route.fulfill( { contentType: `application/json`, body: JSON.stringify( { choices: [ { message: { content } } ] } ) } )
-            if( word_match ) {
-                lookups.push( { french: is_french, context: word_match[1] } )
+            const request = parse_chat_request( route.request().postDataJSON() )
+            const is_french = request.system.includes( `French` )
+            const is_word = request.words.length > 0
+            const answer = answer_request( request, { sentence: () => is_french ? french : spanish, word: text => `Source ${ text }` } )
+            const fulfill = () => fulfil_chat( route, answer )
+            if( is_word ) {
+                // One entry per word, so batched glosses count like single lookups
+                request.words.forEach( () => lookups.push( { french: is_french, context: request.sentence } ) )
                 if( !is_french ) return
             } else if( is_french ) {
                 held_french.push( fulfill )
@@ -166,7 +164,8 @@ test.describe( `Viewport translation budget`, () => {
             await fulfill()
         } )
         await open_seeded_reader( page )
-        await expect.poll( () => lookups.length ).toBe( 2 )
+        // All four words of the one Spanish sentence now share a single held batch request
+        await expect.poll( () => lookups.length ).toBe( 4 )
 
         await page.getByRole( `button`, { name: `Settings` } ).click()
         await page.getByPlaceholder( `Search languages...` ).fill( `French` )

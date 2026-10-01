@@ -1,10 +1,11 @@
 import { test, expect, open_seeded_reader } from './helpers/app_fixture.js'
 import { mock_openrouter } from './helpers/setup.js'
+import { CHAT_URL, parse_chat_request, fulfil_chat, answer_request } from './helpers/openrouter_mock.js'
 
-const CHAT_URL = `**/openrouter.ai/api/v1/chat/completions`
 const INFO_SHEET = `[data-translation-info-sheet]`
 const READER_WORD = `span[data-sentence-id] [data-translation-word-index]`
 const READER_WORD_TOOLTIP = `[data-reader-word-tooltip]`
+const WORD_KINDS = [ `word`, `word_batch` ]
 
 const unique_translation_word_count = sentence => sentence
     .locator( `[data-translation-word]` )
@@ -39,11 +40,11 @@ test.describe( `Sentence Interactions`, () => {
 
         await enter_reader_with_translations( page )
 
+        // Words of one sentence now share a batch request, so count words looked up rather than requests
         let word_lookup_calls = 0
         await page.route( CHAT_URL, async route => {
-            const body = JSON.parse( route.request().postData() )
-            const user_msg = body.messages?.find( message => message.role === `user` )?.content || ``
-            if( user_msg.includes( `Word:` ) ) word_lookup_calls += 1
+            const request = parse_chat_request( route.request().postDataJSON() )
+            if( WORD_KINDS.includes( request.kind ) ) word_lookup_calls += request.words.length
             await route.fallback()
         } )
 
@@ -126,20 +127,15 @@ test.describe( `Sentence Interactions`, () => {
     test( `numeric-only text stays plain while translated words remain selectable`, async ( { page } ) => {
 
         await page.route( CHAT_URL, async route => {
-            const body = JSON.parse( route.request().postData() )
-            const user_msg = body.messages?.find( message => message.role === `user` )?.content || ``
-            const word_match = user_msg.match( /Word:\s*(.+)$/ )
-            const content = word_match
-                ? `source:${ word_match[1].trim() }`
-                : `Translated 123 alpha`
+            const request = parse_chat_request( route.request().postDataJSON() )
+            const translated = () => `Translated 123 alpha`
 
-            await route.fulfill( {
-                contentType: `application/json`,
-                body: JSON.stringify( {
-                    choices: [ { message: { content } } ],
-                    usage: { prompt_tokens: 25, completion_tokens: 15, total_tokens: 40 }
-                } )
-            } )
+            await fulfil_chat( route, answer_request( request, {
+                sentence: translated,
+                explanation: translated,
+                meaning: translated,
+                word: word => `source:${ word.trim() }`
+            } ) )
         } )
 
         await open_seeded_reader( page )
@@ -175,32 +171,19 @@ test.describe( `Sentence Interactions`, () => {
     test( `word-by-word lookups preserve translated text and Explain opens the modal`, async ( { page } ) => {
 
         const adapted_sentence = `Big work. Smart way.`
+        // Words of one sentence now share a batch request, so count words looked up rather than requests
         let word_lookup_calls = 0
 
         await page.route( CHAT_URL, async route => {
-            const body = JSON.parse( route.request().postData() )
-            const user_msg = body.messages?.find( message => message.role === `user` )?.content || ``
-            const is_explanation = user_msg.includes( `Explain this translation` )
-            const is_word_lookup = user_msg.includes( `Word:` )
+            const request = parse_chat_request( route.request().postDataJSON() )
+            if( WORD_KINDS.includes( request.kind ) ) word_lookup_calls += request.words.length
 
-            let content
-            if( is_explanation ) {
-                content = `Detailed explanation here.`
-            } else if( is_word_lookup ) {
-                word_lookup_calls += 1
-                const word_match = user_msg.match( /Word:\s*(.+)$/ )
-                content = `source:${ word_match ? word_match[1].trim() : `word` }`
-            } else {
-                content = adapted_sentence
-            }
-
-            await route.fulfill( {
-                contentType: `application/json`,
-                body: JSON.stringify( {
-                    choices: [ { message: { content } } ],
-                    usage: { prompt_tokens: 25, completion_tokens: 15, total_tokens: 40 }
-                } )
-            } )
+            await fulfil_chat( route, answer_request( request, {
+                sentence: () => adapted_sentence,
+                meaning: () => adapted_sentence,
+                explanation: () => `Detailed explanation here.`,
+                word: word => `source:${ word.trim() }`
+            } ) )
         } )
 
         await open_seeded_reader( page )
@@ -255,45 +238,18 @@ test.describe( `Sentence Interactions`, () => {
         const attempts_by_sentence = {}
 
         await page.route( CHAT_URL, async route => {
-            const body = JSON.parse( route.request().postData() )
-            const user_msg = body.messages?.find( message => message.role === `user` )?.content || ``
-            const is_explanation = user_msg.includes( `Explain this translation` )
-            const is_word_lookup = user_msg.includes( `Word:` )
+            const request = parse_chat_request( route.request().postDataJSON() )
 
-            if( is_explanation ) {
-                const translation_match = user_msg.match( /Translation: "(.+?)"/s )
-                const translation = translation_match ? translation_match[1] : `unknown`
-
-                await route.fulfill( {
-                    contentType: `application/json`,
-                    body: JSON.stringify( {
-                        choices: [ { message: { content: `Explanation for ${ translation }.` } } ]
-                    } )
-                } )
-                return
-            }
-
-            if( is_word_lookup ) {
-                await route.fulfill( {
-                    contentType: `application/json`,
-                    body: JSON.stringify( {
-                        choices: [ { message: { content: `[WORD] definition of the word` } } ]
-                    } )
-                } )
-                return
-            }
-
-            const sentence_match = user_msg.match( /Translate this sentence:\n(.+)/s )
-            const sentence = sentence_match ? sentence_match[1].trim() : `unknown`
-            attempts_by_sentence[sentence] = ( attempts_by_sentence[sentence] || 0 ) + 1
-
-            await route.fulfill( {
-                contentType: `application/json`,
-                body: JSON.stringify( {
-                    choices: [ { message: { content: `[TRANSLATED:${ attempts_by_sentence[sentence] }] ${ sentence }` } } ],
-                    usage: { prompt_tokens: 25, completion_tokens: 15, total_tokens: 40 }
-                } )
-            } )
+            await fulfil_chat( route, answer_request( request, {
+                explanation: ( { user } ) => {
+                    const translation_match = user.match( /Translation: "(.+?)"/s )
+                    return `Explanation for ${ translation_match ? translation_match[1] : `unknown` }.`
+                },
+                sentence: sentence => {
+                    attempts_by_sentence[sentence] = ( attempts_by_sentence[sentence] || 0 ) + 1
+                    return `[TRANSLATED:${ attempts_by_sentence[sentence] }] ${ sentence }`
+                }
+            } ) )
         } )
 
         await open_seeded_reader( page )
@@ -354,9 +310,8 @@ test.describe( `Sentence Interactions`, () => {
 
         let word_lookup_calls = 0
         await page.route( CHAT_URL, async route => {
-            const body = JSON.parse( route.request().postData() )
-            const user_msg = body.messages?.find( message => message.role === `user` )?.content || ``
-            if( user_msg.includes( `Word:` ) ) word_lookup_calls += 1
+            const request = parse_chat_request( route.request().postDataJSON() )
+            if( WORD_KINDS.includes( request.kind ) ) word_lookup_calls += 1
             await route.fallback()
         } )
 
@@ -403,28 +358,15 @@ test.describe( `Sentence Interactions`, () => {
         if( !word_text ) throw new Error( `Expected a translated word in the first sentence` )
 
         await page.route( CHAT_URL, async route => {
-            const body = JSON.parse( route.request().postData() )
-            const user_msg = body.messages?.find( message => message.role === `user` )?.content || ``
-            const is_explanation = user_msg.includes( `Explain this translation` )
-            const is_word_lookup = user_msg.includes( `Word:` )
+            const request = parse_chat_request( route.request().postDataJSON() )
 
-            if( is_explanation ) {
-                await route.fulfill( {
-                    contentType: `application/json`,
-                    body: JSON.stringify( {
-                        choices: [ { message: { content: `This explanation repeats ${ word_text } inside the modal body.` } } ]
-                    } )
-                } )
+            if( request.kind === `explanation` ) {
+                await fulfil_chat( route, `This explanation repeats ${ word_text } inside the modal body.` )
                 return
             }
 
-            if( is_word_lookup ) {
-                await route.fulfill( {
-                    contentType: `application/json`,
-                    body: JSON.stringify( {
-                        choices: [ { message: { content: `definition:modal:${ word_text }` } } ]
-                    } )
-                } )
+            if( WORD_KINDS.includes( request.kind ) ) {
+                await fulfil_chat( route, answer_request( request, { word: () => `definition:modal:${ word_text }` } ) )
                 return
             }
 
@@ -450,29 +392,16 @@ test.describe( `Sentence Interactions`, () => {
         let word_lookup_calls = 0
 
         await page.route( CHAT_URL, async route => {
-            const body = JSON.parse( route.request().postData() )
-            const user_msg = body.messages?.find( message => message.role === `user` )?.content || ``
-            const is_explanation = user_msg.includes( `Explain this translation` )
-            const is_word_lookup = user_msg.includes( `Word:` )
+            const request = parse_chat_request( route.request().postDataJSON() )
 
-            if( is_explanation ) {
-                await route.fulfill( {
-                    contentType: `application/json`,
-                    body: JSON.stringify( {
-                        choices: [ { message: { content: `Explanation before </div> ${ word_text } after the stray tag.` } } ]
-                    } )
-                } )
+            if( request.kind === `explanation` ) {
+                await fulfil_chat( route, `Explanation before </div> ${ word_text } after the stray tag.` )
                 return
             }
 
-            if( is_word_lookup ) {
+            if( WORD_KINDS.includes( request.kind ) ) {
                 word_lookup_calls += 1
-                await route.fulfill( {
-                    contentType: `application/json`,
-                    body: JSON.stringify( {
-                        choices: [ { message: { content: `definition:keyboard:${ word_text }` } } ]
-                    } )
-                } )
+                await fulfil_chat( route, answer_request( request, { word: () => `definition:keyboard:${ word_text }` } ) )
                 return
             }
 

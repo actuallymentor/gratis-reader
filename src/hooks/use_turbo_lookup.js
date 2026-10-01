@@ -4,14 +4,15 @@ const SCROLL_SETTLE_MS = 150
 const BACKGROUND_CONCURRENCY = 2
 
 /**
- * Warms translated words admitted by the shared occurrence window.
- * Dictionary requests deduplicate only after the viewport budget has been applied.
+ * Warms translated words admitted by the shared occurrence window, one request
+ * per translated sentence. Dictionary requests deduplicate only after the
+ * viewport budget has been applied.
  * @param {Object} options
  * @param {boolean} options.enabled - Opt-in, reader available and online
  * @param {Array} options.words - Ordered window words with their translated sentence context
- * @param {Function} options.lookup_word - Shared context-aware foreground lookup
+ * @param {Function} options.lookup_words - Shared context-aware batch lookup
  */
-export const use_turbo_lookup = ( { enabled, words, lookup_word } ) => {
+export const use_turbo_lookup = ( { enabled, words, lookup_words } ) => {
 
     const words_ref = useRef( words )
     words_ref.current = words
@@ -20,16 +21,15 @@ export const use_turbo_lookup = ( { enabled, words, lookup_word } ) => {
     useEffect( () => {
         if( !enabled ) return
 
+        // context → { queued: Map(key → word), requested: Set(key), controller }
         const jobs = new Map()
         let active = 0
         let stopped = false
         let settling = false
         let timer
 
-        const all_jobs = () => [ ...jobs.values() ].flatMap( context_jobs => [ ...context_jobs.values() ] )
-
         const cancel_jobs = () => {
-            all_jobs().forEach( job => job.controller.abort() )
+            jobs.forEach( job => job.controller.abort() )
             jobs.clear()
         }
 
@@ -38,13 +38,16 @@ export const use_turbo_lookup = ( { enabled, words, lookup_word } ) => {
 
             // Reserve a slot under the shared three-request ceiling for foreground taps.
             while( active < BACKGROUND_CONCURRENCY ) {
-                const job = all_jobs().find( candidate => !candidate.started )
-                if( !job ) return
-                job.started = true
+                const entry = [ ...jobs.entries() ].find( ( [ , job ] ) =>
+                    [ ...job.queued.keys() ].some( key => !job.requested.has( key ) )
+                )
+                if( !entry ) return
+                const [ context, job ] = entry
+                const batch = [ ...job.queued.entries() ].filter( ( [ key ] ) => !job.requested.has( key ) )
+                batch.forEach( ( [ key ] ) => job.requested.add( key ) )
                 active += 1
-                lookup_word( job.word.text, {
-                    context: job.word.context,
-                    retry: false,
+                lookup_words( batch.map( ( [ , word ] ) => word.text ), {
+                    context,
                     signal: job.controller.signal
                 } ).catch( () => {} ).finally( () => {
                     active -= 1
@@ -60,17 +63,24 @@ export const use_turbo_lookup = ( { enabled, words, lookup_word } ) => {
             words_ref.current.filter( word => word.context ).forEach( word => {
                 if( !selected.has( word.context ) ) selected.set( word.context, new Map() )
                 const key = word.text.toLowerCase()
-                if( selected.get( word.context ).has( key ) ) return
-                const job = jobs.get( word.context )?.get( key )
-                    || { word, controller: new AbortController(), started: false }
-                selected.get( word.context ).set( key, job )
+                if( !selected.get( word.context ).has( key ) ) selected.get( word.context ).set( key, word )
             } )
-            jobs.forEach( ( context_jobs, context ) => context_jobs.forEach( ( job, key ) => {
-                if( !selected.get( context )?.has( key ) ) job.controller.abort()
-            } ) )
-            // Reorder surviving jobs as well: newly visible words take priority after scrolling back.
+            // Sentences that left the window are abandoned, including their in-flight request.
+            jobs.forEach( ( job, context ) => {
+                if( !selected.has( context ) ) {
+                    job.controller.abort()
+                    jobs.delete( context )
+                }
+            } )
+            // Reorder as well: newly visible sentences take priority after scrolling back.
+            const ordered = new Map()
+            selected.forEach( ( queued, context ) => {
+                const job = jobs.get( context ) || { queued: new Map(), requested: new Set(), controller: new AbortController() }
+                job.queued = queued
+                ordered.set( context, job )
+            } )
             jobs.clear()
-            selected.forEach( ( context_jobs, context ) => jobs.set( context, context_jobs ) )
+            ordered.forEach( ( job, context ) => jobs.set( context, job ) )
             pump()
         }
         refresh_ref.current = refresh
@@ -98,7 +108,7 @@ export const use_turbo_lookup = ( { enabled, words, lookup_word } ) => {
             window.removeEventListener( `resize`, pause )
             document.removeEventListener( `visibilitychange`, refresh )
         }
-    }, [ enabled, lookup_word ] )
+    }, [ enabled, lookup_words ] )
 
     useEffect( () => refresh_ref.current?.(), [ words ] )
 

@@ -1,13 +1,13 @@
 import { test, expect, open_seeded_reader } from './helpers/app_fixture.js'
+import { CHAT_URL, parse_chat_request, fulfil_chat, answer_request } from './helpers/openrouter_mock.js'
 
-const CHAT_URL = `**/openrouter.ai/api/v1/chat/completions`
 const READER_WORD_TOOLTIP = `[data-reader-word-tooltip]`
 
-const translated_sentence_from = ( prompt ) => {
-    const match = prompt.match( /Translate this sentence:\n(.+)/s )
-    return match ? match[1].trim() : `unknown`
-}
-
+/**
+ * Mocks every chat request. `word_lookup_response` runs once per word HTTP request
+ * with `{ word, words, calls }`; it may return a route.fulfill object, a string
+ * (every gloss), or an array (one gloss per word of a batch).
+ */
 const install_translation_mock = async ( page, {
     word_lookup_content,
     word_lookup_response,
@@ -16,43 +16,38 @@ const install_translation_mock = async ( page, {
     const calls = {
         explanation: 0,
         meaning: 0,
-        word_lookup: 0
+        // Words looked up, batched or single
+        word_lookup: 0,
+        // Word HTTP requests
+        word_requests: 0
     }
 
     await page.route( CHAT_URL, async route => {
-        const body = JSON.parse( route.request().postData() )
-        const user_msg = body.messages?.find( message => message.role === `user` )?.content || ``
+        const request = parse_chat_request( route.request().postDataJSON() )
+        if( request.kind === `explanation` ) calls.explanation += 1
+        if( request.kind === `meaning` ) calls.meaning += 1
 
-        let content
-        if( user_msg.includes( `Explain this translation` ) ) {
-            calls.explanation += 1
-            content = `Detailed explanation here.`
-        } else if( user_msg.includes( `Word:` ) ) {
-            calls.word_lookup += 1
-            const word_match = user_msg.match( /Word:\s*(.+)$/ )
-            const word = word_match ? word_match[1].trim() : `word`
-            const custom_response = await word_lookup_response?.( { word, calls } )
-
-            if( custom_response && typeof custom_response === `object` ) {
+        let custom_response
+        if( request.words.length ) {
+            calls.word_lookup += request.words.length
+            calls.word_requests += 1
+            custom_response = await word_lookup_response?.( { word: request.word, words: request.words, calls } )
+            if( custom_response && typeof custom_response === `object` && !Array.isArray( custom_response ) ) {
                 await route.fulfill( custom_response )
                 return
             }
-
-            content = custom_response ?? word_lookup_content ?? `Source ${ word }`
-        } else if( user_msg.includes( `Adapted translation:` ) ) {
-            calls.meaning += 1
-            content = `Unexpected retired meaning request`
-        } else {
-            content = translated_content ?? `Target ${ translated_sentence_from( user_msg ) }`
         }
 
-        await route.fulfill( {
-            contentType: `application/json`,
-            body: JSON.stringify( {
-                choices: [ { message: { content } } ],
-                usage: { prompt_tokens: 25, completion_tokens: 15, total_tokens: 40 }
-            } )
-        } )
+        const gloss = ( word, index ) => {
+            if( Array.isArray( custom_response ) ) return custom_response[index]
+            return custom_response ?? word_lookup_content ?? `Source ${ word }`
+        }
+        await fulfil_chat( route, answer_request( request, {
+            sentence: text => translated_content ?? `Target ${ text }`,
+            word: word => gloss( word, request.words.indexOf( word ) ),
+            explanation: () => `Detailed explanation here.`,
+            meaning: () => `Unexpected retired meaning request`
+        } ) )
     } )
 
     return calls
@@ -157,12 +152,12 @@ test.describe( `Touch translation information`, () => {
         let max_active_lookups = 0
         const calls = await install_translation_mock( page, {
             translated_content: `One two three four five six seven eight`,
-            word_lookup_response: ( { word } ) => new Promise( resolve => {
+            word_lookup_response: ( { words } ) => new Promise( resolve => {
                 active_lookups += 1
                 max_active_lookups = Math.max( max_active_lookups, active_lookups )
                 pending_lookups.push( () => {
                     active_lookups -= 1
-                    resolve( `Source ${ word }` )
+                    resolve( words.map( word => `Source ${ word }` ) )
                 } )
             } )
         } )
@@ -183,21 +178,17 @@ test.describe( `Touch translation information`, () => {
         await expect( direct_translation ).not.toHaveAttribute( `aria-live` )
         await expect( direct_translation ).not.toContainText( `Translation unavailable` )
         await expect( selected_direct_word ).toContainText( `Selected word: ...` )
-        await expect.poll( () => calls.word_lookup ).toBe( 3 )
-        expect( max_active_lookups ).toBe( 3 )
-
-        pending_lookups.splice( 0 ).forEach( release_lookup => release_lookup() )
-        await expect.poll( () => calls.word_lookup ).toBe( 6 )
-        expect( max_active_lookups ).toBe( 3 )
-
-        pending_lookups.splice( 0 ).forEach( release_lookup => release_lookup() )
+        // Batching: the tapped word stays a single request, the other seven share one batch
         await expect.poll( () => calls.word_lookup ).toBe( 8 )
-        expect( max_active_lookups ).toBe( 3 )
+        expect( calls.word_requests ).toBe( 2 )
+        expect( max_active_lookups ).toBe( 2 )
 
         pending_lookups.splice( 0 ).forEach( release_lookup => release_lookup() )
         await expect( direct_translation ).toHaveAttribute( `aria-busy`, `false` )
         await expect( selected_direct_word ).toContainText( `Selected word: Source One` )
         expect( calls.word_lookup ).toBe( 8 )
+        expect( calls.word_requests ).toBe( 2 )
+        expect( max_active_lookups ).toBe( 2 )
 
     } )
 
@@ -524,7 +515,8 @@ test.describe( `Touch translation information`, () => {
         await expect( selected_direct_word ).toContainText( `Translation unavailable` )
         await expect( selected_direct_word ).toHaveCSS( `text-decoration-line`, `underline` )
         await expect( page.locator( `[data-word-by-word-translation]` ) ).toHaveAttribute( `aria-busy`, `false` )
-        expect( calls.word_lookup ).toBe( expected_lookup_count )
+        // Blank batch glosses fall back to one single lookup per word: tapped word + batch + fallbacks
+        expect( calls.word_lookup ).toBe( 2 * expected_lookup_count - 1 )
 
     } )
 

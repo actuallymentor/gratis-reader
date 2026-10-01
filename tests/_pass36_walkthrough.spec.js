@@ -113,7 +113,7 @@ test.describe( `Pass 36 — Walkthrough`, () => {
         // Set dark theme via localStorage
         await page.evaluate( () => {
             const store = JSON.parse( localStorage.getItem( `settings-storage` ) || `{}` )
-            store.state = { ...( store.state || {} ), theme: `dark` }
+            store.state = { ... store.state || {} , theme: `dark` }
             localStorage.setItem( `settings-storage`, JSON.stringify( store ) )
         } )
 

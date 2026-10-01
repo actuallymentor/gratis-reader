@@ -12,6 +12,7 @@
  */
 
 import { test, expect } from '@playwright/test'
+import { CHAT_URL, parse_chat_request, fulfil_chat, answer_request } from './helpers/openrouter_mock.js'
 
 const BASE = `http://localhost:5173`
 
@@ -20,41 +21,21 @@ const BASE = `http://localhost:5173`
 /** Mock the OpenRouter chat completions endpoint with deterministic translation + usage */
 const mock_openrouter = async ( page ) => {
 
-    await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
+    await page.route( CHAT_URL, async route => {
+        const request = parse_chat_request( route.request().postDataJSON() )
+        const usage = { prompt_tokens: 30, completion_tokens: 20, total_tokens: 50 }
 
-        const body = JSON.parse( route.request().postData() )
-        const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
-
-        // Detect request type by the distinctive markers in the USER message only
-        // - Translation: "Translate this sentence:\n..."
-        // - Explanation: "Explain this translation."
-        // - Word lookup: "Word: ..."
-        const is_translation = user_msg.includes( `Translate this sentence:` )
-        const is_explanation = user_msg.includes( `Explain this translation` )
-        const is_word_lookup = user_msg.includes( `Word:` )
-
-        let content
-        if( is_explanation ) {
-            content = `[EXPLANATION] This sentence means something interesting.`
-        } else if( is_word_lookup ) {
-            content = `[WORD] definition here`
-        } else if( is_translation ) {
-            // Translation — extract the sentence from prompt
-            const sentence_match = user_msg.match( /Translate this sentence:\n(.+)/s )
-            const sentence = sentence_match ? sentence_match[1].trim().substring( 0, 60 ) : `unknown`
-            content = `[TR] ${ sentence }`
-        } else {
-            content = `[UNKNOWN] unmatched request`
+        // Unrecognised prompts get a marker the assertions would never match
+        if( request.kind === `unknown` || request.kind === `meaning` ) {
+            await fulfil_chat( route, `[UNKNOWN] unmatched request`, usage )
+            return
         }
 
-        await route.fulfill( {
-            contentType: `application/json`,
-            body: JSON.stringify( {
-                choices: [ { message: { content } } ],
-                usage: { prompt_tokens: 30, completion_tokens: 20, total_tokens: 50 }
-            } )
-        } )
-
+        await fulfil_chat( route, answer_request( request, {
+            sentence: text => `[TR] ${ text.substring( 0, 60 ) }`,
+            word: () => `[WORD] definition here`,
+            explanation: () => `[EXPLANATION] This sentence means something interesting.`
+        } ), usage )
     } )
 
 }
@@ -74,7 +55,7 @@ const setup_api_key = async ( page ) => {
     await page.goto( BASE )
     await page.evaluate( () => {
         const store = JSON.parse( localStorage.getItem( `settings-storage` ) || `{}` )
-        store.state = { ...( store.state || {} ), api_key: `sk-or-test-fake-key-1234567890` }
+        store.state = { ... store.state || {} , api_key: `sk-or-test-fake-key-1234567890` }
         localStorage.setItem( `settings-storage`, JSON.stringify( store ) )
     } )
 }

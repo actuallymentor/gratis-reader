@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { chat_completion } from '../modules/open_router.js'
-import { build_word_lookup_prompt } from '../modules/prompts.js'
+import { build_word_lookup_prompt, build_word_batch_prompt } from '../modules/prompts.js'
+import { extract_string_array } from '../modules/llm_json.js'
 import { use_settings_store } from '../stores/settings_store.js'
 import { use_cache } from './use_cache.js'
 
@@ -10,6 +11,7 @@ const WORD_LOOKUP_MEMORY_LIMIT = 250
 const WORD_LOOKUP_CONCURRENCY = 3
 // Runaway guard only: a gloss is a few tokens, but reasoning models bill their thinking
 const WORD_LOOKUP_MAX_TOKENS = 4_000
+const word_batch_max_tokens = count => count * 16 + WORD_LOOKUP_MAX_TOKENS
 const LOOKUP_CANCELLED = Symbol( `lookup_cancelled` )
 
 // A tap can join a prefetch. One caller leaving must not abort work the other still needs.
@@ -85,7 +87,7 @@ export const use_word_lookup = ( {
     const mounted_ref = useRef( true )
     const api_key = use_settings_store( state => state.api_key )
     const model = use_settings_store( state => state.model )
-    const { get_word_translation, cache_word_translation } = use_cache()
+    const { get_word_translation, get_word_translations, cache_word_translation } = use_cache()
     const lookup_context = cache_by_context ? sentence_context : ``
     const default_context_ref = useRef( sentence_context )
     default_context_ref.current = sentence_context
@@ -295,6 +297,130 @@ export const use_word_lookup = ( {
         release_lookup_slot
     ] )
 
+    // Look up every word of one sentence in a single request. Words the answer
+    // does not cover fall back to single lookups; cache keys stay per word.
+    const lookup_words = useCallback( async ( words, { signal, context = default_context_ref.current } = {} ) => {
+
+        if( !api_key || !mounted_ref.current || signal?.aborted ) return
+
+        const lookup_context = cache_by_context ? context : ``
+        const seen = new Set()
+        const candidates = []
+        words.forEach( word => {
+            const clean_word = clean_lookup_word( word )
+            if( !clean_word ) return
+            const cache_key = word_cache_key( clean_word, source_language, target_language, lookup_context )
+            if( seen.has( cache_key ) ) return
+            seen.add( cache_key )
+            if( word_translations_ref.current[cache_key] || loading_words_ref.current[cache_key] || lookup_errors_ref.current[cache_key] ) return
+            candidates.push( { word: clean_word, cache_key } )
+        } )
+        if( !candidates.length ) return
+
+        // One shared task: taps joining any of these words wait on the same request
+        const task = { cancelled: false, settled: false, consumers: new Set(), controller: null, promise: null }
+        const next_loading = { ...loading_words_ref.current }
+        const next_errors = { ...lookup_errors_ref.current }
+        const next_tasks = { ...lookup_tasks_ref.current }
+        candidates.forEach( ( { cache_key } ) => {
+            next_loading[cache_key] = true
+            next_errors[cache_key] = false
+            next_tasks[cache_key] = task
+        } )
+        loading_words_ref.current = next_loading
+        lookup_errors_ref.current = next_errors
+        lookup_tasks_ref.current = next_tasks
+        refresh_lookup_state()
+
+        const forget = ( keys ) => {
+            const remaining_loading = { ...loading_words_ref.current }
+            const remaining_tasks = { ...lookup_tasks_ref.current }
+            keys.forEach( key => {
+                delete remaining_loading[key]
+                if( remaining_tasks[key] === task ) delete remaining_tasks[key]
+            } )
+            loading_words_ref.current = remaining_loading
+            lookup_tasks_ref.current = remaining_tasks
+        }
+        const remember = ( cache_key, content ) => {
+            word_translations_ref.current = { ...word_translations_ref.current, [cache_key]: content }
+            remember_lookup_key( cache_key )
+        }
+
+        const run_lookup = async () => {
+            let slot_acquired = false
+            const fallback = []
+            let outstanding = candidates
+
+            try {
+                await acquire_lookup_slot()
+                slot_acquired = true
+                if( task.cancelled || !mounted_ref.current ) return LOOKUP_CANCELLED
+
+                const controller = new AbortController()
+                task.controller = controller
+
+                const cached = await get_word_translations( candidates.map( c => c.word ), source_language, target_language, lookup_context )
+                if( controller.signal.aborted || task.cancelled ) return LOOKUP_CANCELLED
+
+                outstanding = candidates.filter( ( { word, cache_key } ) => {
+                    if( !cached[word] ) return true
+                    remember( cache_key, cached[word] )
+                    return false
+                } )
+                forget( candidates.filter( c => !outstanding.includes( c ) ).map( c => c.cache_key ) )
+                if( !outstanding.length || !is_online ) return
+
+                const { system, user } = build_word_batch_prompt( outstanding.map( c => c.word ), source_language, target_language, context )
+                const { content, usage } = await chat_completion( {
+                    api_key, model, system_prompt: system, user_message: user, temperature: 0.1, json: true,
+                    max_tokens: word_batch_max_tokens( outstanding.length ), signal: controller.signal
+                } )
+                on_usage?.( usage )
+                if( task.cancelled || controller.signal.aborted ) return LOOKUP_CANCELLED
+
+                const glosses = extract_string_array( content, `glosses`, outstanding.length )
+                outstanding.forEach( ( candidate, index ) => {
+                    const gloss = glosses?.[index]
+                    if( !gloss ) return fallback.push( candidate )
+                    remember( candidate.cache_key, gloss )
+                    cache_word_translation( candidate.word, source_language, target_language, gloss, lookup_context ).catch( () => {} )
+                } )
+                forget( outstanding.filter( c => !fallback.includes( c ) ).map( c => c.cache_key ) )
+                // The single-word prompt handles what the batch could not
+                forget( fallback.map( c => c.cache_key ) )
+            } catch ( error ) {
+                if( error?.usage ) on_usage?.( error.usage )
+                if( task.cancelled || error?.name === `AbortError` ) return LOOKUP_CANCELLED
+
+                const failed_errors = { ...lookup_errors_ref.current }
+                outstanding.forEach( ( { cache_key } ) => {
+                    failed_errors[cache_key] = true
+                    remember_lookup_key( cache_key )
+                } )
+                lookup_errors_ref.current = failed_errors
+            } finally {
+                task.settled = true
+                forget( candidates.map( c => c.cache_key ) )
+                refresh_lookup_state()
+                if( slot_acquired ) release_lookup_slot()
+            }
+
+            for( const { word } of fallback ) {
+                if( task.cancelled || signal?.aborted ) return LOOKUP_CANCELLED
+                await lookup_word( word, { retry: false, signal, context } )
+            }
+        }
+
+        task.promise = run_lookup()
+        return wait_for_lookup( task, signal )
+
+    }, [
+        api_key, model, source_language, target_language, cache_by_context, is_online, on_usage,
+        get_word_translations, cache_word_translation, remember_lookup_key, refresh_lookup_state,
+        acquire_lookup_slot, release_lookup_slot, lookup_word
+    ] )
+
     const get_lookup_state = useCallback( ( word ) => {
         const cache_key = word_cache_key( word, source_language, target_language, lookup_context )
 
@@ -325,6 +451,6 @@ export const use_word_lookup = ( {
         }
     }, [ cancel_lookups ] )
 
-    return { lookup_word, get_lookup_state, cancel_lookups }
+    return { lookup_word, lookup_words, get_lookup_state, cancel_lookups }
 
 }

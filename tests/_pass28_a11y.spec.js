@@ -3,6 +3,7 @@
  */
 import { test, expect, open_seeded_reader } from './helpers/app_fixture.js'
 import { setup_api_key, upload_demo_book, mock_openrouter, mock_auth } from './helpers/setup.js'
+import { CHAT_URL, parse_chat_request, fulfil_chat, answer_request } from './helpers/openrouter_mock.js'
 
 test.describe( `Pass 28 — Accessibility`, () => {
 
@@ -28,22 +29,12 @@ test.describe( `Pass 28 — Accessibility`, () => {
     test( `P28-02 explanation popover close button has aria-label="Close"`, async ( { page } ) => {
 
         // Override mock to include explanation response
-        await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
-            const body = JSON.parse( route.request().postData() )
-            const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
-            if( user_msg.includes( `Explain` ) || user_msg.includes( `phrase-by-phrase` ) ) {
-                await route.fulfill( {
-                    contentType: `application/json`,
-                    body: JSON.stringify( { choices: [ { message: { content: `**Breakdown:** test → test` } } ] } )
-                } )
-            } else {
-                const match = user_msg.match( /Translate this sentence:\n(.+)/s )
-                const sentence = match ? match[1].trim() : `unknown`
-                await route.fulfill( {
-                    contentType: `application/json`,
-                    body: JSON.stringify( { choices: [ { message: { content: `[TRANSLATED] ${ sentence }` } } ] } )
-                } )
-            }
+        await page.route( CHAT_URL, async route => {
+            const request = parse_chat_request( route.request().postDataJSON() )
+            await fulfil_chat( route, answer_request( request, {
+                word: () => `[TRANSLATED] unknown`,
+                explanation: () => `**Breakdown:** test → test`
+            } ) )
         } )
 
         await open_seeded_reader( page )

@@ -87,6 +87,20 @@ export const LANGUAGE_NOTES = {
     ` )
 }
 
+// Dialect guidance keyed by a word in the language name, so "Albanian (Gheg, Kosovar)"
+// and any other Gheg variant a user types pick up the same note
+const LANGUAGE_NOTE_MATCHERS = [
+    { pattern: /gheg/i, note: LANGUAGE_NOTES[`Albanian (Gheg, Kosovar)`] }
+]
+
+/**
+ * Extra instructions for a target language, if any
+ * @param {string} target_language
+ * @returns {string|null}
+ */
+export const language_note_for = ( target_language ) =>
+    LANGUAGE_NOTE_MATCHERS.find( ( { pattern } ) => pattern.test( target_language || `` ) )?.note || null
+
 /**
  * Builds the system prompt for sentence translation
  * @param {string} source_language
@@ -101,7 +115,8 @@ export const build_translation_system_prompt = ( source_language, target_languag
     const level_info = LEVELS.find( l => l.code === cefr_code )
     if( !level_info ) throw new Error( `Invalid CEFR code: ${ cefr_code }` )
     const { label, description, lvl_guidelines, lvl_example } = level_info
-        
+    const language_note = language_note_for( target_language )
+
     return multiline_trim( `
         You are a language teacher helping a student learn ${ target_language }. You rewrite text from ${ source_language } into ${ target_language } at the ${ label } level, meaning ${ description } (CEFR ${ cefr_code.toUpperCase() }).
 
@@ -125,7 +140,48 @@ export const build_translation_system_prompt = ( source_language, target_languag
         4. No markup or formatting
         5. If the sentence is a heading or title, translate it maintaining its brevity
         6. Maintain the same punctuation style (periods, question marks, etc.)
-    ` )
+    ` ) + ( language_note ? `\n\n## ${ target_language } notes:\n\n${ language_note }` : `` )
+}
+
+// Appended to the system prompt when several sentences of one paragraph travel together
+const BATCH_FORMAT_RULES = multiline_trim( `
+    ## Batch format:
+
+    The user message ends with a JSON object { "sentences": [ ... ] } holding consecutive
+    sentences from one paragraph, in order. Translate EACH sentence separately following the
+    rules above, using the context and the neighbours only for coherence.
+    Respond with ONLY a JSON object { "translations": [ ... ] } containing exactly the same
+    number of strings, in the same order. Never merge, split, drop, or reorder sentences.
+    Never add keys.
+` )
+
+/**
+ * Builds the system prompt for translating several sentences of one paragraph at once
+ * @param {string} source_language
+ * @param {string} target_language
+ * @param {string} cefr_code
+ * @returns {string}
+ */
+export const build_translation_batch_system_prompt = ( source_language, target_language, cefr_code ) =>
+    `${ build_translation_system_prompt( source_language, target_language, cefr_code ) }\n\n${ BATCH_FORMAT_RULES }`
+
+/**
+ * Builds the user message for translating several sentences of one paragraph at once
+ * @param {string[]} sentences - Consecutive sentences of the paragraph, in order
+ * @param {string} context - The surrounding paragraph for coherence
+ * @returns {string}
+ */
+export const build_translation_batch_user_prompt = ( sentences, context ) => {
+
+    return multiline_trim( `
+    Context (for reference only — do NOT translate this):
+    """
+    ${ context }
+    """
+
+    Translate these sentences:
+    ${ JSON.stringify( { sentences } ) }
+` )
 }
 
 /**
@@ -209,5 +265,28 @@ export const build_word_lookup_prompt = ( word, source_language, target_language
     ` ),
 
     user: `Sentence: "${ sentence_context }"\n\nWord: ${ word }`
+
+} )
+
+/**
+ * Builds a prompt for looking up every word of one sentence in a single request
+ * @param {string[]} words - Target-language words, in sentence order
+ * @param {string} source_language
+ * @param {string} target_language
+ * @param {string} sentence_context
+ * @returns {Object} { system, user }
+ */
+export const build_word_batch_prompt = ( words, source_language, target_language, sentence_context ) => ( {
+
+    system: multiline_trim( `
+        You are a dictionary. Given a sentence in ${ target_language } and a JSON list of words
+        from it, in order, respond with the most likely equivalent in ${ source_language } for
+        EACH word as it is used in that sentence. Consider the sentence context for disambiguation.
+
+        Respond with ONLY a JSON object { "glosses": [ ... ] } holding exactly one short string
+        per word, in the same order. No explanations.
+    ` ),
+
+    user: `Sentence: "${ sentence_context }"\n\nWords: ${ JSON.stringify( words ) }`
 
 } )

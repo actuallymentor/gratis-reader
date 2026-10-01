@@ -4,6 +4,7 @@
  */
 import { test, expect } from '@playwright/test'
 import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth } from './helpers/setup.js'
+import { CHAT_URL, parse_chat_request, fulfil_chat, answer_request } from './helpers/openrouter_mock.js'
 
 test.describe( `Pass 31 — Walkthrough`, () => {
 
@@ -124,15 +125,14 @@ test.describe( `Pass 31 — Walkthrough`, () => {
 
         let captured_cache_key = null
 
-        await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
-            const body = JSON.parse( route.request().postData() )
-            const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
-            const match = user_msg.match( /Translate this sentence:\n(.+)/s )
-            const sentence = match ? match[1].trim() : `unknown`
-            await route.fulfill( {
-                contentType: `application/json`,
-                body: JSON.stringify( { choices: [ { message: { content: `[TR] ${ sentence }` } } ] } )
-            } )
+        await page.route( CHAT_URL, async route => {
+            const request = parse_chat_request( route.request().postDataJSON() )
+            await fulfil_chat( route, answer_request( request, {
+                sentence: text => `[TR] ${ text }`,
+                word: () => `[TR] unknown`,
+                explanation: () => `[TR] unknown`,
+                meaning: () => `[TR] unknown`
+            } ) )
         } )
 
         await upload_demo_book( page )
@@ -174,17 +174,15 @@ test.describe( `Pass 31 — Walkthrough`, () => {
 
         let system_prompt = ``
 
-        await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
-            const body = JSON.parse( route.request().postData() )
-            const sys = body.messages?.find( m => m.role === `system` )?.content || ``
-            if( sys && !system_prompt ) system_prompt = sys
-            const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
-            const match = user_msg.match( /Translate this sentence:\n(.+)/s )
-            const sentence = match ? match[1].trim() : `unknown`
-            await route.fulfill( {
-                contentType: `application/json`,
-                body: JSON.stringify( { choices: [ { message: { content: `[TR] ${ sentence }` } } ] } )
-            } )
+        await page.route( CHAT_URL, async route => {
+            const request = parse_chat_request( route.request().postDataJSON() )
+            if( request.system && !system_prompt ) system_prompt = request.system
+            await fulfil_chat( route, answer_request( request, {
+                sentence: text => `[TR] ${ text }`,
+                word: () => `[TR] unknown`,
+                explanation: () => `[TR] unknown`,
+                meaning: () => `[TR] unknown`
+            } ) )
         } )
 
         await upload_demo_book( page )

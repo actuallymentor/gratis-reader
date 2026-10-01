@@ -53,11 +53,12 @@ const retry_after_ms = ( response ) => {
  * @param {string} options.user_message
  * @param {number} [options.temperature=0.3]
  * @param {number} [options.max_tokens] - Ceiling for a runaway completion (reasoning tokens count too)
+ * @param {boolean} [options.json] - Ask for a JSON object response where the model supports it
  * @param {AbortSignal} [options.signal] - For request cancellation
  * @returns {Promise<{ content: string, usage: { prompt_tokens: number, completion_tokens: number, total_tokens: number } }>}
  * @throws {Error} With `status`, `retry_after_ms` (from Retry-After on 429/503) and `usage` (when the call was billed) where known
  */
-export const chat_completion = async ( { api_key, model, system_prompt, user_message, temperature = 0.3, max_tokens, signal } ) => {
+export const chat_completion = async ( { api_key, model, system_prompt, user_message, temperature = 0.3, max_tokens, json = false, signal } ) => {
 
     // Log entry
     log.debug( `Translating ${ user_message?.length } chars with "${ model }" (sys ${ system_prompt?.length } chars) and temperature ${ temperature }` )
@@ -87,7 +88,8 @@ export const chat_completion = async ( { api_key, model, system_prompt, user_mes
                     { role: `user`, content: user_message }
                 ],
                 temperature,
-                ...max_tokens ? { max_tokens } : {}
+                ...max_tokens ? { max_tokens } : {},
+                ...json ? { response_format: { type: `json_object` } } : {}
             } ),
             signal: request_controller.signal
         } )

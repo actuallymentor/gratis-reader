@@ -3,6 +3,7 @@
  */
 import { test, expect } from '@playwright/test'
 import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth, clear_storage } from './helpers/setup.js'
+import { CHAT_URL, parse_chat_request, fulfil_chat, answer_request } from './helpers/openrouter_mock.js'
 
 test.describe( `Pass 34 — Walkthrough`, () => {
 
@@ -122,16 +123,15 @@ test.describe( `Pass 34 — Walkthrough`, () => {
         const response_gate = new Promise( resolve => {
             release_responses = resolve
         } )
-        await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
+        await page.route( CHAT_URL, async route => {
             await response_gate
-            const body = JSON.parse( route.request().postData() )
-            const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
-            const match = user_msg.match( /Translate this sentence:\n(.+)/s )
-            const sentence = match ? match[1].trim() : `unknown`
-            await route.fulfill( {
-                contentType: `application/json`,
-                body: JSON.stringify( { choices: [ { message: { content: `[SLOW] ${ sentence }` } } ] } )
-            } )
+            const request = parse_chat_request( route.request().postDataJSON() )
+            await fulfil_chat( route, answer_request( request, {
+                sentence: text => `[SLOW] ${ text }`,
+                word: () => `[SLOW] unknown`,
+                explanation: () => `[SLOW] unknown`,
+                meaning: () => `[SLOW] unknown`
+            } ) )
         } )
 
         await upload_demo_book( page )
@@ -258,7 +258,7 @@ test.describe( `Pass 34 — Walkthrough`, () => {
         const error_gate = new Promise( resolve => {
             release_errors = resolve
         } )
-        await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
+        await page.route( CHAT_URL, async route => {
             await error_gate
             await route.fulfill( {
                 status: 500,

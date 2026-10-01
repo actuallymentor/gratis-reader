@@ -3,6 +3,14 @@
  */
 import { test, expect, open_seeded_reader, SEEDED_BOOK_ID } from './helpers/app_fixture.js'
 import { mock_auth } from './helpers/setup.js'
+import { CHAT_URL, parse_chat_request, fulfil_chat, answer_request } from './helpers/openrouter_mock.js'
+
+// Echoes `[TR] <sentence>` for single and batched requests alike
+const echo_tr = ( route, { on_request = () => {}, usage } = {} ) => {
+    const request = parse_chat_request( route.request().postDataJSON() )
+    on_request( request )
+    return fulfil_chat( route, answer_request( request, { sentence: text => `[TR] ${ text }` } ), usage )
+}
 
 const wait_for_translations = async ( page ) => {
 
@@ -24,20 +32,10 @@ test.describe( `Pass 40 — Read-ahead buffer`, () => {
         }, SEEDED_BOOK_ID )
         const translated_sentences = new Set()
 
-        await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
-            const body = JSON.parse( route.request().postData() )
-            const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
-            const sentence = user_msg.match( /Translate this sentence:\n(.+)/s )?.[1]?.trim() || ``
-
-            translated_sentences.add( sentence )
-
-            await route.fulfill( {
-                contentType: `application/json`,
-                body: JSON.stringify( {
-                    choices: [ { message: { content: `[TR] ${ sentence }` } } ]
-                } )
-            } )
-        } )
+        // Batches carry several sentences; record each one
+        await page.route( CHAT_URL, route => echo_tr( route, {
+            on_request: request => request.sentences.forEach( sentence => translated_sentences.add( sentence ) )
+        } ) )
 
         await mock_auth( page )
         await open_seeded_reader( page )
@@ -58,18 +56,7 @@ test.describe( `Pass 40 — Read-ahead buffer`, () => {
     } )
 
     test( `BW202 navigating forward shows pre-cached translations instantly`, async ( { page } ) => {
-        await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
-            const body = JSON.parse( route.request().postData() )
-            const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
-            const sentence = user_msg.match( /Translate this sentence:\n(.+)/s )?.[1]?.trim() || ``
-
-            await route.fulfill( {
-                contentType: `application/json`,
-                body: JSON.stringify( {
-                    choices: [ { message: { content: `[TR] ${ sentence }` } } ]
-                } )
-            } )
-        } )
+        await page.route( CHAT_URL, route => echo_tr( route ) )
 
         await mock_auth( page )
         await open_seeded_reader( page )
@@ -87,8 +74,8 @@ test.describe( `Pass 40 — Read-ahead buffer`, () => {
         } ), { timeout: 30_000 } ).toBe( true )
 
         // Block successful API responses after read-ahead so chapter 2 can only use its cache.
-        await page.unroute( `**/openrouter.ai/api/v1/chat/completions` )
-        await page.route( `**/openrouter.ai/api/v1/chat/completions`, route => route.abort( `connectionrefused` ) )
+        await page.unroute( CHAT_URL )
+        await page.route( CHAT_URL, route => route.abort( `connectionrefused` ) )
         const first_sentence = page.locator( `span[data-sentence-id]` ).first()
         const first_id = await first_sentence.getAttribute( `data-sentence-id` )
         await page.keyboard.press( `ArrowRight` )
@@ -102,18 +89,7 @@ test.describe( `Pass 40 — Read-ahead buffer`, () => {
         const errors = []
         page.on( `pageerror`, e => errors.push( e.message ) )
 
-        await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
-            const body = JSON.parse( route.request().postData() )
-            const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
-            const sentence = user_msg.match( /Translate this sentence:\n(.+)/s )?.[1]?.trim() || ``
-
-            await route.fulfill( {
-                contentType: `application/json`,
-                body: JSON.stringify( {
-                    choices: [ { message: { content: `[TR] ${ sentence }` } } ]
-                } )
-            } )
-        } )
+        await page.route( CHAT_URL, route => echo_tr( route ) )
 
         await mock_auth( page )
         await open_seeded_reader( page )
@@ -138,18 +114,7 @@ test.describe( `Pass 40 — Read-ahead buffer`, () => {
         const errors = []
         page.on( `pageerror`, e => errors.push( e.message ) )
 
-        await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
-            const body = JSON.parse( route.request().postData() )
-            const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
-            const sentence = user_msg.match( /Translate this sentence:\n(.+)/s )?.[1]?.trim() || ``
-
-            await route.fulfill( {
-                contentType: `application/json`,
-                body: JSON.stringify( {
-                    choices: [ { message: { content: `[TR] ${ sentence }` } } ]
-                } )
-            } )
-        } )
+        await page.route( CHAT_URL, route => echo_tr( route ) )
 
         await mock_auth( page )
         await open_seeded_reader( page )
@@ -173,18 +138,9 @@ test.describe( `Pass 40 — Read-ahead buffer`, () => {
     test( `BW205 language change re-triggers read-ahead translations`, async ( { page } ) => {
         let translation_count = 0
 
-        await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
+        await page.route( CHAT_URL, route => {
             translation_count++
-            const body = JSON.parse( route.request().postData() )
-            const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
-            const sentence = user_msg.match( /Translate this sentence:\n(.+)/s )?.[1]?.trim() || ``
-
-            await route.fulfill( {
-                contentType: `application/json`,
-                body: JSON.stringify( {
-                    choices: [ { message: { content: `[TR] ${ sentence }` } } ]
-                } )
-            } )
+            return echo_tr( route )
         } )
 
         await mock_auth( page )
@@ -218,19 +174,9 @@ test.describe( `Pass 40 — Read-ahead buffer`, () => {
 
     test( `BW206 token usage and cost displayed in footer`, async ( { page } ) => {
 
-        await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
-            const body = JSON.parse( route.request().postData() )
-            const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
-            const sentence = user_msg.match( /Translate this sentence:\n(.+)/s )?.[1]?.trim() || ``
-
-            await route.fulfill( {
-                contentType: `application/json`,
-                body: JSON.stringify( {
-                    choices: [ { message: { content: `[TR] ${ sentence }` } } ],
-                    usage: { prompt_tokens: 30, completion_tokens: 20, total_tokens: 50 }
-                } )
-            } )
-        } )
+        await page.route( CHAT_URL, route => echo_tr( route, {
+            usage: { prompt_tokens: 30, completion_tokens: 20, total_tokens: 50 }
+        } ) )
 
         await mock_auth( page )
         await open_seeded_reader( page )
@@ -246,19 +192,9 @@ test.describe( `Pass 40 — Read-ahead buffer`, () => {
 
     test( `BW207 token usage persists across chapter navigation`, async ( { page } ) => {
 
-        await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
-            const body = JSON.parse( route.request().postData() )
-            const user_msg = body.messages?.find( m => m.role === `user` )?.content || ``
-            const sentence = user_msg.match( /Translate this sentence:\n(.+)/s )?.[1]?.trim() || ``
-
-            await route.fulfill( {
-                contentType: `application/json`,
-                body: JSON.stringify( {
-                    choices: [ { message: { content: `[TR] ${ sentence }` } } ],
-                    usage: { prompt_tokens: 25, completion_tokens: 15, total_tokens: 40 }
-                } )
-            } )
-        } )
+        await page.route( CHAT_URL, route => echo_tr( route, {
+            usage: { prompt_tokens: 25, completion_tokens: 15, total_tokens: 40 }
+        } ) )
 
         await mock_auth( page )
         await open_seeded_reader( page )

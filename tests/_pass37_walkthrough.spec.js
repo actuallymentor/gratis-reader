@@ -4,6 +4,7 @@
  */
 import { test, expect } from '@playwright/test'
 import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth } from './helpers/setup.js'
+import { CHAT_URL } from './helpers/openrouter_mock.js'
 
 test.describe( `Pass 37 — Error handling & resilience`, () => {
 
@@ -163,7 +164,8 @@ test.describe( `Pass 37 — Reader resilience`, () => {
         const error_gate = new Promise( resolve => {
             release_errors = resolve
         } )
-        await page.route( `**/openrouter.ai/api/v1/chat/completions`, async route => {
+        await page.route( CHAT_URL, async route => {
+            // Every HTTP request fails, a batch fails all its sentences at once
             await error_gate
             await route.fulfill( { status: 500, body: `Internal Server Error` } )
         } )
