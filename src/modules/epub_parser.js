@@ -1,4 +1,3 @@
-import ePub from 'epubjs'
 import { log } from 'mentie'
 import { split_sentences } from './sentence_splitter.js'
 
@@ -16,6 +15,8 @@ export const HASH_BYTES = 8192
  */
 export const parse_epub = async ( array_buffer, timeout_ms = 15_000 ) => {
 
+    // epubjs (with JSZip and xmldom) is a third of the bundle and only needed once a book is opened
+    const { default: ePub } = await import( `epubjs` )
     const book = ePub( array_buffer )
 
     // epubjs hangs forever on corrupt/non-epub data — race against a timeout

@@ -6,6 +6,7 @@ import { ReactRouter6Adapter } from 'use-query-params/adapters/react-router-6'
 import { Toaster } from 'react-hot-toast'
 
 import App from './App.jsx'
+import './fonts.css'
 import './index.css'
 
 // Apply saved theme on load (wrapped in try-catch to handle corrupt localStorage)

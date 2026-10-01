@@ -23,6 +23,7 @@
     "test:headed": "npx playwright test --headed",
     "gutenberg": "node scripts/gutenberg.js",
     "gutenberg:variants": "node scripts/gutenberg.js --variants-only",
+    "gutenberg:trim": "node scripts/gutenberg.js --trim-only",
     "prepare": "husky"
   },
   "devDependencies": {

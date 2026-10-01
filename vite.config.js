@@ -46,20 +46,23 @@ export default defineConfig( {
                 ]
             },
             workbox: {
-                globPatterns: [ `**/*.{js,css,html,woff2}` ],
+                globPatterns: [ `**/*.{js,css,html}` ],
+                // Fonts are subset per script; cache the ones a reader actually uses instead of precaching all
+                globIgnores: [ `fonts/**` ],
                 navigateFallbackDenylist: [ /^\/gutenberg_epubs\// ],
                 runtimeCaching: [
                     {
-                        urlPattern: /^https:\/\/fonts\.googleapis\.com/,
-                        handler: `StaleWhileRevalidate`
-                    },
-                    {
-                        urlPattern: /^https:\/\/fonts\.gstatic\.com/,
+                        urlPattern: ( { url } ) => url.pathname.startsWith( `/fonts/` ),
                         handler: `CacheFirst`,
                         options: {
-                            cacheName: `google-fonts-webfonts`,
+                            cacheName: `fonts`,
                             expiration: { maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 * 365 }
                         }
+                    },
+                    {
+                        urlPattern: ( { url } ) => url.pathname === `/gutenberg.json`,
+                        handler: `StaleWhileRevalidate`,
+                        options: { cacheName: `gutenberg-catalog` }
                     }
                 ]
             }

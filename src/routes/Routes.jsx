@@ -1,11 +1,13 @@
-import { useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { Routes as RouterRoutes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import toast from 'react-hot-toast'
 
-import OnboardingPage from '../components/pages/OnboardingPage.jsx'
 import LibraryPage from '../components/pages/LibraryPage.jsx'
-import ReaderPage from '../components/pages/ReaderPage.jsx'
+
+// The library is the landing page; the reader (with epub parsing and markdown) and onboarding load on demand
+const OnboardingPage = lazy( () => import( `../components/pages/OnboardingPage.jsx` ) )
+const ReaderPage = lazy( () => import( `../components/pages/ReaderPage.jsx` ) )
 import { validate_api_key } from '../modules/open_router.js'
 import { use_settings_store } from '../stores/settings_store.js'
 
@@ -148,7 +150,7 @@ export default function Routes() {
 
     if( fragment_api_key || checking_fragment_key ) return <FragmentKeyLoading />
 
-    return <RouterRoutes>
+    return <Suspense fallback={ null }><RouterRoutes>
 
         { /* Redirect to library if already onboarded */ }
         <Route path="/" element={ api_key ? <Navigate to="/library" replace /> : <OnboardingPage /> } />
@@ -158,6 +160,6 @@ export default function Routes() {
         { /* Catch-all — redirect unknown routes */ }
         <Route path="*" element={ <Navigate to="/" replace /> } />
 
-    </RouterRoutes>
+    </RouterRoutes></Suspense>
 
 }

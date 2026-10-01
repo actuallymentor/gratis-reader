@@ -7,7 +7,10 @@ import sharp from 'sharp'
 import JSZip from 'jszip'
 
 const __dirname = dirname( fileURLToPath( import.meta.url ) )
+// Full Gutendex records are the merge source of truth; the public file carries only what the UI reads.
+const CATALOG_PATH = resolve( __dirname, `../data/gutenberg_catalog.json` )
 const OUTPUT_PATH = resolve( __dirname, `../public/gutenberg.json` )
+const CLIENT_FIELDS = [ `id`, `title`, `authors`, `summaries`, `subjects`, `bookshelves`, `languages`, `copyright`, `download_count` ]
 const EPUB_DIR = resolve( __dirname, `../public/gutenberg_epubs` )
 const BASE_URL = `https://gutendex.com/books/?sort=popular&copyright=false`
 
@@ -35,6 +38,7 @@ const COVER_VARIANTS = [
     { suffix: `xs`,  width: 64,  quality: 50 },   // ~1–2 KB — blur-up placeholder, skeleton grids
     { suffix: `sm`,  width: 128, quality: 65 },   // ~3–6 KB — compact grid thumbnails
     { suffix: `md`,  width: 200, quality: 80 },   // ~8–15 KB — card display, original-ish res
+    { suffix: `lg`,  width: 400, quality: 80 },   // ~20–40 KB — card display on 2–3x displays
 ]
 
 function validate_response( data, url ) {
@@ -81,7 +85,7 @@ async function validate_epub( epub_path ) {
 
 function delete_book_files( book_id ) {
 
-    const suffixes = [ `.epub`, `.jpg`, `-xs.webp`, `-sm.webp`, `-md.webp` ]
+    const suffixes = [ `.epub`, `.jpg`, `-xs.webp`, `-sm.webp`, `-md.webp`, `-lg.webp` ]
 
     for( const suffix of suffixes ) {
         const file_path = resolve( EPUB_DIR, `${ book_id }${ suffix }` )
@@ -405,10 +409,12 @@ async function download_all_assets( books ) {
 
 function load_existing_catalog() {
 
-    if( !existsSync( OUTPUT_PATH ) ) return new Map()
+    // Older checkouts only have the public file, which then still holds every field
+    const source = existsSync( CATALOG_PATH ) ? CATALOG_PATH : OUTPUT_PATH
+    if( !existsSync( source ) ) return new Map()
 
     try {
-        const raw = JSON.parse( readFileSync( OUTPUT_PATH, `utf-8` ) )
+        const raw = JSON.parse( readFileSync( source, `utf-8` ) )
         const map = new Map()
         for( const book of raw ) map.set( book.id, book )
         console.log( `Loaded ${ map.size } existing books from catalog.` )
@@ -459,6 +465,11 @@ async function main() {
     // If invoked with --variants-only, just regenerate variants from existing covers
     if( process.argv.includes( `--variants-only` ) ) {
         return regenerate_all_variants()
+    }
+
+    // If invoked with --trim-only, rewrite the client catalog from the full one without any network access
+    if( process.argv.includes( `--trim-only` ) ) {
+        return write_catalogs( [ ...load_existing_catalog().values() ] )
     }
 
     const existing = load_existing_catalog()
@@ -574,8 +585,20 @@ async function main() {
 
     console.log( `Catalog: ${ merged.length } total (${ fetched_books.length } fetched, ${ merged.length - fetched_books.length } preserved from previous runs).` )
 
-    writeFileSync( OUTPUT_PATH, JSON.stringify( merged, null, 2 ) )
-    console.log( `Written to ${ OUTPUT_PATH }` )
+    write_catalogs( merged )
+
+}
+
+function write_catalogs( books ) {
+
+    mkdirSync( dirname( CATALOG_PATH ), { recursive: true } )
+    writeFileSync( CATALOG_PATH, JSON.stringify( books, null, 2 ) )
+    console.log( `Full catalog written to ${ CATALOG_PATH }` )
+
+    // Minified, client fields only: the browser downloads this on every library visit
+    const trimmed = books.map( book => Object.fromEntries( CLIENT_FIELDS.map( field => [ field, book[field] ] ) ) )
+    writeFileSync( OUTPUT_PATH, JSON.stringify( trimmed ) )
+    console.log( `Client catalog written to ${ OUTPUT_PATH } (${ trimmed.length } books)` )
 
 }
 

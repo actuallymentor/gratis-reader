@@ -10,6 +10,10 @@
 - Reopen books from cached structure and chapters instead of re-parsing the EPUB
 - Open imported Gutenberg books from the import's parse instead of a second one
 - Keep cached translations when a book is removed; they are reused on re-import
+- Load the EPUB parser, reader, and onboarding on demand; initial script ~249KB → ~114KB gzipped
+- Serve fonts from the app itself (no render-blocking Google Fonts round trips); cache them offline
+- Ship a minified, client-only Gutenberg catalogue (`data/gutenberg_catalog.json` keeps the full records) and cache it offline
+- Fetch the catalogue once per page load instead of on every library visit
 
 ### Fixed
 - Release EPUB archives after upload and failed parses so cover object URLs do not leak
