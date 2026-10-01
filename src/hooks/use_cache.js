@@ -1,6 +1,13 @@
 import { useRef, useCallback } from 'react'
 import { get_translation, get_translations, save_translation } from '../modules/cache.js'
 import { log } from 'mentie'
+import { versioned_cache_key } from '../modules/prompts.js'
+
+// Persistent key for one word gloss, optionally scoped to its sentence
+const word_storage_key = ( word, source_lang, target_lang, lookup_context = `` ) => {
+    const context_suffix = lookup_context ? `:${ encodeURIComponent( lookup_context ) }` : ``
+    return versioned_cache_key( `word:${ word.toLowerCase() }:${ source_lang }:${ target_lang }${ context_suffix }` )
+}
 
 /**
  * Hook for word-level translation cache operations
@@ -13,8 +20,7 @@ export const use_cache = () => {
 
     const get_word_translation = useCallback( async ( word, source_lang, target_lang, lookup_context = `` ) => {
 
-        const context_suffix = lookup_context ? `:${ encodeURIComponent( lookup_context ) }` : ``
-        const key = `word:${ word.toLowerCase() }:${ source_lang }:${ target_lang }${ context_suffix }`
+        const key = word_storage_key( word, source_lang, target_lang, lookup_context )
 
         // Check in-memory cache first
         if( word_cache_ref.current[key] ) return word_cache_ref.current[key]
@@ -33,8 +39,7 @@ export const use_cache = () => {
     // Resolve many words at once: memory first, then one IndexedDB read for the rest
     const get_word_translations = useCallback( async ( words, source_lang, target_lang, lookup_context = `` ) => {
 
-        const context_suffix = lookup_context ? `:${ encodeURIComponent( lookup_context ) }` : ``
-        const keys_by_word = new Map( words.map( word => [ word, `word:${ word.toLowerCase() }:${ source_lang }:${ target_lang }${ context_suffix }` ] ) )
+        const keys_by_word = new Map( words.map( word => [ word, word_storage_key( word, source_lang, target_lang, lookup_context ) ] ) )
         // Null prototype: a word like "constructor" must not resolve to Object.prototype
         const found = Object.create( null )
         const missing = []
@@ -63,8 +68,7 @@ export const use_cache = () => {
         lookup_context = ``
     ) => {
 
-        const context_suffix = lookup_context ? `:${ encodeURIComponent( lookup_context ) }` : ``
-        const key = `word:${ word.toLowerCase() }:${ source_lang }:${ target_lang }${ context_suffix }`
+        const key = word_storage_key( word, source_lang, target_lang, lookup_context )
 
         // Save to IndexedDB
         await save_translation( {

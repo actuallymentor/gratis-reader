@@ -2,7 +2,8 @@ import { log } from 'mentie'
 import { split_sentences } from './sentence_splitter.js'
 
 // Bump when extract_chapter_content or the splitter changes shape: cached chapters are rebuilt.
-export const PARSER_VERSION = 1
+// v2: image elements carry their path inside the EPUB archive instead of the raw relative src.
+export const PARSER_VERSION = 2
 
 // Book identity hashes only the archive head, which is enough to tell files apart cheaply
 export const HASH_BYTES = 8192
@@ -80,13 +81,33 @@ export const parse_epub = async ( array_buffer, timeout_ms = 15_000 ) => {
 /**
  * Reduces a parsed EPUB to the plain, storable structure the reader navigates with
  * @param {Object} parsed - Result of parse_epub
- * @returns {{ metadata: Object, toc: Array<{ href: string, label: string }>, spine: Array<{ href: string }> }}
+ * @returns {{ metadata: Object, toc: Array<{ href: string, label: string }>, spine: Array<{ href: string, url: string }> }}
  */
 export const book_index_from = ( { metadata, toc, spine } ) => ( {
     metadata: { title: metadata.title, creator: metadata.creator, language: metadata.language },
     toc: toc.map( ( { href, label } ) => ( { href, label } ) ),
-    spine: spine.map( ( { href } ) => ( { href } ) )
+    // `url` is the section's path inside the archive; chapter images resolve against it
+    spine: spine.map( ( { href, url } ) => ( { href, url } ) )
 } )
+
+// Absolute links stay as they are; anything else becomes a path inside the EPUB archive
+const EXTERNAL_SRC_RE = /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i
+const archive_path = ( src, spine_item ) => {
+    if( EXTERNAL_SRC_RE.test( src ) ) return src
+    const chapter_url = spine_item.url || `/${ spine_item.href }`
+    return decodeURI( new URL( src, `https://epub.invalid${ chapter_url.startsWith( `/` ) ? `` : `/` }${ chapter_url }` ).pathname )
+}
+
+/**
+ * Resolves an image element's src to something an <img> can load
+ * @param {Object} book - The epubjs Book instance
+ * @param {string} src - Archive path or absolute URL from extract_chapter_content
+ * @returns {Promise<string>} Blob or absolute URL; blob URLs live until the book is destroyed
+ */
+export const resolve_archive_asset = async ( book, src ) => {
+    if( EXTERNAL_SRC_RE.test( src ) ) return src
+    return book.archive.createUrl( src )
+}
 
 /**
  * Extracts text content from a single spine item as structured paragraphs/sentences
@@ -200,11 +221,11 @@ export const extract_chapter_content = async ( book, spine_item, book_hash, chap
                 continue
             }
 
-            // Images
+            // Images: relative src is resolved against the chapter's own path in the archive
             if( tag === `img` ) {
                 const src = node.getAttribute( `src` )
                 const alt = node.getAttribute( `alt` ) || ``
-                if( src ) elements.push( { type: `image`, src, alt } )
+                if( src ) elements.push( { type: `image`, src: archive_path( src, spine_item ), alt } )
                 continue
             }
 

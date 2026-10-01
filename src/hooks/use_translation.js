@@ -6,6 +6,7 @@ import {
     build_translation_user_prompt,
     build_translation_batch_system_prompt,
     build_translation_batch_user_prompt,
+    versioned_cache_key,
     DEFAULT_LEVEL,
     LEVELS
 } from '../modules/prompts.js'
@@ -43,7 +44,7 @@ const run_pool = ( pick_next, work, signal ) => Promise.all( Array.from( { lengt
 } ) )
 
 const translation_cache_key = ( sentence_id, target_language, level ) =>
-    `${ sentence_id }:${ target_language }:${ level }`
+    versioned_cache_key( `${ sentence_id }:${ target_language }:${ level }` )
 
 const is_abort_error = error => error?.name === `AbortError`
 // Rate limits and server outages are worth waiting out; anything else means the request shape itself failed
@@ -133,6 +134,45 @@ export const use_translation = ( {
     const retry_running_ref = useRef( false )
     const active_operations_ref = useRef( new Set() )
     const active_controllers_ref = useRef( new Set() )
+    // One ceiling for every translation request of this reader: the live window, failure
+    // retries and a forced re-translation each run their own pool, but share these slots.
+    const request_slots_ref = useRef( { active: 0, waiters: [] } )
+    const acquire_request_slot = useCallback( ( signal ) => new Promise( ( resolve, reject ) => {
+        const slots = request_slots_ref.current
+        if( signal?.aborted ) return reject( new DOMException( `Aborted`, `AbortError` ) )
+        if( slots.active < MAX_CONCURRENT ) {
+            slots.active += 1
+            return resolve()
+        }
+        // A queued request that is aborted leaves the queue instead of taking a slot later
+        const waiter = {
+            give_up: () => {
+                slots.waiters = slots.waiters.filter( candidate => candidate !== waiter.start )
+                reject( new DOMException( `Aborted`, `AbortError` ) )
+            },
+            start: () => {
+                signal?.removeEventListener( `abort`, waiter.give_up )
+                slots.active += 1
+                resolve()
+            }
+        }
+        signal?.addEventListener( `abort`, waiter.give_up, { once: true } )
+        slots.waiters.push( waiter.start )
+    } ), [] )
+    const release_request_slot = useCallback( () => {
+        const slots = request_slots_ref.current
+        slots.active = Math.max( 0, slots.active - 1 )
+        slots.waiters.shift()?.()
+    }, [] )
+    const with_request_slot = useCallback( async ( signal, request ) => {
+        await acquire_request_slot( signal )
+        try {
+            return await request()
+        } finally {
+            release_request_slot()
+        }
+    }, [ acquire_request_slot, release_request_slot ] )
+
     const translations_ref = useRef( {} )
     const failed_sentences_ref = useRef( {} )
     const translation_requests_ref = useRef( {} )
@@ -234,10 +274,15 @@ export const use_translation = ( {
 
         const user_message = build_translation_user_prompt( sentence.text, sentence.context || sentence.text )
 
-        const { content, usage } = await chat_completion( {
-            api_key, model, system_prompt: options.system_prompt, user_message, signal,
-            max_tokens: sentence_max_tokens( user_message )
+        const { content, usage } = await with_request_slot( signal, () => {
+            // Waiting for a slot can outlast the sentence's place in the window
+            if( options.is_eligible && !options.is_eligible( sentence.id ) ) return { content: null }
+            return chat_completion( {
+                api_key, model, system_prompt: options.system_prompt, user_message, signal,
+                max_tokens: sentence_max_tokens( user_message )
+            } )
         } )
+        if( content === null ) return { id: sentence.id, skipped: true }
 
         if( signal.aborted ) return { id: sentence.id, skipped: true }
 
@@ -259,7 +304,7 @@ export const use_translation = ( {
 
         return { id: sentence.id, translated: content, from_cache: false, usage }
 
-    }, [ api_key, model, target_language, level ] )
+    }, [ api_key, model, target_language, level, with_request_slot ] )
 
     // Results land one sentence at a time; React updates and usage are flushed once per task turn.
     const pending_translations_ref = useRef( {} )
@@ -395,11 +440,11 @@ export const use_translation = ( {
 
             let answers = null
             try {
-                const { content, usage } = await chat_completion( {
+                const { content, usage } = await with_request_slot( signal, () => chat_completion( {
                     api_key, model, user_message, signal, json: true,
                     system_prompt: options.batch_system_prompt,
                     max_tokens: sentence_max_tokens( user_message )
-                } )
+                } ) )
                 queue_result( { id: pending[0].sentence.id, usage } )
                 if( signal.aborted ) return translated
                 answers = extract_string_array( content, `translations`, pending.length )
@@ -453,7 +498,7 @@ export const use_translation = ( {
             release()
         }
     }, [
-        api_key, model, target_language, level,
+        api_key, model, target_language, level, with_request_slot,
         request_key_for, mark_in_flight, settle, translate_one, translate_sentence,
         remember_failed_sentence, queue_result
     ] )

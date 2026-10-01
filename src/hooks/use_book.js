@@ -5,7 +5,7 @@ import {
     get_book_index, save_book_index, get_chapter, save_chapter, delete_chapters
 } from '../modules/cache.js'
 import {
-    parse_epub, load_epubjs, extract_chapter_content, hash_buffer, book_index_from, PARSER_VERSION, HASH_BYTES
+    parse_epub, load_epubjs, extract_chapter_content, resolve_archive_asset, hash_buffer, book_index_from, PARSER_VERSION, HASH_BYTES
 } from '../modules/epub_parser.js'
 import { take_parsed_book } from '../modules/book_handoff.js'
 import { segment_translation_text } from '../modules/translation_alignment.js'
@@ -67,6 +67,12 @@ export const use_book = ( book_id, ahead_word_budget = 0 ) => {
         return chapter_cache.get( index )
 
     }, [ epub_data, chapter_cache ] )
+
+    // Chapter images live inside the archive: open it on demand and hand back a loadable URL
+    const resolve_asset = useCallback( async ( src ) => {
+        if( !epub_data ) throw new Error( `Book not loaded` )
+        return resolve_archive_asset( await epub_data.open_book(), src )
+    }, [ epub_data ] )
 
     // Never expose read-ahead from the previous chapter during navigation.
     const ahead_chapters_content = ahead_content?.epub_data === epub_data
@@ -356,6 +362,7 @@ export const use_book = ( book_id, ahead_word_budget = 0 ) => {
         loading,
         chapter_loading,
         chapter_error,
+        resolve_asset,
         book_hash: book_hash_ref.current,
         source_language: epub_data?.metadata?.language || `en`
     }

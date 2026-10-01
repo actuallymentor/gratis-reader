@@ -1,5 +1,18 @@
 import { multiline_trim } from 'mentie'
 
+// --- Cache versioning ---
+
+// Bump when prompt changes should make cached translations and glosses re-run. Version 1
+// keeps the original key format, so translations cached before versioning stay valid.
+export const PROMPT_VERSION = 1
+
+/**
+ * Appends the prompt version to a persistent cache key
+ * @param {string} key
+ * @returns {string}
+ */
+export const versioned_cache_key = ( key ) => PROMPT_VERSION > 1 ? `${ key }:v${ PROMPT_VERSION }` : key
+
 // --- Level definitions ---
 
 export const LEVELS = [

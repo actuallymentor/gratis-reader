@@ -1,5 +1,5 @@
 import { Component, lazy, Suspense, useEffect, useRef, useState } from 'react'
-import { Routes as RouterRoutes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { Routes as RouterRoutes, Route, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
 import styled from 'styled-components'
 import toast from 'react-hot-toast'
 
@@ -7,7 +7,22 @@ import LibraryPage from '../components/pages/LibraryPage.jsx'
 
 // The library is the landing page; the reader (with epub parsing and markdown) and onboarding load on demand
 const OnboardingPage = lazy( () => import( `../components/pages/OnboardingPage.jsx` ) )
-const ReaderPage = lazy( () => import( `../components/pages/ReaderPage.jsx` ) )
+
+// The reader chunk is fetched while the browser is idle after the first paint. Once loaded it
+// renders directly: suspending a route on navigation costs far more than the download itself.
+const load_reader = () => import( `../components/pages/ReaderPage.jsx` )
+let reader_module = null
+const prefetch_reader = () => load_reader().then( module => {
+    reader_module = module
+} ).catch( () => {} )
+const LazyReaderPage = lazy( load_reader )
+
+// Every book gets a fresh reader: chapter index, content and caches never leak between books
+const BookReader = () => {
+    const { book_id } = useParams()
+    const Reader = reader_module?.default || LazyReaderPage
+    return <Reader key={ book_id } />
+}
 
 // A lazy chunk that fails to download (stale deploy, flaky network) is recovered by reloading once;
 // React caches the rejected import, so re-rendering alone would never retry it.
@@ -111,6 +126,12 @@ const FragmentKeyLoading = () => <AuthLoadingContainer>
 
 export default function Routes() {
 
+    // Warm the reader once the library (or onboarding) has painted
+    useEffect( () => {
+        const schedule = window.requestIdleCallback || ( callback => setTimeout( callback, 1_000 ) )
+        schedule( prefetch_reader )
+    }, [] )
+
     const location = useLocation()
     const navigate = useNavigate()
     const api_key = use_settings_store( state => state.api_key )
@@ -179,7 +200,7 @@ export default function Routes() {
         { /* Redirect to library if already onboarded */ }
         <Route path="/" element={ api_key ? <Navigate to="/library" replace /> : <OnboardingPage /> } />
         <Route path="/library" element={ api_key ? <LibraryPage /> : <Navigate to="/" replace /> } />
-        <Route path="/read/:book_id" element={ api_key ? <ReaderPage /> : <Navigate to="/" replace /> } />
+        <Route path="/read/:book_id" element={ api_key ? <BookReader /> : <Navigate to="/" replace /> } />
 
         { /* Catch-all — redirect unknown routes */ }
         <Route path="*" element={ <Navigate to="/" replace /> } />

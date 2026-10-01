@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.24.0] - 2026-10-01
+
+### Fixed
+- Keep every translation request of a reader under one ceiling of five, including failure retries and forced re-translation
+- Serve hashed assets, covers and EPUBs with long-lived cache headers; deploys now use a wrangler version that applies `_headers`
+- Show illustrations inside chapters; they pointed at paths outside the book
+- Stop library covers from failing to load after returning from the reader
+- Give every book its own reader state, so switching books never reuses the previous chapter
+- Open books as fast as before the bundle split: the reader is prefetched while idle instead of suspending the route on click (first open had slowed from ~0.35s to ~1.5s)
+
+### Changed
+- Version translation and gloss cache keys by prompt, so a future prompt change can re-translate without clearing storage; existing cached translations stay valid
+
 ## [1.23.0] - 2026-10-01
 
 ### Changed

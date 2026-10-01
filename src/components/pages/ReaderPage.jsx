@@ -273,7 +273,7 @@ export default function ReaderPage() {
         book_meta, chapters, spine, current_chapter, current_chapter_content,
         ahead_chapters_content,
         go_to_chapter, next_chapter, prev_chapter, progress,
-        loading, chapter_loading, chapter_error, source_language
+        loading, chapter_loading, chapter_error, source_language, resolve_asset
     } = use_book( book_id, reading_window.ahead_word_budget )
 
     // Settings
@@ -825,6 +825,7 @@ export default function ReaderPage() {
                     translation_selection={ translation_selection }
                     selected_word_lookup={ selected_word_lookup }
                     on_select_word={ select_translation_word }
+                    resolve_asset={ resolve_asset }
                 /> }
 
             { !chapter_loading && !chapter_error && current_chapter_content?.elements?.length === 0

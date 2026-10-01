@@ -1,5 +1,5 @@
-import { useMemo, useEffect } from 'react'
 import styled from 'styled-components'
+import { cover_url_for } from '../../modules/cover_urls.js'
 
 const Card = styled.div`
     background: var(--bg-surface);
@@ -93,17 +93,7 @@ const DeleteButton = styled.button`
  */
 export default function BookCard( { book, on_open, on_delete } ) {
 
-    // Create and revoke object URL to prevent memory leaks
-    const cover_url = useMemo( () => {
-        if( book.cover_image ) return URL.createObjectURL( book.cover_image )
-        return null
-    }, [ book.cover_image ] )
-
-    useEffect( () => {
-        return () => {
-            if( cover_url ) URL.revokeObjectURL( cover_url )
-        }
-    }, [ cover_url ] )
+    const cover_url = cover_url_for( book )
 
     return <Card>
         <div onClick={ on_open } style={ { flex: 1 } }>

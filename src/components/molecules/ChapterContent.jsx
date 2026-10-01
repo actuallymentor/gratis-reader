@@ -1,4 +1,4 @@
-import { memo, Fragment } from 'react'
+import { memo, Fragment, useEffect, useState } from 'react'
 import styled from 'styled-components'
 import Sentence from './Sentence.jsx'
 
@@ -37,6 +37,30 @@ const Blockquote = styled.blockquote`
     font-style: italic;
 `
 
+const Figure = styled.img`
+    display: block;
+    max-width: 100%;
+    height: auto;
+    margin: var(--space-l) auto;
+`
+
+// EPUB images are archive paths; the reader resolves them to blob URLs on demand
+function ChapterImage( { src, alt, resolve_asset } ) {
+
+    const [ url, set_url ] = useState( null )
+
+    useEffect( () => {
+        let live = true
+        resolve_asset( src ).then( resolved => live && set_url( resolved ) ).catch( () => {} )
+        return () => {
+            live = false
+        }
+    }, [ src, resolve_asset ] )
+
+    return url ? <Figure src={ url } alt={ alt } /> : null
+
+}
+
 /**
  * Renders one chapter's parsed elements as selectable sentences.
  * Memoised so lookup, token and status updates in the reader chrome do not
@@ -47,9 +71,10 @@ const Blockquote = styled.blockquote`
  * @param {Object|null} props.translation_selection - { sentence_id, word_index, word } for the selected word
  * @param {Object|null} props.selected_word_lookup - Lookup state for the selected word
  * @param {Function} props.on_select_word - Receives the selected fragment and word
+ * @param {Function} props.resolve_asset - Turns an image element's src into a loadable URL
  * @returns {JSX.Element}
  */
-function ChapterContent( { elements, translations, translation_selection, selected_word_lookup, on_select_word } ) {
+function ChapterContent( { elements, translations, translation_selection, selected_word_lookup, on_select_word, resolve_asset } ) {
 
     // Render sentences with inter-sentence spacing via text node
     const render_sentence = ( sentence, index ) => <Fragment key={ sentence.id }>
@@ -98,7 +123,7 @@ function ChapterContent( { elements, translations, translation_selection, select
             </Blockquote>
 
         case `image`:
-            return <img key={ i } src={ element.src } alt={ element.alt } />
+            return <ChapterImage key={ i } src={ element.src } alt={ element.alt } resolve_asset={ resolve_asset } />
 
         default:
             return null

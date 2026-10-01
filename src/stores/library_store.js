@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { get_all_books, save_book, delete_book as db_delete_book, get_book } from '../modules/cache.js'
 import { log } from 'mentie'
+import { release_cover_url } from '../modules/cover_urls.js'
 
 /**
  * Book library state — metadata synced from IndexedDB
@@ -32,6 +33,7 @@ export const use_library_store = create( ( set, get ) => ( {
     remove_book: async ( id ) => {
         await db_delete_book( id )
         set( { books: get().books.filter( b => b.id !== id ) } )
+        release_cover_url( id )
     },
 
     // Get a single book by ID

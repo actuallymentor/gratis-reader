@@ -68,9 +68,12 @@ jobs:
                     exit 1
                   fi
 
+            # wrangler-action's bundled wrangler predates _headers support for Workers static
+            # assets, which silently served every file with max-age=0. Pin a version that applies it.
             - name: Deploy to Cloudflare Workers
               uses: cloudflare/wrangler-action@v3
               with:
                   apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
                   accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+                  wranglerVersion: "4.145.0"
                   command: deploy

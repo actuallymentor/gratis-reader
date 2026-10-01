@@ -59,6 +59,23 @@ const expected_sentences = async page => {
     } ) )
 }
 
+// Resize notifications arrive on a real rendering step that the fake clock does not drive.
+// A fresh observer's first callback lands in that same step, after the window's resize event,
+// so the reader has seen the new viewport before the clock runs its scan timer.
+const after_layout = page => page.evaluate( () => new Promise( resolve => {
+    const observer = new ResizeObserver( () => {
+        observer.disconnect()
+        resolve()
+    } )
+    observer.observe( document.documentElement )
+} ) )
+
+// Advance fake time in small steps: React commits on real-time tasks between them, so a
+// timer scheduled by a commit (scan → window update → translation queue) still fires.
+const run_clock = async ( page, ms ) => {
+    for( let elapsed = 0; elapsed < ms; elapsed += 50 ) await page.clock.runFor( 50 )
+}
+
 const settle = async page => {
     await expect( page.getByText( /^Translating · \d+\/\d+$/ ) ).not.toBeVisible()
     await page.clock.runFor( 600 )
@@ -267,7 +284,8 @@ test.describe( `Viewport translation budget`, () => {
         const original_window = await expected_sentences( page )
 
         await page.setViewportSize( { width: 900, height: 500 } )
-        await page.clock.runFor( 600 )
+        await after_layout( page )
+        await run_clock( page, 600 )
         const smaller_window = await expected_sentences( page )
         expect( original_window.length ).toBeGreaterThan( smaller_window.length )
         expect( initial.every( sentence => smaller_window.includes( sentence ) ) ).toBe( true )
@@ -298,4 +316,47 @@ test.describe( `Viewport translation budget`, () => {
         await settle( page )
         expect( calls.sentences.filter( sentence => chapters[0].includes( sentence ) ) ).toEqual( initial.filter( sentence => chapters[0].includes( sentence ) ) )
     } )
+
+    test( `keeps live, retried and queued translations under one shared request ceiling`, async ( { page } ) => {
+        // One sentence per paragraph: every request is a single, so counts map to requests
+        const sentences = Array.from( { length: 40 }, ( _, index ) => `Sentence number ${ index } carries a handful of short words.` )
+        await seed_epub( page, [ sentences ] )
+        const failed_sentences = []
+        const held = []
+        const retried = []
+        let release_all = false
+        await page.route( CHAT_URL, async route => {
+            const request = parse_chat_request( route.request().postDataJSON() )
+            const answer = () => fulfil_chat( route, answer_request( request, { sentence: text => text } ) )
+            if( request.kind !== `sentence` ) return answer()
+            // The first five requests fail and schedule retries
+            if( failed_sentences.length < 5 && !failed_sentences.includes( request.sentence ) ) {
+                failed_sentences.push( request.sentence )
+                return route.fulfill( { status: 500, body: `{}` } )
+            }
+            if( failed_sentences.includes( request.sentence ) ) retried.push( request.sentence )
+            if( release_all ) return answer()
+            held.push( answer )
+        } )
+        await open_seeded_reader( page )
+
+        // The live window fills every slot after the failures
+        await expect.poll( () => held.length ).toBe( 5 )
+
+        // Retries come due while those five are still open (the retry check runs every
+        // 5s and the first backoff is 5s, so the 10s check picks them up): they must wait
+        await run_clock( page, 11_000 )
+        expect( held.length ).toBe( 5 )
+        expect( retried ).toHaveLength( 0 )
+
+        // Freed slots go to the waiting work, retries included
+        release_all = true
+        await Promise.all( held.splice( 0 ).map( answer => answer() ) )
+        await run_clock( page, 1_000 )
+        await expect.poll( async () => {
+            await page.clock.runFor( 500 )
+            return new Set( retried ).size
+        } ).toBe( 5 )
+    } )
+
 } )

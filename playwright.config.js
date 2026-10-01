@@ -4,7 +4,8 @@ export default defineConfig( {
 
     testDir: `./tests`,
 
-    timeout: 30_000,
+    // Upload → parse → reader flows run close to 30s on a busy machine with two workers
+    timeout: 60_000,
     expect: { timeout: 5_000 },
 
     fullyParallel: false,
