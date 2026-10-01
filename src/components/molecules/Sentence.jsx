@@ -6,26 +6,34 @@ import { segment_translation_text } from '../../modules/translation_alignment.js
 
 const lookup_unavailable = `Translation unavailable`
 
+// Words are plain spans styled from the sentence: a styled-component instance per
+// word costs a hook call and class resolution for thousands of words per chapter.
 const SentenceSpan = styled.span`
     position: relative;
-`
 
-const SelectableWord = styled.span`
-    position: relative;
-    border-radius: 2px;
-    color: inherit;
-    cursor: pointer;
-    scroll-margin-bottom: calc(var(--reader-dock-height, 0px) + var(--space-m));
-    text-decoration-line: ${ p => p.$selected ? `underline` : `none` };
-    text-decoration-thickness: 2px;
-    text-underline-offset: 0.15em;
-    touch-action: manipulation;
+    & [data-translation-word-index] {
+        position: relative;
+        border-radius: 2px;
+        color: inherit;
+        cursor: pointer;
+        scroll-margin-bottom: calc(var(--reader-dock-height, 0px) + var(--space-m));
+        text-decoration-line: none;
+        text-decoration-thickness: 2px;
+        text-underline-offset: 0.15em;
+        touch-action: manipulation;
+    }
 
-    &:focus-visible {
+    & [data-translation-word-index][aria-pressed="true"] {
+        text-decoration-line: underline;
+    }
+
+    & [data-translation-word-index]:focus-visible {
         outline: 2px solid currentColor;
         outline-offset: 2px;
     }
 `
+
+const ACTIVATION_KEYS = [ `Enter`, ` `, `Spacebar` ]
 
 /**
  * Renders one translated fragment as individually selectable words.
@@ -57,37 +65,38 @@ function Sentence( {
             : segment.text ) }
     </SentenceSpan>
 
-    const select_word = ( word, element ) => {
+    const segments = segment_translation_text( translated )
+
+    // One delegated handler per sentence instead of two closures per word.
+    const activate_word = ( e ) => {
         if( !on_select_word ) return
+        if( e.type === `keydown` && !ACTIVATION_KEYS.includes( e.key ) ) return
 
-        on_select_word( {
-            sentence_id,
-            word_index: word.word_index,
-            word: word.text,
-            element
-        } )
-    }
-
-    const activate_word = ( e, word ) => {
-        if( e.type === `keydown` && ![ `Enter`, ` `, `Spacebar` ].includes( e.key ) ) return
+        const element = e.target.closest( `[data-translation-word-index]` )
+        if( !element || !e.currentTarget.contains( element ) ) return
 
         e.preventDefault()
         e.stopPropagation()
-        select_word( word, e.currentTarget )
+
+        on_select_word( {
+            sentence_id,
+            word_index: Number( element.dataset.translationWordIndex ),
+            word: element.dataset.translationWord,
+            element
+        } )
     }
 
     const tooltip_content = word_lookup?.content
         || ( !word_lookup?.can_lookup || word_lookup?.error ? lookup_unavailable : `...` )
 
-    const rendered_segments = segment_translation_text( translated ).map( ( segment, index ) => {
+    const rendered_segments = segments.map( ( segment, index ) => {
         if( !segment.is_word ) return segment.text
 
         const selected = segment.word_index === selected_word_index
 
-        return <SelectableWord
+        return <span
             key={ `${ index }-${ segment.word_index }` }
             ref={ selected ? selected_word_ref : null }
-            $selected={ selected }
             role="button"
             tabIndex={ 0 }
             aria-pressed={ selected }
@@ -97,14 +106,12 @@ function Sentence( {
             data-reading-word-index={ segment.word_index }
             data-translation-word={ segment.text }
             data-translation-word-index={ segment.word_index }
-            onClick={ e => activate_word( e, segment ) }
-            onKeyDown={ e => activate_word( e, segment ) }
         >
             { segment.text }
-        </SelectableWord>
+        </span>
     } )
 
-    return <SentenceSpan data-sentence-id={ sentence_id }>
+    return <SentenceSpan data-sentence-id={ sentence_id } onClick={ activate_word } onKeyDown={ activate_word }>
         { rendered_segments }
         { selected_word_index !== null && <ReaderWordTooltip
             anchor_ref={ selected_word_ref }

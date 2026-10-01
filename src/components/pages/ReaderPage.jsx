@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, useRef, Fragment } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import * as Throttle from 'promise-parallel-throttle'
@@ -7,11 +7,12 @@ import { use_translation } from '../../hooks/use_translation.js'
 import { use_reading_window } from '../../hooks/use_reading_window.js'
 import { use_turbo_lookup } from '../../hooks/use_turbo_lookup.js'
 import { use_word_lookup } from '../../hooks/use_word_lookup.js'
+import { useShallow } from 'zustand/react/shallow'
 import { use_settings_store } from '../../stores/settings_store.js'
 import { save_progress, get_progress } from '../../modules/cache.js'
 import { DEFAULT_LEVEL, LEVELS } from '../../modules/prompts.js'
 import { segment_translation_text } from '../../modules/translation_alignment.js'
-import Sentence from '../molecules/Sentence.jsx'
+import ChapterContent from '../molecules/ChapterContent.jsx'
 import ExplanationPopover from '../molecules/ExplanationPopover.jsx'
 import TranslationInfoSheet from '../molecules/TranslationInfoSheet.jsx'
 import SettingsDrawer from '../molecules/SettingsDrawer.jsx'
@@ -98,41 +99,6 @@ const ReadingArea = styled.main`
     line-height: 1.8;
     letter-spacing: 0.01em;
     overflow-wrap: break-word;
-`
-
-const Paragraph = styled.p`
-    margin-bottom: var(--space-l);
-    line-height: 1.8;
-`
-
-const Heading = styled.div`
-    font-family: var(--font-heading);
-    font-weight: 500;
-    margin: var(--space-xl) 0 var(--space-l);
-
-    &[data-level="1"] { font-size: 1.8em; }
-    &[data-level="2"] { font-size: 1.4em; }
-    &[data-level="3"] { font-size: 1.2em; }
-    &[data-level="4"], &[data-level="5"], &[data-level="6"] { font-size: 1.1em; }
-`
-
-const ListContainer = styled.ul`
-    margin-bottom: var(--space-l);
-    padding-left: var(--space-xl);
-    list-style-type: ${ p => p.$ordered ? `decimal` : `disc` };
-`
-
-const ListItem = styled.li`
-    margin-bottom: var(--space-s);
-    line-height: 1.8;
-`
-
-const Blockquote = styled.blockquote`
-    border-left: 3px solid var(--accent);
-    padding-left: var(--space-l);
-    margin: var(--space-l) 0;
-    color: var(--text-muted);
-    font-style: italic;
 `
 
 const ReaderDock = styled.div`
@@ -312,7 +278,9 @@ export default function ReaderPage() {
     } = use_book( book_id, reading_window.ahead_word_budget )
 
     // Settings
-    const { font_size, font_family, last_language, last_level, set_last_language, set_last_level, model, turbo_mode } = use_settings_store()
+    const { font_size, font_family, last_language, last_level, set_last_language, set_last_level, model, turbo_mode } = use_settings_store( useShallow( ( {
+        font_size, font_family, last_language, last_level, set_last_language, set_last_level, model, turbo_mode
+    } ) => ( { font_size, font_family, last_language, last_level, set_last_language, set_last_level, model, turbo_mode } ) ) )
 
     // A previous chapter/language window must never authorize lookups in the new context.
     const window_key = JSON.stringify( [ book_id, current_chapter, source_language, last_language, last_level ] )
@@ -424,9 +392,17 @@ export default function ReaderPage() {
         () => segment_translation_text( selected_translation ),
         [ selected_translation ]
     )
-    const selected_word_lookup = translation_selection?.word
+    const latest_word_lookup = translation_selection?.word
         ? get_lookup_state( translation_selection.word )
         : null
+    // get_lookup_state returns a fresh object per render; keep the reference while its values hold
+    // so the memoised chapter body and selected sentence skip unrelated re-renders.
+    const selected_word_lookup_ref = useRef( null )
+    const previous_word_lookup = selected_word_lookup_ref.current
+    const word_lookup_unchanged = previous_word_lookup && latest_word_lookup
+        && Object.keys( latest_word_lookup ).every( key => previous_word_lookup[key] === latest_word_lookup[key] )
+    selected_word_lookup_ref.current = word_lookup_unchanged ? previous_word_lookup : latest_word_lookup
+    const selected_word_lookup = selected_word_lookup_ref.current
 
     const word_by_word_segments = selected_translation_segments.map( segment => {
         if( !segment.is_word ) return segment
@@ -592,18 +568,9 @@ export default function ReaderPage() {
     const select_word_by_word = useCallback( ( segment ) => {
         if( !selected_sentence || !segment?.is_word ) return
 
-        const sentence_elements = Array.from(
-            reading_area_ref.current?.querySelectorAll( `[data-sentence-id]` ) || []
-        )
-        const sentence_element = sentence_elements.find(
-            element => element.dataset.sentenceId === selected_sentence.id
-        )
-        const word_elements = Array.from(
-            sentence_element?.querySelectorAll( `[data-translation-word-index]` ) || []
-        )
-        const word_element = word_elements.find(
-            element => Number( element.dataset.translationWordIndex ) === segment.word_index
-        )
+        const word_element = reading_area_ref.current?.querySelector(
+            `[data-sentence-id="${ CSS.escape( selected_sentence.id ) }"] [data-translation-word-index="${ segment.word_index }"]`
+        ) || undefined
 
         select_translation_word( {
             sentence_id: selected_sentence.id,
@@ -744,6 +711,12 @@ export default function ReaderPage() {
     // Get level info for badge
     const level_info = LEVELS.find( l => l.code === last_level ) || DEFAULT_LEVEL
 
+    // Match TOC entries to spine items by href (strip hash fragments); the reader re-renders often.
+    const toc_labels = useMemo( () => {
+        const labels_by_href = new Map( chapters.map( c => [ c.href?.split( `#` )[0], c.label ] ) )
+        return spine.map( spine_item => labels_by_href.get( spine_item?.href?.split( `#` )[0] ) )
+    }, [ spine, chapters ] )
+
     const translated_sentence_count = useMemo(
         () => current_chapter_sentences.filter( sentence => translations[sentence.id] ).length,
         [ current_chapter_sentences, translations ]
@@ -751,63 +724,6 @@ export default function ReaderPage() {
     const translation_sentence_count = current_chapter_sentences.length
     const current_chapter_translating = is_translating
         && translated_sentence_count < translation_sentence_count
-
-    // --- Render helpers ---
-
-    // Render sentences with inter-sentence spacing via text node
-    const render_sentence = ( sentence, index ) => <Fragment key={ sentence.id }>
-        { index > 0 && ` ` }
-        <Sentence
-            sentence_id={ sentence.id }
-            original={ sentence.text }
-            translated={ translations[sentence.id] }
-            selected_word_index={ translation_selection?.sentence_id === sentence.id
-                ? translation_selection.word_index
-                : null }
-            word_lookup={ translation_selection?.sentence_id === sentence.id
-                ? selected_word_lookup
-                : null }
-            on_select_word={ select_translation_word }
-        />
-    </Fragment>
-
-    const render_element = ( element, i ) => {
-
-        switch ( element.type ) {
-
-        case `heading`:
-            return <Heading key={ i } data-level={ element.level }>
-                { element.sentences.map( render_sentence ) }
-            </Heading>
-
-        case `paragraph`:
-            return <Paragraph key={ i }>
-                { element.sentences.map( render_sentence ) }
-            </Paragraph>
-
-        case `unordered_list`:
-        case `ordered_list`:
-            return <ListContainer key={ i } $ordered={ element.type === `ordered_list` }>
-                { element.items.map( ( item, j ) =>
-                    <ListItem key={ j }>
-                        { item.sentences.map( render_sentence ) }
-                    </ListItem>
-                ) }
-            </ListContainer>
-
-        case `blockquote`:
-            return <Blockquote key={ i }>
-                { element.sentences.map( render_sentence ) }
-            </Blockquote>
-
-        case `image`:
-            return <img key={ i } src={ element.src } alt={ element.alt } />
-
-        default:
-            return null
-        }
-
-    }
 
     // --- Book not found — redirect to library ---
 
@@ -864,9 +780,7 @@ export default function ReaderPage() {
         </ModalOverlay>
     </Page>
 
-    // --- Chapter title ---
-    const current_spine_href = spine[current_chapter]?.href?.split( `#` )[0]
-    const chapter_title = chapters.find( c => c.href?.split( `#` )[0] === current_spine_href )?.label
+    const chapter_title = toc_labels[current_chapter]
         || book_meta?.title
         || `Chapter ${ current_chapter + 1 }`
 
@@ -885,14 +799,11 @@ export default function ReaderPage() {
                     value={ current_chapter }
                     onChange={ ( e ) => go_to_chapter( Number( e.target.value ) ) }
                 >
-                    { spine.map( ( spine_item, i ) => {
-                        // Match TOC entry by href (strip hash fragments for comparison)
-                        const spine_href = spine_item?.href?.split( `#` )[0]
-                        const toc_entry = chapters.find( c => c.href?.split( `#` )[0] === spine_href )
-                        return <option key={ i } value={ i }>
-                            { toc_entry?.label || `Section ${ i + 1 }` }
+                    { spine.map( ( spine_item, i ) =>
+                        <option key={ i } value={ i }>
+                            { toc_labels[i] || `Section ${ i + 1 }` }
                         </option>
-                    } ) }
+                    ) }
                 </TocSelect>
                 : <ChapterTitle>{ chapter_title }</ChapterTitle> }
 
@@ -921,7 +832,13 @@ export default function ReaderPage() {
             </ChapterError> }
 
             { !chapter_loading && !chapter_error && current_chapter_content?.elements?.length > 0
-                && current_chapter_content.elements.map( render_element ) }
+                && <ChapterContent
+                    elements={ current_chapter_content.elements }
+                    translations={ translations }
+                    translation_selection={ translation_selection }
+                    selected_word_lookup={ selected_word_lookup }
+                    on_select_word={ select_translation_word }
+                /> }
 
             { !chapter_loading && !chapter_error && current_chapter_content?.elements?.length === 0
                 && <ChapterError>This chapter has no translatable text content.</ChapterError> }

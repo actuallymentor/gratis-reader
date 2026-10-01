@@ -95,29 +95,69 @@ const index_translation_words = ( segments ) => {
 
 }
 
+// One segmenter per page: constructing Intl.Segmenter loads ICU data and is far
+// slower than segmenting a sentence with it.
+let word_segmenter
+const get_word_segmenter = () => {
+
+    if( word_segmenter !== undefined ) return word_segmenter
+
+    try {
+        word_segmenter = typeof Intl !== `undefined` && Intl.Segmenter
+            ? new Intl.Segmenter( undefined, { granularity: `word` } )
+            : null
+    } catch {
+        // Some older WebViews expose Segmenter but reject word granularity.
+        word_segmenter = null
+    }
+
+    return word_segmenter
+
+}
+
+// Sentences are re-segmented on every translation batch and reading-window scan,
+// so memoise per text. Results are shared: callers must treat them as frozen.
+const SEGMENT_CACHE_LIMIT = 5_000
+const segment_cache = new Map()
+
+const remember_segments = ( text, segments ) => {
+
+    if( segment_cache.size >= SEGMENT_CACHE_LIMIT ) {
+        // Map iterates in insertion order, so the first key is the oldest entry.
+        const [ oldest_text ] = segment_cache.keys()
+        segment_cache.delete( oldest_text )
+    }
+
+    segment_cache.set( text, segments )
+    return segments
+
+}
+
 /**
  * Splits translated text into exact display segments with stable tap-target indexes.
  * Locale-aware segmentation handles languages without spaces; a Unicode fallback
  * keeps the same public shape on older browsers.
  * @param {string} text - Adapted target-language fragment
- * @returns {Array<{ text: string, is_word: boolean, word_index: number|null }>}
+ * @returns {Array<{ text: string, is_word: boolean, word_index: number|null }>} Shared, do not mutate
  */
 export const segment_translation_text = ( text ) => {
 
     const visible_text = String( text || `` )
     if( !visible_text ) return []
 
-    if( typeof Intl !== `undefined` && Intl.Segmenter ) {
-        try {
-            const segmenter = new Intl.Segmenter( undefined, { granularity: `word` } )
-            const raw_segments = Array.from( segmenter.segment( visible_text ) )
+    const cached_segments = segment_cache.get( visible_text )
+    if( cached_segments ) return cached_segments
 
-            return index_translation_words( combine_hyphenated_words( raw_segments ) )
+    const segmenter = get_word_segmenter()
+    if( segmenter ) {
+        try {
+            const raw_segments = Array.from( segmenter.segment( visible_text ) )
+            return remember_segments( visible_text, index_translation_words( combine_hyphenated_words( raw_segments ) ) )
         } catch {
-            // Some older WebViews expose Segmenter but reject word granularity.
+            // Fall through to the Unicode fallback for this text only.
         }
     }
 
-    return index_translation_words( segment_with_unicode_fallback( visible_text ) )
+    return remember_segments( visible_text, index_translation_words( segment_with_unicode_fallback( visible_text ) ) )
 
 }

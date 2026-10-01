@@ -5,13 +5,12 @@ import styled from 'styled-components'
 const viewport_gap = 12
 const word_gap = 8
 
-const arrow_offset = ( offset = 0 ) =>
-    `${ offset < 0 ? `-` : `+` } ${ Math.abs( offset ) }px`
-
+// Position lives in inline styles and data attributes: styled-components would mint
+// a new stylesheet rule for every pixel the bubble moves while the reader scrolls.
 const Tooltip = styled.span`
     position: fixed;
-    top: ${ p => p.$y }px;
-    left: ${ p => p.$x }px;
+    top: 0;
+    left: 0;
     z-index: 100;
     width: max-content;
     max-width: min(16rem, calc(100vw - var(--space-xl)));
@@ -27,18 +26,29 @@ const Tooltip = styled.span`
     overflow-wrap: anywhere;
     pointer-events: none;
     text-align: center;
-    visibility: ${ p => p.$positioned ? `visible` : `hidden` };
+    visibility: hidden;
+
+    &[data-positioned="true"] {
+        visibility: visible;
+    }
 
     &::after {
         content: '';
         position: absolute;
-        top: ${ p => p.$below ? `auto` : `100%` };
-        bottom: ${ p => p.$below ? `100%` : `auto` };
-        left: clamp( 8px, calc( 50% ${ p => arrow_offset( p.$arrow_offset ) } ), calc( 100% - 8px ) );
+        top: 100%;
+        bottom: auto;
+        left: clamp( 8px, calc( 50% + var(--arrow-offset, 0px) ), calc( 100% - 8px ) );
         transform: translateX(-50%);
         border: 5px solid transparent;
-        border-top-color: ${ p => p.$below ? `transparent` : `var(--text)` };
-        border-bottom-color: ${ p => p.$below ? `var(--text)` : `transparent` };
+        border-top-color: var(--text);
+        border-bottom-color: transparent;
+    }
+
+    &[data-below="true"]::after {
+        top: auto;
+        bottom: 100%;
+        border-top-color: transparent;
+        border-bottom-color: var(--text);
     }
 `
 
@@ -167,11 +177,9 @@ export default function ReaderWordTooltip( { anchor_ref, anchor_key, id, content
         id={ id }
         role="tooltip"
         data-reader-word-tooltip
-        $x={ position.x }
-        $y={ position.y }
-        $arrow_offset={ position.arrow_offset }
-        $below={ position.below }
-        $positioned={ position.positioned }
+        data-below={ position.below }
+        data-positioned={ position.positioned }
+        style={ { top: position.y, left: position.x, '--arrow-offset': `${ position.arrow_offset }px` } }
     >
         { content }
     </Tooltip>, document.body )

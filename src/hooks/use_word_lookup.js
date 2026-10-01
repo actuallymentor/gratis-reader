@@ -88,8 +88,14 @@ export const use_word_lookup = ( {
     const default_context_ref = useRef( sentence_context )
     default_context_ref.current = sentence_context
 
+    // Turbo settles hundreds of lookups per screen; coalesce their re-renders to one per frame.
+    const refresh_frame_ref = useRef( null )
     const refresh_lookup_state = useCallback( () => {
-        if( mounted_ref.current ) set_lookup_version( version => version + 1 )
+        if( refresh_frame_ref.current !== null ) return
+        refresh_frame_ref.current = requestAnimationFrame( () => {
+            refresh_frame_ref.current = null
+            if( mounted_ref.current ) set_lookup_version( version => version + 1 )
+        } )
     }, [] )
 
     const remember_lookup_key = useCallback( ( cache_key ) => {
@@ -309,6 +315,8 @@ export const use_word_lookup = ( {
             mounted_ref.current = false
             cancel_lookups()
             word_abort_ref.current = {}
+            if( refresh_frame_ref.current !== null ) cancelAnimationFrame( refresh_frame_ref.current )
+            refresh_frame_ref.current = null
         }
     }, [ cancel_lookups ] )
 

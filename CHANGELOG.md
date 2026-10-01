@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.23.0] - 2026-10-01
+
+### Changed
+- Speed up the reader: one shared word segmenter with memoised segments, cheaper
+  viewport scans, lighter word spans, and fewer full-page re-renders during Turbo lookups
+- Position word tooltips with inline styles instead of a new stylesheet rule per scroll frame
+- Split sentences without re-slicing the paragraph at every punctuation mark
+
 ## [1.22.0] - 2026-09-30
 
 ### Added
