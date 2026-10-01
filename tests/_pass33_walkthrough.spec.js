@@ -4,6 +4,7 @@
  */
 import { test, expect, open_seeded_reader } from './helpers/app_fixture.js'
 import { setup_api_key, mock_openrouter, mock_auth } from './helpers/setup.js'
+import { chapter_combobox, open_chapter_list, expect_chapter } from './helpers/reader.js'
 
 test.describe( `Pass 33 — Walkthrough`, () => {
 
@@ -84,16 +85,15 @@ test.describe( `Pass 33 — Walkthrough`, () => {
 
             await open_seeded_reader( page )
 
-            const toc = page.locator( `header select` )
-            await expect( toc ).toBeVisible()
+            await expect( chapter_combobox( page ) ).toBeVisible()
 
             // Send each directional burst without serializing it on intermediate UI.
             for( let i = 0; i < 5; i++ ) await page.keyboard.press( `ArrowRight` )
-            await expect( toc ).toHaveValue( `5` )
+            await expect_chapter( page, 5 )
 
             for( let i = 0; i < 5; i++ ) await page.keyboard.press( `ArrowLeft` )
 
-            await expect( toc ).toHaveValue( `0` )
+            await expect_chapter( page, 0 )
             await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible()
             expect( errors ).toEqual( [] )
         } )
@@ -120,12 +120,10 @@ test.describe( `Pass 33 — Walkthrough`, () => {
         test( `BW121 TOC dropdown shows chapter list`, async ( { page } ) => {
             await open_seeded_reader( page )
 
-            // Find select/dropdown for TOC
-            const toc = page.locator( `select` ).first()
-            if( await toc.count() > 0 ) {
-                const options = await toc.locator( `option` ).count()
-                expect( options ).toBeGreaterThanOrEqual( 1 )
-            }
+            // Find the TOC combobox and its chapter list
+            await expect( chapter_combobox( page ) ).toBeVisible()
+            const options = await ( await open_chapter_list( page ) ).count()
+            expect( options ).toBeGreaterThanOrEqual( 1 )
         } )
 
     } )

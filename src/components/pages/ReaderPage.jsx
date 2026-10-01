@@ -16,6 +16,13 @@ import ExplanationPopover from '../molecules/ExplanationPopover.jsx'
 import TranslationInfoSheet from '../molecules/TranslationInfoSheet.jsx'
 import SettingsDrawer from '../molecules/SettingsDrawer.jsx'
 import LanguagePicker from '../molecules/LanguagePicker.jsx'
+import ComboBox from '../molecules/ComboBox.jsx'
+import LoadError from '../molecules/LoadError.jsx'
+import HelpButton from '../molecules/HelpButton.jsx'
+import Modal from '../atoms/Modal.jsx'
+import StatusPill from '../atoms/StatusPill.jsx'
+import { Button, IconButton } from '../atoms/Button.jsx'
+import { ArrowLeft, ChevronLeft, ChevronRight, FileText, Loader2, Menu, WifiOff } from 'lucide-react'
 import LevelPicker from '../molecules/LevelPicker.jsx'
 import ProgressBar from '../atoms/ProgressBar.jsx'
 import { SkeletonParagraph } from '../atoms/Skeleton.jsx'
@@ -44,20 +51,6 @@ const TopBar = styled.header`
     min-height: 48px;
 `
 
-const BackBtn = styled.button`
-    background: none;
-    border: none;
-    color: var(--text-muted);
-    font-size: 1.2em;
-    min-width: 44px;
-    min-height: 44px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: var(--radius-s);
-
-    &:hover { background: var(--bg-hover); color: var(--text); }
-`
 
 const ChapterTitle = styled.span`
     font-size: 0.85em;
@@ -69,20 +62,6 @@ const ChapterTitle = styled.span`
     text-align: center;
 `
 
-const GearBtn = styled.button`
-    background: none;
-    border: none;
-    color: var(--text-muted);
-    font-size: 1.2em;
-    min-width: 44px;
-    min-height: 44px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: var(--radius-s);
-
-    &:hover { background: var(--bg-hover); color: var(--text); }
-`
 
 const EMPTY_READING_WINDOW = { sentence_ids: [], words: [], ahead_word_budget: 0 }
 
@@ -120,19 +99,6 @@ const NavRow = styled.div`
     margin-top: var(--space-s);
 `
 
-const NavBtn = styled.button`
-    background: none;
-    border: 1px solid var(--border);
-    color: var(--text);
-    padding: var(--space-s) var(--space-m);
-    border-radius: var(--radius-s);
-    min-width: 44px;
-    min-height: 44px;
-    font-size: 0.85em;
-
-    &:hover:not(:disabled) { background: var(--bg-hover); }
-    &:disabled { opacity: 0.3; cursor: not-allowed; }
-`
 
 const ProgressText = styled.span`
     font-size: 0.8em;
@@ -146,20 +112,6 @@ const StatusRow = styled.div`
     margin-bottom: var(--space-s);
 `
 
-const TranslationStatus = styled.span`
-    font-size: 0.75em;
-    color: ${ p => p.$active ? `var(--accent-dark)` : `var(--text-muted)` };
-    animation: ${ p => p.$active ? `pulse 1.5s ease infinite` : `none` };
-
-    @keyframes pulse {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.5; }
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-        animation: none;
-    }
-`
 
 const TokenStats = styled.span`
     font-size: 0.7em;
@@ -170,90 +122,72 @@ const TokenStats = styled.span`
 `
 
 const OfflineBanner = styled.div`
-    background: var(--accent-light);
-    color: var(--accent-dark);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-xs);
+
+    svg { width: 1rem; height: 1rem; }
+
+    background: var(--warning-tint);
+    color: var(--warning-text);
     text-align: center;
     padding: var(--space-xs) var(--space-m);
     font-size: 0.8em;
 `
 
-const ChapterError = styled.div`
+const ChapterEmpty = styled.div`
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-s);
     text-align: center;
     padding: var(--space-2xl) var(--space-l);
     color: var(--text-muted);
-    font-size: 0.9em;
-    line-height: 1.6;
+    font-size: 0.95rem;
+    line-height: 1.5;
+
+    > svg { width: 1.5rem; height: 1.5rem; color: var(--accent); }
+`
+
+const TocSlot = styled.div`
+    flex: 1;
+    min-width: 0;
+    max-width: 22rem;
 `
 
 // --- Language Selection Modal ---
 
-const ModalOverlay = styled.div`
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 200;
-    padding: var(--space-l);
-`
 
-const ModalCard = styled.div`
-    background: var(--bg-surface);
-    border-radius: var(--radius-l);
-    padding: var(--space-2xl);
-    max-width: 420px;
-    width: 100%;
-    box-shadow: var(--shadow-l);
-`
 
-const ModalTitle = styled.h2`
-    margin-bottom: var(--space-l);
-    text-align: center;
-`
 
 const ModalSection = styled.div`
     margin-bottom: var(--space-l);
 `
 
+const ModalLabelRow = styled.div`
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--space-xs);
+`
+
 const ModalLabel = styled.label`
-    display: block;
-    font-size: 0.8em;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--text-muted);
-    margin-bottom: var(--space-s);
+    font-size: 0.9rem;
+    font-weight: 500;
 `
 
-const StartButton = styled.button`
-    width: 100%;
-    padding: var(--space-m);
-    background: var(--accent);
-    color: white;
-    border: none;
-    border-radius: var(--radius-m);
-    font-size: 1em;
-    font-weight: 600;
-    min-height: 48px;
-
-    &:hover { background: var(--accent-dark); }
+const ModalActions = styled.div`
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: var(--space-s);
+    margin-top: var(--space-l);
 `
+
 
 // --- Chapter TOC Dropdown ---
 
-const TocSelect = styled.select`
-    max-width: 200px;
-    min-width: 0;
-    flex: 1;
-    padding: var(--space-xs) var(--space-s);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-s);
-    background: var(--bg);
-    color: var(--text);
-    font-size: 0.8em;
-    text-overflow: ellipsis;
-`
 
 // --- Component ---
 
@@ -273,7 +207,7 @@ export default function ReaderPage() {
         book_meta, chapters, spine, current_chapter, current_chapter_content,
         ahead_chapters_content,
         go_to_chapter, next_chapter, prev_chapter, progress,
-        loading, chapter_loading, chapter_error, source_language, resolve_asset
+        loading, chapter_loading, chapter_error, retry_chapter, source_language, resolve_asset
     } = use_book( book_id, reading_window.ahead_word_budget )
 
     // Settings
@@ -704,6 +638,11 @@ export default function ReaderPage() {
         return spine.map( spine_item => labels_by_href.get( spine_item?.href?.split( `#` )[0] ) )
     }, [ spine, chapters ] )
 
+    const toc_options = useMemo(
+        () => spine.map( ( _, i ) => ( { value: String( i ), label: toc_labels[i] || `Section ${ i + 1 }` } ) ),
+        [ spine, toc_labels ]
+    )
+
     const translated_sentence_count = useMemo(
         () => current_chapter_sentences.filter( sentence => translations[sentence.id] ).length,
         [ current_chapter_sentences, translations ]
@@ -728,9 +667,9 @@ export default function ReaderPage() {
 
     if( loading ) return <Page>
         <TopBar>
-            <BackBtn onClick={ () => navigate( `/library` ) }>←</BackBtn>
+            <IconButton label="Back to library" icon={ <ArrowLeft strokeWidth={ 1.5 } /> } onClick={ () => navigate( `/library` ) } />
             <ChapterTitle>Loading...</ChapterTitle>
-            <div style={ { width: 44 } } />
+            <div style={ { width: `2rem` } } />
         </TopBar>
         <ReadingArea $font_size={ font_size } $font_family={ font_family }>
             <SkeletonParagraph lines={ 4 } />
@@ -742,29 +681,38 @@ export default function ReaderPage() {
     // --- Language selection modal ---
 
     if( show_language_modal ) return <Page>
-        <ModalOverlay role="dialog" aria-modal="true" aria-label="Choose your language">
-            <ModalCard>
-                <ModalTitle>Choose Your Language</ModalTitle>
+        <Modal title="Choose Your Language" width="30rem">
+            <ModalSection>
+                <ModalLabelRow>
+                    <ModalLabel htmlFor="first-open-language">Target language</ModalLabel>
+                </ModalLabelRow>
+                <LanguagePicker id="first-open-language" value={ last_language } on_change={ set_last_language } />
+            </ModalSection>
 
-                <ModalSection>
-                    <ModalLabel>Target Language</ModalLabel>
-                    <LanguagePicker value={ last_language } on_change={ set_last_language } />
-                </ModalSection>
+            <ModalSection>
+                <ModalLabelRow>
+                    <ModalLabel as="span">Proficiency level</ModalLabel>
+                    <HelpButton title="Choosing a proficiency level" topic="proficiency levels">
+                        <p>The level decides how much each sentence is simplified before it is translated. Caveman and Toddler use very short, concrete sentences; Adult keeps the author's full style.</p>
+                        <p>Pick the level where you understand most words without looking them up. You can change it any time in Settings; translations at each level are cached separately.</p>
+                    </HelpButton>
+                </ModalLabelRow>
+                <LevelPicker value={ last_level } on_change={ set_last_level } />
+            </ModalSection>
 
-                <ModalSection>
-                    <ModalLabel>Proficiency Level</ModalLabel>
-                    <LevelPicker value={ last_level } on_change={ set_last_level } />
-                </ModalSection>
-
-                <StartButton onClick={ () => {
+            <ModalActions>
+                <Button variant="quiet" icon={ <ArrowLeft strokeWidth={ 1.5 } /> } onClick={ () => navigate( `/library` ) }>
+                    Back to library
+                </Button>
+                <Button variant="primary" data-autofocus onClick={ () => {
                     set_show_language_modal( false )
                     set_language_chosen( true )
                 } }
                 >
                     Start Reading
-                </StartButton>
-            </ModalCard>
-        </ModalOverlay>
+                </Button>
+            </ModalActions>
+        </Modal>
     </Page>
 
     const chapter_title = toc_labels[current_chapter]
@@ -773,28 +721,28 @@ export default function ReaderPage() {
 
     return <Page>
 
-        { is_offline && <OfflineBanner>
+        { is_offline && <OfflineBanner role="status">
+            <WifiOff strokeWidth={ 1.5 } aria-hidden="true" />
             Offline — showing cached translations
         </OfflineBanner> }
 
         <TopBar>
-            <BackBtn onClick={ () => navigate( `/library` ) } aria-label="Back to library">←</BackBtn>
+            <IconButton label="Back to library" icon={ <ArrowLeft strokeWidth={ 1.5 } /> } onClick={ () => navigate( `/library` ) } />
 
-            { /* eslint-disable react/jsx-indent-props */ }
+            {   }
             { chapters.length > 1
-                ? <TocSelect
-                    value={ current_chapter }
-                    onChange={ ( e ) => go_to_chapter( Number( e.target.value ) ) }
-                >
-                    { spine.map( ( spine_item, i ) =>
-                        <option key={ i } value={ i }>
-                            { toc_labels[i] || `Section ${ i + 1 }` }
-                        </option>
-                    ) }
-                </TocSelect>
+                ? <TocSlot>
+                    <ComboBox
+                        label="Chapter"
+                        value={ String( current_chapter ) }
+                        options={ toc_options }
+                        on_change={ value => go_to_chapter( Number( value ) ) }
+                        placeholder="Search chapters…"
+                    />
+                </TocSlot>
                 : <ChapterTitle>{ chapter_title }</ChapterTitle> }
 
-            <GearBtn onClick={ () => set_settings_open( true ) } aria-label="Settings">⚙</GearBtn>
+            <IconButton label="Settings" icon={ <Menu strokeWidth={ 1.5 } /> } onClick={ () => set_settings_open( true ) } />
         </TopBar>
 
         <ReadingArea
@@ -812,11 +760,11 @@ export default function ReaderPage() {
                 <SkeletonParagraph lines={ 3 } />
             </> }
 
-            { !chapter_loading && chapter_error && <ChapterError>
-                { chapter_error }
-                <br />
-                Try navigating to a different chapter.
-            </ChapterError> }
+            { !chapter_loading && <LoadError
+                title="Couldn't load this chapter"
+                error={ chapter_error && `${ chapter_error }. Retry, or move to another chapter.` }
+                on_retry={ retry_chapter }
+            /> }
 
             { !chapter_loading && !chapter_error && current_chapter_content?.elements?.length > 0
                 && <ChapterContent
@@ -829,7 +777,13 @@ export default function ReaderPage() {
                 /> }
 
             { !chapter_loading && !chapter_error && current_chapter_content?.elements?.length === 0
-                && <ChapterError>This chapter has no translatable text content.</ChapterError> }
+                && <ChapterEmpty>
+                    <FileText strokeWidth={ 1.5 } aria-hidden="true" />
+                    <p>This chapter has no translatable text content.</p>
+                    { current_chapter < spine.length - 1 && <Button icon={ <ChevronRight strokeWidth={ 1.5 } /> } onClick={ next_chapter }>
+                        Next chapter
+                    </Button> }
+                </ChapterEmpty> }
 
         </ReadingArea>
 
@@ -847,14 +801,15 @@ export default function ReaderPage() {
             <BottomBar>
                 <StatusRow>
                     <LevelBadge cefr={ level_info.cefr } label={ level_info.label } />
-                    { ( is_offline || current_chapter_translating ) && <TranslationStatus
-                        $active={ !is_offline && current_chapter_translating }
+                    { ( is_offline || current_chapter_translating ) && <StatusPill
+                        tone={ is_offline ? `warning` : `info` }
+                        icon={ is_offline ? <WifiOff strokeWidth={ 1.5 } aria-hidden="true" /> : <Loader2 className="spin" strokeWidth={ 1.5 } aria-hidden="true" /> }
                         aria-live="polite"
                     >
                         { is_offline
                             ? `Offline · ${ translated_sentence_count }/${ translation_sentence_count } cached`
                             : `Translating · ${ translated_sentence_count }/${ translation_sentence_count }` }
-                    </TranslationStatus> }
+                    </StatusPill> }
                     { ( token_usage.prompt_tokens > 0 || token_usage.completion_tokens > 0 ) && <TokenStats>
                         { format_tokens( token_usage.prompt_tokens + token_usage.completion_tokens ) } tokens
                         · { format_cost( estimate_cost( token_usage.prompt_tokens, token_usage.completion_tokens, model ) ) }
@@ -862,13 +817,14 @@ export default function ReaderPage() {
                 </StatusRow>
                 <ProgressBar percent={ progress } />
                 <NavRow>
-                    <NavBtn onClick={ prev_chapter } disabled={ current_chapter === 0 }>
-                        ← Prev
-                    </NavBtn>
+                    <Button icon={ <ChevronLeft strokeWidth={ 1.5 } /> } onClick={ prev_chapter } disabled={ current_chapter === 0 }>
+                        Prev
+                    </Button>
                     <ProgressText>{ current_chapter + 1 } / { spine.length } · { progress }%</ProgressText>
-                    <NavBtn onClick={ next_chapter } disabled={ current_chapter >= spine.length - 1 }>
-                        Next →
-                    </NavBtn>
+                    <Button onClick={ next_chapter } disabled={ current_chapter >= spine.length - 1 }>
+                        Next
+                        <ChevronRight strokeWidth={ 1.5 } />
+                    </Button>
                 </NavRow>
             </BottomBar>
         </ReaderDock>

@@ -1,22 +1,42 @@
 import { useState, useRef, useCallback } from 'react'
 import styled from 'styled-components'
+import { Upload } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { log } from 'mentie'
 import { parse_epub, hash_buffer } from '../../modules/epub_parser.js'
 import { use_library_store } from '../../stores/library_store.js'
 
-const DropZone = styled.div`
+// A label around a visually hidden file input: Tab reaches the input and Enter or Space opens
+// the native file chooser, with no scripted click. Dropping a file works on the whole zone.
+const DropZone = styled.label`
+    position: relative;
+    display: block;
+    width: 100%;
+    font: inherit;
+    color: inherit;
     border: 2px dashed ${ p => p.$active ? `var(--accent)` : `var(--border)` };
     border-radius: var(--radius-l);
-    padding: var(--space-2xl);
+    padding: var(--space-xl) var(--space-l);
     text-align: center;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: border-color var(--duration-press) ease, background var(--duration-press) ease;
+
+    svg {
+        width: 1.5rem;
+        height: 1.5rem;
+        margin: 0 auto var(--space-s);
+        color: var(--accent);
+    }
     background: ${ p => p.$active ? `var(--accent-light)` : `transparent` };
 
     &:hover {
         border-color: var(--accent);
         background: var(--accent-light);
+    }
+
+    &:focus-within {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 5px var(--focus-halo);
     }
 `
 
@@ -28,10 +48,17 @@ const DropText = styled.p`
 const DropAccent = styled.span`
     color: var(--accent);
     font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
 `
 
 const HiddenInput = styled.input`
-    display: none;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
 `
 
 /**
@@ -125,43 +152,42 @@ export default function FileUploader( { on_upload_complete } ) {
         if( file ) process_file( file )
     }, [ process_file, is_uploading ] )
 
-    return <>
-        <DropZone
-            $active={ is_active }
-            onClick={ () => input_ref.current?.click() }
-            onDragOver={ ( e ) => e.preventDefault() }
-            onDragEnter={ ( e ) => {
-                e.preventDefault()
-                drag_counter.current++
-                set_is_active( true )
-            } }
-            onDragLeave={ () => {
-                drag_counter.current--
-                if( drag_counter.current <= 0 ) {
-                    drag_counter.current = 0
-                    set_is_active( false )
-                }
-            } }
-            onDrop={ handle_drop }
-        >
-            { is_uploading
-                ? <DropText>Processing...</DropText>
-                : <>
-                    <DropText>
-                        Drop an EPUB file here, or <DropAccent>browse</DropAccent>
-                    </DropText>
-                    <DropText style={ { fontSize: `0.8em` } }>
-                        Supports .epub files
-                    </DropText>
-                </> }
-        </DropZone>
-
+    return <DropZone
+        $active={ is_active }
+        onDragOver={ ( e ) => e.preventDefault() }
+        onDragEnter={ ( e ) => {
+            e.preventDefault()
+            drag_counter.current++
+            set_is_active( true )
+        } }
+        onDragLeave={ () => {
+            drag_counter.current--
+            if( drag_counter.current <= 0 ) {
+                drag_counter.current = 0
+                set_is_active( false )
+            }
+        } }
+        onDrop={ handle_drop }
+    >
+        { is_uploading
+            ? <DropText>Processing...</DropText>
+            : <>
+                <Upload strokeWidth={ 1.5 } aria-hidden="true" />
+                <DropText>
+                    Drop an EPUB file here, or <DropAccent>browse</DropAccent>
+                </DropText>
+                <DropText style={ { fontSize: `0.8em` } }>
+                    Supports .epub files
+                </DropText>
+            </> }
         <HiddenInput
             ref={ input_ref }
             type="file"
             accept=".epub"
+            aria-label="Add a book: choose an EPUB file, or drop one here"
+            disabled={ is_uploading }
             onChange={ handle_file_input }
         />
-    </>
+    </DropZone>
 
 }

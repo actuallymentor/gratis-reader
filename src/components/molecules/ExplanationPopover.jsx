@@ -2,6 +2,9 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import styled from 'styled-components'
 import { marked } from 'marked'
 import { RotateCw } from 'lucide-react'
+import Modal from '../atoms/Modal.jsx'
+import { use_confirm } from './ConfirmModal.jsx'
+import { IconButton } from '../atoms/Button.jsx'
 import { chat_completion } from '../../modules/open_router.js'
 import { build_explanation_prompt, DEFAULT_LEVEL, LEVELS } from '../../modules/prompts.js'
 import { use_settings_store } from '../../stores/settings_store.js'
@@ -33,107 +36,6 @@ const FOREIGN_WORD_IGNORED_SELECTOR = [
 
 const tooltip_arrow_offset = ( offset = 0 ) =>
     `${ offset < 0 ? `-` : `+` } ${ Math.abs( offset ) }px`
-
-const Overlay = styled.div`
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.4);
-    display: flex;
-    align-items: flex-end;
-    justify-content: center;
-    z-index: 200;
-    animation: fade_in 0.2s ease;
-
-    @keyframes fade_in {
-        from { opacity: 0; }
-        to { opacity: 1; }
-    }
-
-    @media (min-width: 768px) {
-        align-items: center;
-    }
-`
-
-const Panel = styled.div`
-    background: var(--bg-surface);
-    border-radius: var(--radius-l) var(--radius-l) 0 0;
-    padding: var(--space-xl);
-    max-height: 80vh;
-    overflow-y: auto;
-    width: 100%;
-    max-width: min( 900px, calc( 100vw - var(--space-xl) * 2 ) );
-    animation: slide_up 0.3s ease-out;
-
-    @keyframes slide_up {
-        from { transform: translateY(100%); }
-        to { transform: translateY(0); }
-    }
-
-    @media (min-width: 768px) {
-        border-radius: var(--radius-l);
-        animation: scale_in 0.25s ease-out;
-
-        @keyframes scale_in {
-            from { transform: scale(0.95); opacity: 0; }
-            to { transform: scale(1); opacity: 1; }
-        }
-    }
-`
-
-const Header = styled.div`
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: var(--space-l);
-    gap: var(--space-m);
-`
-
-const TitleRow = styled.div`
-    display: flex;
-    align-items: center;
-    gap: var(--space-xs);
-    min-width: 0;
-`
-
-const Title = styled.h3`
-    font-size: 1.1em;
-    color: var(--text);
-`
-
-const HeaderActions = styled.div`
-    display: flex;
-    align-items: center;
-    gap: var(--space-xs);
-    flex-shrink: 0;
-`
-
-const IconButton = styled.button`
-    background: none;
-    border: none;
-    color: var(--text-muted);
-    line-height: 1;
-    padding: var(--space-xs);
-    min-width: 44px;
-    min-height: 44px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: var(--radius-s);
-
-    &:hover {
-        background: var(--bg-hover);
-        color: var(--text);
-    }
-
-    &:disabled {
-        cursor: wait;
-        opacity: 0.55;
-    }
-`
-
-const CloseButton = styled( IconButton )`
-    font-size: 1.5em;
-`
 
 const SentenceBlock = styled.div`
     background: var(--bg-hover);
@@ -360,6 +262,7 @@ export default function ExplanationPopover( {
     const [ explanation_tooltips, set_explanation_tooltips ] = useState( {} )
     const explanation_ref = useRef( null )
     const panel_ref = useRef( null )
+    const [ confirm_element, confirm ] = use_confirm()
     const api_key = use_settings_store( state => state.api_key )
     const model = use_settings_store( state => state.model )
     const last_level = use_settings_store( state => state.last_level )
@@ -391,7 +294,13 @@ export default function ExplanationPopover( {
 
     const retranslate = useCallback( async () => {
         if( !on_retranslate || retranslating ) return
-        if( !window.confirm( `Do you want to re-translate this sentence?` ) ) return
+        const confirmed = await confirm( {
+            title: `Do you want to re-translate this sentence?`,
+            body: <p>The cached translation is replaced with a fresh one, which uses API credits.</p>,
+            confirm_label: `Re-translate`,
+            danger: false
+        } )
+        if( !confirmed ) return
 
         set_retranslating( true )
         set_loading( true )
@@ -407,7 +316,7 @@ export default function ExplanationPopover( {
         } finally {
             set_retranslating( false )
         }
-    }, [ on_retranslate, retranslating, sentence_id ] )
+    }, [ on_retranslate, retranslating, sentence_id, confirm ] )
 
     const dismiss_explanation_tooltip = useCallback( ( tooltip_key ) => {
         set_explanation_tooltips( tooltips => {
@@ -512,15 +421,6 @@ export default function ExplanationPopover( {
         set_explanation_tooltips( {} )
     }, [ decorated_html ] )
 
-    // Close on Escape
-    useEffect( () => {
-        const handle_key = ( e ) => {
-            if( e.key === `Escape` ) on_close()
-        }
-        window.addEventListener( `keydown`, handle_key )
-        return () => window.removeEventListener( `keydown`, handle_key )
-    }, [ on_close ] )
-
     let explanation_body = <SkeletonParagraph lines={ 5 } />
     if( !loading ) explanation_body = <ExplanationText
         ref={ explanation_ref }
@@ -528,32 +428,18 @@ export default function ExplanationPopover( {
         dangerouslySetInnerHTML={ decorated_inner_html }
     />
 
-    return <Overlay
-        role="dialog"
-        aria-modal="true"
-        aria-label="Translation Explanation"
-        onClick={ ( e ) => {
-            if( e.target === e.currentTarget ) on_close()
-        } }
+    return <Modal
+        title="Translation Explanation"
+        width="56rem"
+        on_close={ on_close }
+        header_actions={ <IconButton
+            label="Re-translate sentence"
+            icon={ <RotateCw strokeWidth={ 1.5 } aria-hidden="true" /> }
+            onClick={ retranslate }
+            disabled={ retranslating || !on_retranslate }
+        /> }
     >
-        <Panel ref={ panel_ref }>
-
-            <Header>
-                <TitleRow>
-                    <Title>Translation Explanation</Title>
-                    <IconButton
-                        type="button"
-                        onClick={ retranslate }
-                        aria-label="Re-translate sentence"
-                        disabled={ retranslating || !on_retranslate }
-                    >
-                        <RotateCw size={ 18 } aria-hidden="true" />
-                    </IconButton>
-                </TitleRow>
-                <HeaderActions>
-                    <CloseButton onClick={ on_close } aria-label="Close">×</CloseButton>
-                </HeaderActions>
-            </Header>
+        <div ref={ panel_ref }>
 
             <SentenceBlock>
                 <Label>Original</Label>
@@ -604,7 +490,8 @@ export default function ExplanationPopover( {
                 </FloatingTooltip>
             } ) }
 
-        </Panel>
-    </Overlay>
+        </div>
+        { confirm_element }
+    </Modal>
 
 }

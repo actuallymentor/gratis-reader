@@ -1,5 +1,6 @@
 import { test, expect, open_seeded_reader } from './helpers/app_fixture.js'
 import { mock_openrouter } from './helpers/setup.js'
+import { chapter_combobox, open_chapter_list } from './helpers/reader.js'
 
 test.describe( `Reader`, () => {
 
@@ -87,15 +88,15 @@ test.describe( `Reader`, () => {
 
         await open_seeded_reader( page )
 
-        const select = page.locator( `select` )
         const first_sentence = page.locator( `span[data-sentence-id]` ).first()
         const first_id = await first_sentence.getAttribute( `data-sentence-id` )
 
-        await expect( select ).toBeVisible()
-        await expect.poll( () => select.locator( `option` ).count() ).toBeGreaterThan( 3 )
+        await expect( chapter_combobox( page ) ).toBeVisible()
+        const options = await open_chapter_list( page )
+        await expect.poll( () => options.count() ).toBeGreaterThan( 3 )
 
         // Select a later chapter
-        await select.selectOption( { index: 3 } )
+        await options.nth( 3 ).click()
         await expect( first_sentence ).not.toHaveAttribute( `data-sentence-id`, first_id )
 
     } )

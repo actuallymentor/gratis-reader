@@ -4,6 +4,7 @@
  */
 import { test, expect } from '@playwright/test'
 import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth, clear_storage } from './helpers/setup.js'
+import { confirm_in_modal } from './helpers/confirm_modal.js'
 
 test.describe( `Pass 32 — Walkthrough`, () => {
 
@@ -205,9 +206,11 @@ test.describe( `Pass 32 — Walkthrough`, () => {
         // Find and click remove button
         const delete_btn = page.getByRole( `button`, { name: /remove/i } )
 
-        // Handle confirm dialog
-        page.on( `dialog`, dialog => dialog.accept() )
-        await delete_btn.click()
+        // Confirm in the remove modal
+        await confirm_in_modal( page, {
+            title: `Remove “Smart work beats hard work”?`,
+            action: () => delete_btn.click()
+        } )
 
         // Book should be gone without counting Gutenberg catalog headings.
         await expect( page.getByRole( `heading`, { name: `Smart work beats hard work` } ) ).toHaveCount( 0 )

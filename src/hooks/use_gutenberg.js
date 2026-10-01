@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 
 // The first library mount downloads and parses the catalogue; later mounts re-request it
 // (the service worker answers from cache and revalidates) but only re-parse when it changed.
@@ -7,6 +7,7 @@ let catalog_etag = null
 
 const load_catalog = () => {
     catalog_promise ||= fetch( `/gutenberg.json` ).then( async response => {
+        if( !response.ok ) throw new Error( `The server answered ${ response.status }.` )
         catalog_etag = response.headers.get( `etag` ) || response.headers.get( `last-modified` )
         return response.json()
     } ).catch( error => {
@@ -28,18 +29,22 @@ const refresh_catalog = async () => {
 
 /**
  * Fetches the Gutenberg book catalog from the static JSON file
- * @returns {{ books: Array, loading: boolean }}
+ * @returns {{ books: Array, loading: boolean, error: string|null, retry: Function }}
  */
 export const use_gutenberg = () => {
 
     const [ books, set_books ] = useState( [] )
     const [ loading, set_loading ] = useState( true )
+    const [ error, set_error ] = useState( null )
+    const [ attempt, set_attempt ] = useState( 0 )
 
     useEffect( () => {
 
         let mounted = true
         const already_loaded = !!catalog_promise
 
+        set_loading( true )
+        set_error( null )
         load_catalog()
             .then( data => {
                 if( !mounted ) return
@@ -47,14 +52,22 @@ export const use_gutenberg = () => {
                 set_loading( false )
                 if( already_loaded ) return refresh_catalog().then( fresh => mounted && fresh && set_books( fresh ) )
             } )
-            .catch( () => mounted && set_loading( false ) )
+            .catch( failure => {
+                if( !mounted ) return
+                set_loading( false )
+                set_error( navigator.onLine === false
+                    ? `You are offline. Connect to the internet and try again.`
+                    : `Check your connection and try again. ${ failure?.message || `` }`.trim() )
+            } )
 
         return () => {
             mounted = false
         }
 
-    }, [] )
+    }, [ attempt ] )
 
-    return { books, loading }
+    const retry = useCallback( () => set_attempt( current => current + 1 ), [] )
+
+    return { books, loading, error, retry }
 
 }

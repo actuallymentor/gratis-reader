@@ -1,6 +1,7 @@
 import JSZip from 'jszip'
 import { test, expect, open_seeded_reader, SEEDED_BOOK_ID } from './helpers/app_fixture.js'
 import { CHAT_URL, parse_chat_request, fulfil_chat, answer_request } from './helpers/openrouter_mock.js'
+import { language_combobox } from './helpers/reader.js'
 const chapters = [ 12, 48, 48 ].map( ( count, chapter ) => Array.from( { length: count }, ( _, sentence ) =>
     Array.from( { length: 12 }, ( _, word ) => `word${ chapter }x${ sentence }x${ word }` ).join( ` ` ) + `.`
 ) )
@@ -185,7 +186,7 @@ test.describe( `Viewport translation budget`, () => {
         await expect.poll( () => lookups.length ).toBe( 4 )
 
         await page.getByRole( `button`, { name: `Settings` } ).click()
-        await page.getByPlaceholder( `Search languages...` ).fill( `French` )
+        await language_combobox( page ).fill( `French` )
         await page.keyboard.press( `Enter` )
         await page.keyboard.press( `Escape` )
         await expect.poll( () => held_french.length ).toBeGreaterThan( 0 )

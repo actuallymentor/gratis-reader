@@ -8,6 +8,8 @@ import {
     get_current_translation_entries
 } from './helpers/setup.js'
 import { CHAT_URL, parse_chat_request, fulfil_chat, answer_request } from './helpers/openrouter_mock.js'
+import { confirm_in_modal } from './helpers/confirm_modal.js'
+import { chapter_combobox, open_chapter_list, language_combobox } from './helpers/reader.js'
 
 /**
  * Pass 24 — Coverage gap tests
@@ -138,11 +140,11 @@ test.describe( `Pass 24 — Coverage Gaps`, () => {
         await expect( page.getByText( `TARGET LANGUAGE` ) ).toBeVisible( { timeout: 3000 } )
 
         // Focus the language input to open the dropdown
-        const lang_input = page.locator( `input[placeholder*="earch"]` ).first()
+        const lang_input = language_combobox( page )
         await lang_input.click()
 
-        // The dropdown should now show common languages — look for li items
-        const options = page.locator( `li` )
+        // The dropdown should now show common languages as options
+        const options = page.getByRole( `option` )
         await expect( options.first() ).toBeVisible()
         const option_texts = await options.allTextContents()
         const common = [ `Spanish`, `French`, `German`, `Italian`, `Portuguese` ]
@@ -233,9 +235,8 @@ test.describe( `Pass 24 — Coverage Gaps`, () => {
         await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible()
 
         // TOC dropdown should be functional
-        const toc = page.locator( `select` ).first()
-        await expect( toc ).toBeVisible()
-        expect( await toc.locator( `option` ).count() ).toBeGreaterThan( 0 )
+        await expect( chapter_combobox( page ) ).toBeVisible()
+        expect( await ( await open_chapter_list( page ) ).count() ).toBeGreaterThan( 0 )
     } )
 
     // ── Cache-first verification (Spec §6) ──
@@ -294,16 +295,12 @@ test.describe( `Pass 24 — Coverage Gaps`, () => {
         await cache_btn.scrollIntoViewIfNeeded()
         await expect( cache_btn ).toBeVisible()
 
-        // Click — dismiss the confirmation
-        const dialog_message = page.waitForEvent( `dialog` ).then( async dialog => {
-            const message = dialog.message()
-            await dialog.dismiss()
-            return message
+        // Click — the confirmation modal should appear; cancel it
+        await confirm_in_modal( page, {
+            title: /clear/i,
+            action: () => cache_btn.click(),
+            cancel: true
         } )
-        await cache_btn.click()
-
-        // Confirmation dialog should have appeared
-        expect( await dialog_message ).toMatch( /clear/i )
     } )
 
     // ── API key remove from settings (Spec §1) ──

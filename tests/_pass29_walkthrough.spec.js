@@ -8,6 +8,7 @@
 import { test, expect } from '@playwright/test'
 import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth } from './helpers/setup.js'
 import { CHAT_URL, parse_chat_request, fulfil_chat, answer_request } from './helpers/openrouter_mock.js'
+import { confirm_in_modal } from './helpers/confirm_modal.js'
 
 // Helper to open settings from reader
 const open_settings = async ( page ) => {
@@ -152,8 +153,9 @@ test.describe( `Pass 29 — Walkthrough`, () => {
         await expect( page.getByText( `FONT FAMILY` ) ).toBeVisible()
         await expect( page.getByText( `THEME` ) ).toBeVisible()
         await expect( page.getByText( `LLM MODEL` ) ).toBeVisible()
-        await expect( page.locator( `label` ).filter( { hasText: /api key/i } ) ).toBeVisible()
-        await expect( page.locator( `label` ).filter( { hasText: /cache/i } ) ).toBeVisible()
+        // API key and cache are now section headings (spans) rather than <label>s; cache lives under Maintenance
+        await expect( page.getByText( `API key`, { exact: true } ) ).toBeVisible()
+        await expect( page.getByRole( `button`, { name: /cache/i } ) ).toBeVisible()
 
         // Close button works
         await page.getByRole( `button`, { name: `Close`, exact: true } ).click()
@@ -310,8 +312,10 @@ test.describe( `Pass 29 — Walkthrough`, () => {
         // Delete the book
         const delete_btn = page.getByRole( `button`, { name: `Remove` } ).first()
         await expect( delete_btn ).toBeVisible()
-        page.once( `dialog`, dialog => dialog.accept() )
-        await delete_btn.click()
+        await confirm_in_modal( page, {
+            title: `Remove “Smart work beats hard work”?`,
+            action: () => delete_btn.click()
+        } )
         await expect( uploaded_book ).toHaveCount( 0 )
     } )
 

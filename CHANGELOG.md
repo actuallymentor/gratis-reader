@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.25.0] - 2026-10-01
+
+### Changed
+- Follow the device's light or dark mode by default (new System theme); dark mode uses a deep-blue palette
+- Show books as compact rows on phones, with cover, title and actions visible at a glance
+- Use clear icons throughout (settings menu, back, close, chapter arrows) instead of text symbols that some devices could not draw
+- Restyle buttons as small pills with larger tap areas; compact card actions show their label on hover, keyboard focus or a long press
+- Show keyboard focus as a soft halo, and turn off animations when the device asks for reduced motion
+- Make Turbo Mode a switch row, the theme a segmented control, and proficiency levels a radio group with tinted selection
+- Ask before removing a book, clearing the cache, removing the API key or re-translating, in a styled dialog; removing a book or clearing the cache requires ticking an acknowledgement
+- Show unsaved, saving and saved states when changing the API key, with inline errors for a rejected key and a retry dialog when OpenRouter cannot be reached
+- Offer retry when the classic library or a chapter fails to load, and an empty-state action for an empty library or chapter
+- Add short help ("i") for the API key, proficiency levels, Turbo Mode and model choice
+
+### Fixed
+- Add books with the keyboard: the upload area is reachable by Tab and opens the file picker with Enter
+- Choose a language or chapter with the keyboard: searchable lists support arrow keys, Enter and Escape
+- Keep focus inside dialogs and return it to the button that opened them; the first-open language dialog offers a way back to the library
+
 ## [1.24.1] - 2026-10-01
 
 ### Fixed

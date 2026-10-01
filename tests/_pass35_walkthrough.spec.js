@@ -4,6 +4,7 @@
 import { test, expect } from '@playwright/test'
 import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth } from './helpers/setup.js'
 import { CHAT_URL, parse_chat_request, fulfil_chat, answer_request } from './helpers/openrouter_mock.js'
+import { chapter_combobox, expect_chapter } from './helpers/reader.js'
 
 test.describe( `Pass 35 — Walkthrough`, () => {
 
@@ -128,8 +129,7 @@ test.describe( `Pass 35 — Walkthrough`, () => {
         await upload_demo_book( page )
         await open_reader( page )
 
-        const toc = page.locator( `header select` )
-        await expect( toc ).toBeVisible()
+        await expect( chapter_combobox( page ) ).toBeVisible()
 
         // Keep the key burst genuinely rapid; the settings interaction below is
         // the responsiveness barrier after all three events have been queued.
@@ -140,7 +140,7 @@ test.describe( `Pass 35 — Walkthrough`, () => {
 
         // Settings should be visible without crash
         await expect( page.getByText( `FONT SIZE` ) ).toBeVisible( { timeout: 3000 } )
-        await expect( toc ).toHaveValue( `3` )
+        await expect_chapter( page, 3 )
         expect( errors ).toEqual( [] )
     } )
 

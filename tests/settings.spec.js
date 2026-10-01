@@ -1,6 +1,7 @@
 import { execSync } from 'node:child_process'
 import { test, expect, open_seeded_reader } from './helpers/app_fixture.js'
 import { mock_openrouter } from './helpers/setup.js'
+import { confirm_in_modal } from './helpers/confirm_modal.js'
 
 const expected_commit_hash = () => {
 
@@ -74,9 +75,9 @@ test.describe( `Settings`, () => {
 
         await page.goto( `/library` )
         await page.getByRole( `button`, { name: `Settings` } ).click()
-        const drawer = page.locator( `aside` )
+        const drawer = page.getByRole( `dialog`, { name: `Settings` } )
 
-        await expect( drawer.getByText( `Font Size`, { exact: true } ) ).toBeVisible()
+        await expect( drawer.getByText( `Font size`, { exact: true } ) ).toBeVisible()
         await expect( drawer.getByText( `Theme`, { exact: true } ) ).toBeVisible()
         await expect( drawer.getByText( `LLM Model`, { exact: true } ) ).toBeVisible()
 
@@ -158,7 +159,7 @@ test.describe( `Settings`, () => {
 
             // Close settings and verify font applied
             await page.keyboard.press( `Escape` )
-            await expect( page.locator( `aside` ).filter( { hasText: `Target Language` } ) ).not.toBeVisible()
+            await expect( page.getByRole( `dialog`, { name: `Settings` } ).filter( { hasText: `Target Language` } ) ).not.toBeVisible()
             await expect( page.locator( `main` ) ).toHaveCSS( `font-family`, /Georgia/ )
 
         } )
@@ -170,17 +171,12 @@ test.describe( `Settings`, () => {
         await page.goto( `/library` )
         await page.getByRole( `button`, { name: `Settings` } ).click()
 
-        // Accept and await the confirmation dialog so the cache operation has
+        // Confirm and await the modal closing so the cache operation has
         // definitely started before checking that settings remains usable.
-        const dialog_handled = new Promise( resolve => {
-            page.once( `dialog`, async dialog => {
-                await dialog.accept()
-                resolve()
-            } )
+        await confirm_in_modal( page, {
+            title: `Clear all cached translations?`,
+            action: () => page.getByRole( `button`, { name: `Clear Translation Cache` } ).click()
         } )
-
-        await page.getByRole( `button`, { name: `Clear Translation Cache` } ).click()
-        await dialog_handled
 
         // Should still be functional after clearing
         await expect( page.getByText( `FONT SIZE` ) ).toBeVisible()
@@ -192,7 +188,8 @@ test.describe( `Settings`, () => {
         await page.goto( `/library` )
         await page.getByRole( `button`, { name: `Settings` } ).click()
 
-        await expect( page.getByText( `APP UPDATE` ) ).toBeVisible()
+        // The App Update section is now part of Maintenance
+        await expect( page.getByText( `Maintenance`, { exact: true } ) ).toBeVisible()
         await expect( page.getByRole( `button`, { name: `Force Update` } ) ).toBeVisible()
 
     } )
@@ -211,10 +208,11 @@ test.describe( `Settings`, () => {
         await page.goto( `/library` )
         await page.getByRole( `button`, { name: `Settings` } ).click()
 
-        // Accept the confirm dialog
-        page.on( `dialog`, dialog => dialog.accept() )
-
-        await page.getByRole( `button`, { name: `Remove API Key` } ).click()
+        // Confirm in the modal
+        await confirm_in_modal( page, {
+            title: `Remove your API key?`,
+            action: () => page.getByRole( `button`, { name: `Remove API Key` } ).click()
+        } )
         await page.waitForURL( `/`, { timeout: 5000 } )
 
         // Should show onboarding
@@ -256,7 +254,7 @@ test.describe( `Settings`, () => {
             await page.locator( `input[type="range"]` ).fill( `22` )
             await expect( page.locator( `main` ) ).toHaveCSS( `font-size`, `22px` )
             await page.keyboard.press( `Escape` )
-            await expect( page.locator( `aside` ).filter( { hasText: `Target Language` } ) ).not.toBeVisible()
+            await expect( page.getByRole( `dialog`, { name: `Settings` } ).filter( { hasText: `Target Language` } ) ).not.toBeVisible()
 
             // Reload
             await page.reload( { waitUntil: `networkidle` } )

@@ -6,6 +6,8 @@
 import { test, expect } from '@playwright/test'
 import { open_reader } from './helpers/setup.js'
 import { CHAT_URL, parse_chat_request, fulfil_chat, answer_request } from './helpers/openrouter_mock.js'
+import { confirm_in_modal } from './helpers/confirm_modal.js'
+import { language_combobox } from './helpers/reader.js'
 
 const DEMO_BOOK = `./tests/fixtures/book.epub`
 
@@ -210,8 +212,10 @@ test.describe( `Pass 25 — Regression & Coverage`, () => {
         await page.goto( `/library` )
         await page.waitForSelector( `h3`, { timeout: 5000 } )
 
-        page.once( `dialog`, dialog => dialog.accept() )
-        await page.getByRole( `button`, { name: `Remove` } ).first().click()
+        await confirm_in_modal( page, {
+            title: `Remove “Smart work beats hard work”?`,
+            action: () => page.getByRole( `button`, { name: `Remove` } ).first().click()
+        } )
 
         // Verify the uploaded book is gone without counting Gutenberg catalog headings.
         await expect( page.getByRole( `heading`, { name: `Smart work beats hard work` } ) ).toHaveCount( 0 )
@@ -284,10 +288,12 @@ test.describe( `Pass 25 — Regression & Coverage`, () => {
         await page.getByRole( `button`, { name: /settings/i } ).click()
         await expect( page.getByText( /font size/i ) ).toBeVisible( { timeout: 3000 } )
 
-        const lang_input = page.locator( `input[placeholder="Search languages..."]` )
-        await expect( lang_input ).toBeVisible()
+        // The search placeholder shows once the combobox is open
+        const lang_input = language_combobox( page )
+        await lang_input.click()
+        await expect( lang_input ).toHaveAttribute( `placeholder`, `Search languages...` )
         await lang_input.fill( `Japan` )
-        await expect( page.getByText( `Japanese`, { exact: true } ) ).toBeVisible()
+        await expect( page.getByRole( `option`, { name: `Japanese`, exact: true } ) ).toBeVisible()
     } )
 
     // --- Back button navigation ---

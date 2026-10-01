@@ -20,14 +20,14 @@ test.describe( `Pass 36 — Walkthrough`, () => {
         // Go offline
         await page.context().setOffline( true )
 
-        // Offline banner should appear
-        await expect( page.getByText( `Offline — showing cached library`, { exact: true } ) ).toBeVisible()
+        // Offline banner should appear (copy reworded in the redesign)
+        await expect( page.getByText( `Offline · showing your saved library`, { exact: true } ) ).toBeVisible()
 
         // Go back online
         await page.context().setOffline( false )
 
         // Banner should disappear
-        await expect( page.getByText( `Offline — showing cached library`, { exact: true } ) ).not.toBeVisible()
+        await expect( page.getByText( `Offline · showing your saved library`, { exact: true } ) ).not.toBeVisible()
     } )
 
     // ── 2. Reader page offline banner still works ──

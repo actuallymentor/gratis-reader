@@ -8,6 +8,7 @@
  */
 import { test, expect, open_seeded_reader } from './helpers/app_fixture.js'
 import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth, clear_storage } from './helpers/setup.js'
+import { confirm_in_modal } from './helpers/confirm_modal.js'
 
 const get_store_count = async ( page, store_name ) => page.evaluate( async ( name ) => {
     return new Promise( resolve => {
@@ -21,26 +22,6 @@ const get_store_count = async ( page, store_name ) => page.evaluate( async ( nam
         req.onerror = () => resolve( -1 )
     } )
 }, store_name )
-
-const accept_confirmation = async ( page, expected_message, action ) => {
-
-    const handled = new Promise( ( resolve, reject ) => {
-        page.once( `dialog`, async dialog => {
-            try {
-                expect( dialog.type() ).toBe( `confirm` )
-                expect( dialog.message() ).toBe( expected_message )
-                await dialog.accept()
-                resolve()
-            } catch ( error ) {
-                reject( error )
-            }
-        } )
-    } )
-
-    await action()
-    await handled
-
-}
 
 test.describe( `Pass 41 — Coverage Gaps`, () => {
 
@@ -71,11 +52,10 @@ test.describe( `Pass 41 — Coverage Gaps`, () => {
         await page.waitForURL( /\/library/ )
 
         // Delete the book
-        await accept_confirmation(
-            page,
-            `Remove "Smart work beats hard work" from your library?`,
-            () => page.getByRole( `button`, { name: `Remove` } ).click()
-        )
+        await confirm_in_modal( page, {
+            title: `Remove “Smart work beats hard work”?`,
+            action: () => page.getByRole( `button`, { name: `Remove` } ).click()
+        } )
 
         // Verify token_usage was cleaned up
         await expect.poll( () => get_store_count( page, `token_usage` ) ).toBe( 0 )
@@ -106,11 +86,10 @@ test.describe( `Pass 41 — Coverage Gaps`, () => {
             await page.getByRole( `button`, { name: `Settings` } ).click()
 
             // Accept confirmation dialog and clear cache
-            await accept_confirmation(
-                page,
-                `Clear all cached translations? This cannot be undone.`,
-                () => page.getByRole( `button`, { name: `Clear Translation Cache` } ).click()
-            )
+            await confirm_in_modal( page, {
+                title: `Clear all cached translations?`,
+                action: () => page.getByRole( `button`, { name: `Clear Translation Cache` } ).click()
+            } )
 
             // Verify translations store is now empty
             await expect( page.getByText( `Translation cache cleared` ) ).toBeVisible()
@@ -166,11 +145,10 @@ test.describe( `Pass 41 — Coverage Gaps`, () => {
         await page.getByRole( `button`, { name: /back/i } ).click()
         await page.waitForURL( /\/library/ )
 
-        await accept_confirmation(
-            page,
-            `Remove "Smart work beats hard work" from your library?`,
-            () => page.getByRole( `button`, { name: `Remove` } ).click()
-        )
+        await confirm_in_modal( page, {
+            title: `Remove “Smart work beats hard work”?`,
+            action: () => page.getByRole( `button`, { name: `Remove` } ).click()
+        } )
 
         // Verify progress was cleaned up
         await expect.poll( () => get_store_count( page, `progress` ) ).toBe( 0 )
@@ -196,11 +174,10 @@ test.describe( `Pass 41 — Coverage Gaps`, () => {
         await page.getByRole( `button`, { name: /back/i } ).click()
         await page.waitForURL( /\/library/ )
 
-        await accept_confirmation(
-            page,
-            `Remove "Smart work beats hard work" from your library?`,
-            () => page.getByRole( `button`, { name: `Remove` } ).click()
-        )
+        await confirm_in_modal( page, {
+            title: `Remove “Smart work beats hard work”?`,
+            action: () => page.getByRole( `button`, { name: `Remove` } ).click()
+        } )
 
         // Verify the book itself is gone while its translations survive
         await expect.poll( () => get_store_count( page, `books` ) ).toBe( 0 )

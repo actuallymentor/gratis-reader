@@ -1,6 +1,7 @@
 import { test, expect, open_seeded_reader } from './helpers/app_fixture.js'
 import { mock_openrouter } from './helpers/setup.js'
 import { CHAT_URL, parse_chat_request, fulfil_chat, answer_request } from './helpers/openrouter_mock.js'
+import { confirm_in_modal } from './helpers/confirm_modal.js'
 
 const INFO_SHEET = `[data-translation-info-sheet]`
 const READER_WORD = `span[data-sentence-id] [data-translation-word-index]`
@@ -266,26 +267,19 @@ test.describe( `Sentence Interactions`, () => {
 
         const retranslate_button = dialog.getByRole( `button`, { name: `Re-translate sentence` } )
 
-        const dismissal = new Promise( resolve => {
-            page.once( `dialog`, async confirm_dialog => {
-                expect( confirm_dialog.message() ).toBe( `Do you want to re-translate this sentence?` )
-                await confirm_dialog.dismiss()
-                resolve()
-            } )
+        await confirm_in_modal( page, {
+            title: `Do you want to re-translate this sentence?`,
+            action: () => retranslate_button.click(),
+            cancel: true
         } )
-
-        await retranslate_button.click()
-        await dismissal
 
         await expect( sentence ).toContainText( `[TRANSLATED:1]` )
         await expect( sentence ).not.toContainText( `[TRANSLATED:2]` )
 
-        page.once( `dialog`, async confirm_dialog => {
-            expect( confirm_dialog.message() ).toBe( `Do you want to re-translate this sentence?` )
-            await confirm_dialog.accept()
+        await confirm_in_modal( page, {
+            title: `Do you want to re-translate this sentence?`,
+            action: () => retranslate_button.click()
         } )
-
-        await retranslate_button.click()
 
         await expect( sentence ).toContainText( `[TRANSLATED:2]`, { timeout: 10_000 } )
         await expect( dialog ).toContainText( `[TRANSLATED:2]`, { timeout: 10_000 } )

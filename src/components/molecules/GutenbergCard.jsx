@@ -1,24 +1,39 @@
 import { memo, useState } from 'react'
 import styled from 'styled-components'
+import { BookOpen, Info } from 'lucide-react'
+import { Button } from '../atoms/Button.jsx'
+import ExpandingAction from '../atoms/ExpandingAction.jsx'
 
-const Card = styled.div`
+// Phones: a compact row with the cover beside the details. Wider screens: a vertical card.
+const Card = styled.article`
+    display: grid;
+    grid-template-columns: 4.5rem 1fr;
+    gap: var(--space-m);
+    padding: var(--space-s);
     background: var(--bg-surface);
     border: 1px solid var(--border);
     border-radius: var(--radius-m);
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    transition: transform var(--duration-press) ease, box-shadow var(--duration-press) ease;
 
-    &:hover {
-        transform: translateY(-2px);
-        box-shadow: var(--shadow-m);
+    @media (min-width: 600px) {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr;
+        gap: 0;
+        padding: 0;
+        overflow: hidden;
+
+        &:hover {
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-m);
+        }
     }
 `
 
 const Cover = styled.div`
     width: 100%;
     aspect-ratio: 2 / 3;
+    align-self: start;
+    border-radius: var(--radius-s);
     background: linear-gradient(135deg, var(--accent-light), var(--accent));
     display: flex;
     align-items: center;
@@ -30,42 +45,46 @@ const Cover = styled.div`
         height: 100%;
     }
 
-    img {
-        object-fit: cover;
-    }
+    img { object-fit: cover; }
+
+    @media (min-width: 600px) { border-radius: 0; }
 `
 
 const CoverPlaceholder = styled.div`
     font-family: var(--font-heading);
-    font-size: 1.2em;
-    font-weight: 500;
+    font-size: 0.75rem;
     color: white;
     text-align: center;
-    padding: var(--space-m);
+    padding: var(--space-xs);
     word-break: break-word;
+
+    @media (min-width: 600px) {
+        font-size: 1.2em;
+        padding: var(--space-m);
+    }
 `
 
 const Body = styled.div`
-    padding: var(--space-m);
-    flex: 1;
+    min-width: 0;
     display: flex;
     flex-direction: column;
+
+    @media (min-width: 600px) { padding: var(--space-m); }
 `
 
 const Title = styled.h3`
-    font-size: 0.95em;
-    font-weight: 600;
+    font-size: 1rem;
+    font-weight: 500;
     margin-bottom: var(--space-xs);
     color: var(--text);
     overflow: hidden;
-    text-overflow: ellipsis;
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
 `
 
 const Author = styled.p`
-    font-size: 0.8em;
+    font-size: 0.85rem;
     color: var(--text-muted);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -74,46 +93,24 @@ const Author = styled.p`
 `
 
 const Summary = styled.p`
-    font-size: 0.75em;
+    font-size: 0.8rem;
     color: var(--text-muted);
-    line-height: 1.4;
+    line-height: 1.45;
     overflow: hidden;
-    text-overflow: ellipsis;
     display: -webkit-box;
-    -webkit-line-clamp: 3;
+    -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     flex: 1;
+
+    @media (min-width: 600px) { -webkit-line-clamp: 3; }
 `
 
 const ButtonRow = styled.div`
     display: flex;
-    border-top: 1px solid var(--border);
-`
-
-const ActionButton = styled.button`
-    flex: 1;
-    background: none;
-    border: none;
-    padding: var(--space-s) var(--space-m);
-    font-size: 0.8em;
-    font-weight: 500;
-    min-height: 44px;
-    cursor: pointer;
-    color: ${ p => p.$primary ? `var(--accent)` : `var(--text-muted)` };
-    transition: background 0.15s ease;
-
-    &:hover {
-        background: var(--bg-hover);
-    }
-
-    &:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-    }
-
-    & + & {
-        border-left: 1px solid var(--border);
-    }
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--space-s);
+    margin-top: var(--space-s);
 `
 
 /**
@@ -140,7 +137,7 @@ function GutenbergCard( { book, on_info, on_read, is_importing, is_imported } ) 
                     <source
                         type="image/webp"
                         srcSet={ `${ base }-xs.webp 64w, ${ base }-sm.webp 128w, ${ base }-md.webp 200w, ${ base }-lg.webp 400w` }
-                        sizes="(max-width: 480px) calc(100vw - 4rem), (max-width: 767px) calc((100vw - 5.5rem) / 2), 280px"
+                        sizes="(max-width: 599px) 72px, (max-width: 767px) calc((100vw - 5.5rem) / 2), 280px"
                     />
                     <img
                         src={ `${ base }.jpg` }
@@ -156,20 +153,18 @@ function GutenbergCard( { book, on_info, on_read, is_importing, is_imported } ) 
             <Title>{ book.title }</Title>
             <Author>{ author }</Author>
             { summary && <Summary>{ summary }</Summary> }
+            <ButtonRow>
+                <ExpandingAction icon={ <Info strokeWidth={ 1.5 } /> } label="Info" onClick={ () => on_info( book ) } />
+                <Button
+                    variant="primary"
+                    icon={ <BookOpen strokeWidth={ 1.5 } /> }
+                    onClick={ () => on_read( book ) }
+                    disabled={ is_importing }
+                >
+                    { is_importing ? `Loading…` : is_imported ? `Open` : `Read` }
+                </Button>
+            </ButtonRow>
         </Body>
-
-        <ButtonRow>
-            <ActionButton onClick={ () => on_info( book ) }>
-                Info
-            </ActionButton>
-            <ActionButton
-                $primary
-                onClick={ () => on_read( book ) }
-                disabled={ is_importing }
-            >
-                { is_importing ? `Loading…` : is_imported ? `Open` : `Read` }
-            </ActionButton>
-        </ButtonRow>
 
     </Card>
 

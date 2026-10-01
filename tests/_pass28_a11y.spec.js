@@ -82,13 +82,12 @@ test.describe( `Pass 28 — First-open accessibility`, () => {
         await page.locator( `img[alt]` ).first().click()
         await page.waitForURL( /\/read\// )
 
-        // Modal should have role="dialog" and aria-modal
-        const dialog = page.locator( `[role="dialog"]` )
+        // Modal should have role="dialog" and be modal
+        const dialog = page.getByRole( `dialog`, { name: `Choose Your Language` } )
         await expect( dialog ).toBeVisible( { timeout: 5000 } )
 
-        // Should also have aria-modal="true"
-        const aria_modal = await dialog.getAttribute( `aria-modal` )
-        expect( aria_modal ).toBe( `true` )
+        // A native <dialog> opened with showModal() is implicitly aria-modal (no attribute needed)
+        expect( await dialog.evaluate( element => element.matches( `:modal` ) ) ).toBe( true )
 
     } )
 

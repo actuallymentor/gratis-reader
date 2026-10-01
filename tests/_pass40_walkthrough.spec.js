@@ -4,6 +4,7 @@
 import { test, expect, open_seeded_reader, SEEDED_BOOK_ID } from './helpers/app_fixture.js'
 import { mock_auth } from './helpers/setup.js'
 import { CHAT_URL, parse_chat_request, fulfil_chat, answer_request } from './helpers/openrouter_mock.js'
+import { chapter_labels, choose_chapter, expect_chapter } from './helpers/reader.js'
 
 // Echoes `[TR] <sentence>` for single and batched requests alike
 const echo_tr = ( route, { on_request = () => {}, usage } = {} ) => {
@@ -99,8 +100,8 @@ test.describe( `Pass 40 — Read-ahead buffer`, () => {
             await page.keyboard.press( `ArrowRight` )
         }
 
-        // The final TOC value proves every rapid key event was processed.
-        await expect( page.locator( `select` ).first() ).toHaveValue( `6` )
+        // The final chapter position proves every rapid key event was processed.
+        await expect_chapter( page, 6 )
         await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible()
 
         // No crashes
@@ -120,13 +121,11 @@ test.describe( `Pass 40 — Read-ahead buffer`, () => {
         await open_seeded_reader( page )
 
         // Jump to last chapter using TOC
-        const toc_select = page.locator( `select` ).first()
-        const options = await toc_select.locator( `option` ).all()
-        const last_index = options.length - 1
+        const last_index = ( await chapter_labels( page ) ).length - 1
         const first_sentence = page.locator( `span[data-sentence-id]` ).first()
         const first_id = await first_sentence.getAttribute( `data-sentence-id` )
-        await toc_select.selectOption( { index: last_index } )
-        await expect( toc_select ).toHaveValue( `${ last_index }` )
+        await choose_chapter( page, last_index )
+        await expect_chapter( page, last_index )
         await expect( first_sentence ).not.toHaveAttribute( `data-sentence-id`, first_id )
 
         // No errors on last chapter (read-ahead has nothing to pre-fetch)

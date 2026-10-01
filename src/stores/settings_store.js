@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { apply_theme } from '../modules/theme.js'
 
 /**
  * Global app settings, persisted to localStorage
@@ -16,7 +17,8 @@ export const use_settings_store = create(
             // Display
             font_size: 18,
             font_family: `Nunito`,
-            theme: `light`,
+            // Follows the device until the reader picks a theme
+            theme: `system`,
 
             // Language
             last_language: `Spanish`,
@@ -29,7 +31,7 @@ export const use_settings_store = create(
             set_font_size: ( font_size ) => set( { font_size } ),
             set_font_family: ( font_family ) => set( { font_family } ),
             set_theme: ( theme ) => {
-                document.documentElement.setAttribute( `data-theme`, theme )
+                apply_theme( theme )
                 set( { theme } )
             },
             set_last_language: ( last_language ) => set( { last_language } ),
@@ -39,8 +41,8 @@ export const use_settings_store = create(
         } ),
         {
             name: `settings-storage`,
-            version: 1,
-            migrate: ( state ) => {
+            version: 2,
+            migrate: ( state, version ) => {
                 // Repair retired/invalid IDs without resetting a reader's saved choice.
                 const model_updates = {
                     'anthropic/claude-sonnet-4-6': `anthropic/claude-sonnet-4.6`,
@@ -48,7 +50,10 @@ export const use_settings_store = create(
                     'google/gemini-2.0-flash-001': `google/gemini-3.8-flash`,
                 }
 
-                return { ...state, model: model_updates[state.model] || state.model || `openai/gpt-6-luna` }
+                // "light" was the default before the System theme existed, not a reader's choice
+                const theme = version < 2 && ( !state.theme || state.theme === `light` ) ? `system` : state.theme
+
+                return { ...state, theme, model: model_updates[state.model] || state.model || `openai/gpt-6-luna` }
             },
             partialize: ( state ) => ( {
                 api_key: state.api_key,

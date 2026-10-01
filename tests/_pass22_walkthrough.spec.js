@@ -5,6 +5,7 @@
 import { test, expect } from '@playwright/test'
 import { open_reader } from './helpers/setup.js'
 import { CHAT_URL, parse_chat_request, fulfil_chat, answer_request } from './helpers/openrouter_mock.js'
+import { chapter_labels } from './helpers/reader.js'
 
 const DEMO_BOOK = `./tests/fixtures/book.epub`
 
@@ -80,7 +81,7 @@ test.describe( `Pass 22 — Bug Fixes & Edge Cases`, () => {
         await expect( page.getByText( `Font Size` ) ).toBeVisible()
 
         // Close settings
-        await page.locator( `text=×` ).first().click()
+        await page.getByRole( `dialog`, { name: `Settings` } ).getByRole( `button`, { name: `Close` } ).click()
         await expect( page.getByText( `Font Size` ) ).not.toBeVisible()
 
         // Chapter should not have changed
@@ -213,7 +214,7 @@ test.describe( `Pass 22 — Bug Fixes & Edge Cases`, () => {
         await expect( page.getByText( `Font Family` ) ).toBeVisible()
         await expect( page.getByText( `Theme` ) ).toBeVisible()
         await expect( page.getByText( `LLM Model` ) ).toBeVisible()
-        await expect( page.getByText( `API Key`, { exact: true } ) ).toBeVisible()
+        await expect( page.getByText( `API key`, { exact: true } ) ).toBeVisible()
         await expect( page.getByText( `Clear Translation Cache` ) ).toBeVisible()
     } )
 
@@ -428,17 +429,11 @@ test.describe( `Pass 22 — Bug Fixes & Edge Cases`, () => {
         await enter_reader( page )
         await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible( { timeout: 10_000 } )
 
-        // Check for select dropdown or chapter title
-        const select = page.locator( `select` )
-        const count = await select.count()
-        if( count > 0 ) {
-            const options = await select.first().locator( `option` ).allTextContents()
-            expect( options.length ).toBeGreaterThan( 0 )
-            // Options should have labels, not just "Section N"
-            const has_label = options.some( o => !o.match( /^Section \d+$/ ) )
-            // At least the first option should have some text
-            expect( options[0].length ).toBeGreaterThan( 0 )
-        }
+        // Check the chapter combobox's option labels
+        const options = await chapter_labels( page )
+        expect( options.length ).toBeGreaterThan( 0 )
+        // At least the first option should have some text
+        expect( options[0].length ).toBeGreaterThan( 0 )
     } )
 
     // ── REGRESSION: Level badge visible ─────────────────────────

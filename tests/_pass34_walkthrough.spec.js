@@ -4,6 +4,7 @@
 import { test, expect } from '@playwright/test'
 import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth, clear_storage } from './helpers/setup.js'
 import { CHAT_URL, parse_chat_request, fulfil_chat, answer_request } from './helpers/openrouter_mock.js'
+import { confirm_in_modal } from './helpers/confirm_modal.js'
 
 test.describe( `Pass 34 — Walkthrough`, () => {
 
@@ -66,8 +67,10 @@ test.describe( `Pass 34 — Walkthrough`, () => {
         await page.getByRole( `button`, { name: `Settings` } ).click()
         await expect( page.getByText( `FONT SIZE` ) ).toBeVisible( { timeout: 3000 } )
 
-        page.on( `dialog`, d => d.accept() )
-        await page.getByRole( `button`, { name: /clear/i } ).click()
+        await confirm_in_modal( page, {
+            title: `Clear all cached translations?`,
+            action: () => page.getByRole( `button`, { name: /clear/i } ).click()
+        } )
         await expect( page.getByText( `Translation cache cleared` ) ).toBeVisible()
         await expect.poll( read_cache_count ).toBe( 0 )
 
@@ -302,8 +305,8 @@ test.describe( `Pass 34 — Walkthrough`, () => {
         await expect( page.getByText( `Font Family` ) ).toBeVisible( { timeout: 3000 } )
 
         // Find font family select by proximity to its label
-        const font_section = page.locator( `text=Font Family` ).locator( `..` )
-        const font_select = font_section.locator( `select` )
+        // The label is now a real <label for>, so find the select by its label
+        const font_select = page.getByLabel( `Font family` )
         await font_select.selectOption( `Georgia` )
         await expect( font_select ).toHaveValue( `Georgia` )
 

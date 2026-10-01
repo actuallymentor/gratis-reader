@@ -7,19 +7,23 @@ const Grid = styled.div`
     gap: var(--space-s);
 `
 
+// Selected: accent tint and border, no dark rim and no large solid fill
 const LevelCard = styled.button`
-    background: ${ p => p.$selected ? `var(--accent)` : `var(--bg)` };
-    color: ${ p => p.$selected ? `white` : `var(--text)` };
-    border: 2px solid ${ p => p.$selected ? `var(--accent)` : `var(--border)` };
+    position: relative;
+    padding: var(--space-s) var(--space-m);
+    border: 1px solid ${ p => p.$selected ? `var(--accent)` : `var(--border)` };
     border-radius: var(--radius-m);
-    padding: var(--space-m);
+    background: ${ p => p.$selected ? `var(--accent-light)` : `var(--bg-surface)` };
+    color: var(--text);
     text-align: left;
-    transition: all 0.2s ease;
-    min-height: 44px;
+    transition: background var(--duration-press) ease, border-color var(--duration-press) ease, transform var(--duration-press) ease;
 
     &:hover {
         border-color: var(--accent);
+        transform: translateY(-1px);
     }
+
+    &:active { transform: scale(0.985); }
 `
 
 const LevelCode = styled.div`
@@ -41,12 +45,27 @@ const LevelLabel = styled.div`
  */
 export default function LevelPicker( { value, on_change } ) {
 
-    return <Grid>
-        { LEVELS.map( level =>
+    // Arrow keys move between levels like native radios
+    const on_key_down = ( e, index ) => {
+        const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key]
+        if( !step ) return
+        e.preventDefault()
+        const next = LEVELS[( index + step + LEVELS.length ) % LEVELS.length]
+        on_change( next.code )
+        e.currentTarget.parentElement.children[LEVELS.indexOf( next )]?.focus()
+    }
+
+    return <Grid role="radiogroup" aria-label="Proficiency level">
+        { LEVELS.map( ( level, index ) =>
             <LevelCard
                 key={ level.code }
+                type="button"
+                role="radio"
+                aria-checked={ level.code === value }
+                tabIndex={ level.code === value ? 0 : -1 }
                 $selected={ level.code === value }
                 onClick={ () => on_change( level.code ) }
+                onKeyDown={ e => on_key_down( e, index ) }
             >
                 <LevelCode>{ level.cefr }</LevelCode>
                 <LevelLabel>{ level.label }</LevelLabel>

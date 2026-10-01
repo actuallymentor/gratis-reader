@@ -1,88 +1,38 @@
 import { useState, useEffect, useRef } from 'react'
 import styled from 'styled-components'
+import { useShallow } from 'zustand/react/shallow'
+import { Download, LogOut, Trash2 } from 'lucide-react'
+import Modal from '../atoms/Modal.jsx'
+import SwitchRow from '../atoms/SwitchRow.jsx'
+import { Button } from '../atoms/Button.jsx'
+import HelpButton from './HelpButton.jsx'
+import ApiKeySetting from './ApiKeySetting.jsx'
+import { use_confirm } from './ConfirmModal.jsx'
+import { THEMES } from '../../modules/theme.js'
 import { use_settings_store } from '../../stores/settings_store.js'
 import LanguagePicker from './LanguagePicker.jsx'
 import LevelPicker from './LevelPicker.jsx'
 import toast from 'react-hot-toast'
 import { clear_translations } from '../../modules/cache.js'
-import { validate_api_key } from '../../modules/open_router.js'
 import { force_pwa_update } from '../../modules/pwa_update.js'
 
-const Overlay = styled.div`
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.3);
-    z-index: 100;
-    animation: fade_in 0.15s ease;
-
-    @keyframes fade_in {
-        from { opacity: 0; }
-        to { opacity: 1; }
-    }
+const Section = styled.section`
+    margin-bottom: var(--space-l);
 `
 
-const Drawer = styled.aside`
-    position: fixed;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    width: 100%;
-    max-width: 380px;
-    background: var(--bg-surface);
-    border-left: 1px solid var(--border);
-    padding: var(--space-xl);
-    overflow-y: auto;
-    z-index: 101;
-    animation: slide_in 0.25s ease-out;
-
-    @keyframes slide_in {
-        from { transform: translateX(100%); }
-        to { transform: translateX(0); }
-    }
-
-    @media (max-width: 480px) {
-        max-width: 100%;
-    }
-`
-
-const Header = styled.div`
+const LabelRow = styled.div`
     display: flex;
+    align-items: center;
     justify-content: space-between;
-    align-items: center;
-    margin-bottom: var(--space-xl);
-`
-
-const Title = styled.h2`
-    font-size: 1.2em;
-`
-
-const CloseBtn = styled.button`
-    background: none;
-    border: none;
-    font-size: 1.5em;
-    color: var(--text-muted);
-    min-width: 44px;
-    min-height: 44px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: var(--radius-s);
-
-    &:hover { background: var(--bg-hover); color: var(--text); }
-`
-
-const Section = styled.div`
-    margin-bottom: var(--space-xl);
+    gap: var(--space-s);
+    min-height: 2rem;
+    margin-bottom: var(--space-xs);
 `
 
 const Label = styled.label`
-    display: block;
-    font-size: 0.8em;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--text-muted);
-    margin-bottom: var(--space-s);
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text);
 `
 
 const SliderRow = styled.div`
@@ -97,148 +47,95 @@ const Slider = styled.input`
 `
 
 const SliderValue = styled.span`
-    font-size: 0.9em;
-    min-width: 36px;
+    font-size: 0.9rem;
+    min-width: 2.5rem;
     text-align: right;
     color: var(--text);
 `
 
 const Select = styled.select`
     width: 100%;
+    min-height: 2.5rem;
     padding: var(--space-s) var(--space-m);
     border: 1px solid var(--border);
-    border-radius: var(--radius-s);
-    background: var(--bg);
+    border-radius: var(--radius-m);
+    background: var(--field-bg);
     color: var(--text);
-    font-size: 0.95em;
+    font: inherit;
+    font-size: 0.95rem;
 `
 
-const ThemeRow = styled.div`
+// Segmented control: tinted selection, no dark rim
+const Segmented = styled.div`
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    padding: 0.2rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--field-bg);
+`
+
+const Segment = styled.button`
+    min-height: 2rem;
+    padding: 0 var(--space-s);
+    border: none;
+    border-radius: 999px;
+    background: ${ p => p.$active ? `var(--accent-light)` : `transparent` };
+    box-shadow: ${ p => p.$active ? `inset 0 0 0 1px var(--accent)` : `none` };
+    color: ${ p => p.$active ? `var(--text)` : `var(--text-muted)` };
+    font: inherit;
+    font-size: 0.85rem;
+    font-weight: ${ p => p.$active ? 600 : 400 };
+    transition: background var(--duration-press) ease, color var(--duration-press) ease;
+
+    &:hover { color: var(--text); }
+`
+
+const HelpText = styled.p`
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    line-height: 1.45;
+    margin-top: var(--space-xs);
+`
+
+const ButtonRow = styled.div`
     display: flex;
+    flex-wrap: wrap;
     gap: var(--space-s);
 `
 
-const ThemeBtn = styled.button`
-    flex: 1;
-    padding: var(--space-s) var(--space-m);
-    border: 2px solid ${ p => p.$active ? `var(--accent)` : `var(--border)` };
-    border-radius: var(--radius-s);
-    background: ${ p => p.$active ? `var(--accent-light)` : `var(--bg)` };
-    color: var(--text);
-    font-size: 0.85em;
-    min-height: 44px;
-    transition: all 0.15s ease;
-
-    &:hover { border-color: var(--accent); }
-`
-
-const DangerBtn = styled.button`
-    width: 100%;
-    padding: var(--space-s) var(--space-m);
-    border: 1px solid #e53e3e;
-    border-radius: var(--radius-s);
-    background: transparent;
-    color: #e53e3e;
-    font-size: 0.85em;
-    min-height: 44px;
-
-    &:hover { background: rgba(229, 62, 62, 0.1); }
-`
-
-const ActionBtn = styled.button`
-    width: 100%;
-    padding: var(--space-s) var(--space-m);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-s);
-    background: var(--bg);
-    color: var(--text);
-    font-size: 0.85em;
-    min-height: 44px;
-
-    &:hover:not(:disabled) { background: var(--bg-hover); }
-
-    &:disabled {
-        opacity: 0.6;
-        cursor: wait;
-    }
-`
-
-const KeyRow = styled.div`
-    display: flex;
-    align-items: center;
-    gap: var(--space-s);
-    margin-bottom: var(--space-s);
+const Divider = styled.hr`
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: var(--space-l) 0;
 `
 
 const TurboDialog = styled.dialog`
     width: calc(100% - 2rem);
     max-width: 26rem;
     margin: auto;
-    padding: var(--space-xl);
+    padding: var(--space-l);
     border: 1px solid var(--border);
-    border-radius: var(--radius-s);
+    border-radius: var(--radius-l);
     background: var(--bg-surface);
     color: var(--text);
+    box-shadow: var(--shadow-l);
 
-    &::backdrop { background: rgba(0, 0, 0, 0.5); }
+    &::backdrop { background: var(--overlay); }
+    &[open] { animation: turbo-in 500ms var(--ease-out); }
+    @keyframes turbo-in { from { opacity: 0; transform: translateY(8px); } }
 
-    p { margin: var(--space-m) 0; }
+    p { margin: var(--space-m) 0; color: var(--text-muted); line-height: 1.5; }
 `
 
-const HelpText = styled.p`
-    color: var(--text-muted);
-    font-size: 0.85em;
-    margin-top: var(--space-s);
-`
-
-const KeyDisplay = styled.code`
-    flex: 1;
-    font-size: 0.85em;
-    color: var(--text-muted);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-`
-
-const KeyInput = styled.input`
-    flex: 1;
-    padding: var(--space-s) var(--space-m);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-s);
-    background: var(--bg);
-    color: var(--text);
-    font-size: 0.85em;
-    font-family: monospace;
-`
-
-const SmallBtn = styled.button`
-    padding: var(--space-xs) var(--space-s);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-s);
-    background: var(--bg);
-    color: var(--text);
-    font-size: 0.8em;
-    min-height: 44px;
-    white-space: nowrap;
-
-    &:hover:not(:disabled) { background: var(--bg-hover); }
-
-    &:disabled {
-        opacity: 0.6;
-        cursor: not-allowed;
-    }
-`
-
-const ValidationStatus = styled.p`
-    color: var(--text-muted);
-    font-size: 0.8em;
-    margin-top: var(--space-xs);
+const TurboTitle = styled.h2`
+    font-size: 1.5rem;
 `
 
 const VersionLine = styled.p`
     color: var(--text-muted);
-    font-size: 0.75em;
-    margin-top: var(--space-xl);
+    font-size: 0.75rem;
+    margin-top: var(--space-l);
     text-align: center;
 `
 
@@ -271,24 +168,12 @@ export default function SettingsDrawer( { is_open, on_close, show_language = tru
         model, set_model,
         turbo_mode, set_turbo_mode,
         clear_api_key
-    } = use_settings_store()
+    } = use_settings_store( useShallow( state => state ) )
+    const [ confirm_element, confirm ] = use_confirm()
 
-    const [ editing_key, set_editing_key ] = useState( false )
-    const [ key_draft, set_key_draft ] = useState( `` )
-    const [ validating_key, set_validating_key ] = useState( false )
     const [ forcing_update, set_forcing_update ] = useState( false )
     const force_update_reset_timer_ref = useRef( null )
     const turbo_dialog_ref = useRef( null )
-
-    // Close on Escape
-    useEffect( () => {
-        if( !is_open ) return
-        const handle_key = ( e ) => {
-            if( e.key === `Escape` && !turbo_dialog_ref.current?.open ) on_close()
-        }
-        window.addEventListener( `keydown`, handle_key )
-        return () => window.removeEventListener( `keydown`, handle_key )
-    }, [ is_open, on_close ] )
 
     useEffect( () => () => {
         if( force_update_reset_timer_ref.current ) clearTimeout( force_update_reset_timer_ref.current )
@@ -306,16 +191,27 @@ export default function SettingsDrawer( { is_open, on_close, show_language = tru
     if( !is_open ) return null
 
     const handle_clear_cache = async () => {
-        if( window.confirm( `Clear all cached translations? This cannot be undone.` ) ) {
-            await clear_translations()
-            toast.success( `Translation cache cleared` )
-        }
+        const confirmed = await confirm( {
+            title: `Clear all cached translations?`,
+            body: <>
+                <p>Every saved sentence translation and word gloss is deleted from this device.</p>
+                <p>Reading those pages again translates them again, which uses API credits.</p>
+            </>,
+            acknowledgement: `I understand cached translations are permanently deleted`,
+            confirm_label: `Clear cache`
+        } )
+        if( !confirmed ) return
+        await clear_translations()
+        toast.success( `Translation cache cleared` )
     }
 
-    const handle_logout = () => {
-        if( window.confirm( `Remove your API key? You'll need to enter it again.` ) ) {
-            clear_api_key()
-        }
+    const handle_logout = async () => {
+        const confirmed = await confirm( {
+            title: `Remove your API key?`,
+            body: <p>You'll need to enter it again before books can be translated.</p>,
+            confirm_label: `Remove API key`
+        } )
+        if( confirmed ) clear_api_key()
     }
 
     const handle_force_update = async () => {
@@ -337,220 +233,152 @@ export default function SettingsDrawer( { is_open, on_close, show_language = tru
 
     }
 
-    const cancel_key_edit = () => {
-        set_editing_key( false )
-        set_key_draft( `` )
-    }
+    return <Modal title="Settings" variant="drawer" on_close={ on_close }>
 
-    const save_key = async () => {
-
-        const trimmed = key_draft.trim()
-        if( !trimmed ) {
-            toast.error( `Please enter an API key` )
-            return
-        }
-
-        // Validate the key before saving it into persisted settings.
-        set_validating_key( true )
-        try {
-            const valid = await validate_api_key( trimmed )
-            if( valid ) {
-                set_api_key( trimmed )
-                toast.success( `API key updated` )
-                cancel_key_edit()
-            } else {
-                toast.error( `Invalid API key — please check and try again` )
-            }
-        } catch {
-            toast.error( `Could not connect — check your internet connection` )
-        } finally {
-            set_validating_key( false )
-        }
-
-    }
-
-    return <>
-        <Overlay onClick={ on_close } />
-        <Drawer>
-
-            <Header>
-                <Title>Settings</Title>
-                <CloseBtn onClick={ on_close } aria-label="Close">×</CloseBtn>
-            </Header>
-
-            { /* Language & Level */ }
-            { show_language && <>
-                <Section>
-                    <Label>Target Language</Label>
-                    <LanguagePicker value={ last_language } on_change={ set_last_language } />
-                </Section>
-
-                <Section>
-                    <Label>Proficiency Level</Label>
-                    <LevelPicker value={ last_level } on_change={ set_last_level } />
-                </Section>
-            </> }
-
-            { /* Display Settings */ }
+        { /* Language & Level */ }
+        { show_language && <>
             <Section>
-                <Label>Font Size</Label>
-                <SliderRow>
-                    <Slider
-                        type="range"
-                        min="12"
-                        max="32"
-                        value={ font_size }
-                        onChange={ ( e ) => set_font_size( Number( e.target.value ) ) }
-                    />
-                    <SliderValue>{ font_size }px</SliderValue>
-                </SliderRow>
+                <LabelRow><Label htmlFor="settings-language">Target language</Label></LabelRow>
+                <LanguagePicker id="settings-language" value={ last_language } on_change={ set_last_language } />
             </Section>
 
             <Section>
-                <Label>Font Family</Label>
-                <Select value={ font_family } onChange={ ( e ) => set_font_family( e.target.value ) }>
-                    { FONT_OPTIONS.map( font =>
-                        <option key={ font } value={ font }>{ font }</option>
-                    ) }
-                </Select>
+                <LabelRow><Label as="span">Proficiency level</Label></LabelRow>
+                <LevelPicker value={ last_level } on_change={ set_last_level } />
             </Section>
+        </> }
 
-            <Section>
-                <Label>Theme</Label>
-                <ThemeRow>
-                    { [ `light`, `dark`, `sepia` ].map( t =>
-                        <ThemeBtn
-                            key={ t }
-                            $active={ theme === t }
-                            onClick={ () => set_theme( t ) }
-                        >
-                            { t.charAt( 0 ).toUpperCase() + t.slice( 1 ) }
-                        </ThemeBtn>
-                    ) }
-                </ThemeRow>
-            </Section>
+        { /* Display Settings */ }
+        <Section>
+            <LabelRow><Label htmlFor="settings-font-size">Font size</Label></LabelRow>
+            <SliderRow>
+                <Slider
+                    id="settings-font-size"
+                    type="range"
+                    min="12"
+                    max="32"
+                    value={ font_size }
+                    onChange={ ( e ) => set_font_size( Number( e.target.value ) ) }
+                />
+                <SliderValue>{ font_size }px</SliderValue>
+            </SliderRow>
+        </Section>
 
-            { /* Background Lookups */ }
-            <Section>
-                <Label id="turbo-mode-label">Turbo Mode</Label>
-                <ActionBtn
-                    role="switch"
-                    aria-checked={ turbo_mode }
-                    aria-labelledby="turbo-mode-label"
-                    aria-describedby="turbo-mode-help"
-                    onClick={ () => {
-                        if( turbo_mode ) set_turbo_mode( false )
-                        else turbo_dialog_ref.current.showModal()
-                    } }
-                >
-                    { turbo_mode ? `On` : `Off` }
-                </ActionBtn>
-                <HelpText id="turbo-mode-help">
-                    Preload visible words plus twice that word count ahead so word lookups are ready sooner. Uses extra API credits.
-                </HelpText>
-            </Section>
+        <Section>
+            <LabelRow><Label htmlFor="settings-font-family">Font family</Label></LabelRow>
+            <Select id="settings-font-family" value={ font_family } onChange={ ( e ) => set_font_family( e.target.value ) }>
+                { FONT_OPTIONS.map( font =>
+                    <option key={ font } value={ font }>{ font }</option>
+                ) }
+            </Select>
+        </Section>
 
-            { /* Model Selection */ }
-            <Section>
+        <Section>
+            <LabelRow><Label as="span" id="settings-theme-label">Theme</Label></LabelRow>
+            <Segmented role="group" aria-labelledby="settings-theme-label">
+                { THEMES.map( t =>
+                    <Segment
+                        key={ t }
+                        type="button"
+                        $active={ theme === t }
+                        aria-pressed={ theme === t }
+                        onClick={ () => set_theme( t ) }
+                    >
+                        { t.charAt( 0 ).toUpperCase() + t.slice( 1 ) }
+                    </Segment>
+                ) }
+            </Segmented>
+            <HelpText>System follows your device's light or dark mode.</HelpText>
+        </Section>
+
+        <Divider />
+
+        { /* Background Lookups */ }
+        <Section>
+            <LabelRow>
+                <Label as="span" id="turbo-mode-label">Turbo Mode</Label>
+                <HelpButton title="What Turbo Mode does" topic="Turbo Mode">
+                    <p>Normally a word is looked up when you tap it. Turbo Mode looks up the words on screen, plus twice as many ahead, in the background, so tapped words show their meaning instantly.</p>
+                    <p>It sends more requests, including for words you never tap, so it uses more API credits. Turning it on asks you to confirm.</p>
+                </HelpButton>
+            </LabelRow>
+            <SwitchRow
+                checked={ turbo_mode }
+                labelledby="turbo-mode-label"
+                describedby="turbo-mode-help"
+                on_toggle={ () => {
+                    if( turbo_mode ) set_turbo_mode( false )
+                    else turbo_dialog_ref.current.showModal()
+                } }
+            >
+                Preload visible words plus twice that word count ahead so word lookups are ready sooner. Uses extra API credits.
+            </SwitchRow>
+        </Section>
+
+        { /* Model Selection */ }
+        <Section>
+            <LabelRow>
                 <Label htmlFor="llm-model">LLM Model</Label>
-                <Select id="llm-model" value={ model } onChange={ ( e ) => set_model( e.target.value ) }>
-                    <option value="openai/gpt-6-luna">GPT-6 Luna (default)</option>
-                    <option value="google/gemini-3.8-flash">Gemini 3.8 Flash</option>
-                    <option value="anthropic/claude-sonnet-5.5">Claude Sonnet 5.5</option>
-                    <option value="openai/gpt-4o-mini">GPT-4o Mini (fast, cheap)</option>
-                    <option value="openai/gpt-4o">GPT-4o (better quality)</option>
-                    <option value="anthropic/claude-sonnet-4.6">Claude Sonnet 4.6</option>
-                    <option value="anthropic/claude-haiku-4.5">Claude Haiku 4.5 (fast)</option>
-                </Select>
-            </Section>
+                <HelpButton title="Choosing a translation model" topic="translation models">
+                    <p>The model writes every translation and word gloss. GPT-6 Luna is the default: in our blinded comparison it translated Dutch and Kosovar Albanian best, at a fraction of a cent per page.</p>
+                    <p>Changing the model only affects new translations; pages you already read stay cached.</p>
+                </HelpButton>
+            </LabelRow>
+            <Select id="llm-model" value={ model } onChange={ ( e ) => set_model( e.target.value ) }>
+                <option value="openai/gpt-6-luna">GPT-6 Luna (default)</option>
+                <option value="google/gemini-3.8-flash">Gemini 3.8 Flash</option>
+                <option value="anthropic/claude-sonnet-5.5">Claude Sonnet 5.5</option>
+                <option value="openai/gpt-4o-mini">GPT-4o Mini (fast, cheap)</option>
+                <option value="openai/gpt-4o">GPT-4o (better quality)</option>
+                <option value="anthropic/claude-sonnet-4.6">Claude Sonnet 4.6</option>
+                <option value="anthropic/claude-haiku-4.5">Claude Haiku 4.5 (fast)</option>
+            </Select>
+        </Section>
 
-            { /* Danger Zone */ }
-            <Section>
-                <Label>Cache</Label>
-                <DangerBtn onClick={ handle_clear_cache }>
-                    Clear Translation Cache
-                </DangerBtn>
-            </Section>
+        <Section>
+            <LabelRow><Label as="span">API key</Label></LabelRow>
+            <ApiKeySetting api_key={ api_key } on_save={ set_api_key } />
+        </Section>
 
-            <Section>
-                <Label>App Update</Label>
-                <ActionBtn onClick={ handle_force_update } disabled={ forcing_update }>
+        <Divider />
+
+        <Section>
+            <LabelRow><Label as="span">Maintenance</Label></LabelRow>
+            <ButtonRow>
+                <Button icon={ <Download strokeWidth={ 1.5 } /> } onClick={ handle_force_update } disabled={ forcing_update }>
                     { forcing_update ? `Forcing Update...` : `Force Update` }
-                </ActionBtn>
-            </Section>
-
-            <Section>
-                <Label>API Key</Label>
-
-                { /* Show masked key or edit input */ }
-                { editing_key ? 
-                    <KeyRow>
-                        <KeyInput
-                            type="text"
-                            value={ key_draft }
-                            onChange={ ( e ) => set_key_draft( e.target.value ) }
-                            placeholder="sk-or-..."
-                            disabled={ validating_key }
-                            autoFocus
-                        />
-                        <SmallBtn
-                            disabled={ validating_key }
-                            onClick={ save_key }
-                        >
-                            { validating_key ? `Validating...` : `Save` }
-                        </SmallBtn>
-                        <SmallBtn
-                            onClick={ cancel_key_edit }
-                            disabled={ validating_key }
-                        >
-                            Cancel
-                        </SmallBtn>
-                    </KeyRow>
-                    : 
-                    <KeyRow>
-                        <KeyDisplay>
-                            { api_key ? `${ api_key.slice( 0, 6 ) }...${ api_key.slice( -4 ) }` : `Not set` }
-                        </KeyDisplay>
-                        <SmallBtn onClick={ () => {
-                            set_key_draft( `` )
-                            set_editing_key( true )
-                        } }
-                        >
-                            Update Key
-                        </SmallBtn>
-                    </KeyRow> }
-
-                { validating_key && <ValidationStatus role="status" aria-live="polite">
-                    Checking OpenRouter API key...
-                </ValidationStatus> }
-
-                <DangerBtn onClick={ handle_logout }>
+                </Button>
+                <Button variant="danger" icon={ <Trash2 strokeWidth={ 1.5 } /> } onClick={ handle_clear_cache }>
+                    Clear Translation Cache
+                </Button>
+                <Button variant="danger" icon={ <LogOut strokeWidth={ 1.5 } /> } onClick={ handle_logout }>
                     Remove API Key
-                </DangerBtn>
-            </Section>
+                </Button>
+            </ButtonRow>
+        </Section>
 
-            <VersionLine>Version: { APP_VERSION }</VersionLine>
+        <VersionLine>Version: { APP_VERSION }</VersionLine>
 
-        </Drawer>
+        { confirm_element }
         <TurboDialog
             ref={ turbo_dialog_ref }
             aria-labelledby="turbo-confirm-title"
             aria-describedby="turbo-confirm-description"
         >
-            <Title id="turbo-confirm-title">Enable Turbo Mode?</Title>
+            <TurboTitle id="turbo-confirm-title">Enable Turbo Mode?</TurboTitle>
             <p id="turbo-confirm-description">
                 Turbo Mode costs more: it translates visible words plus twice that word count ahead in the background,
                 including words you might never look up. This uses additional API credits.
             </p>
-            <ThemeRow>
-                <ActionBtn autoFocus onClick={ () => turbo_dialog_ref.current.close() }>Cancel</ActionBtn>
-                <ActionBtn onClick={ () => {
+            <ButtonRow style={ { justifyContent: `flex-end` } }>
+                <Button autoFocus onClick={ () => turbo_dialog_ref.current.close() }>Cancel</Button>
+                <Button variant="primary" onClick={ () => {
                     set_turbo_mode( true )
                     turbo_dialog_ref.current.close()
                 } }
-                >Enable Turbo Mode</ActionBtn>
-            </ThemeRow>
+                >Enable Turbo Mode</Button>
+            </ButtonRow>
         </TurboDialog>
-    </>
+    </Modal>
 
 }

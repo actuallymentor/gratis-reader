@@ -5,6 +5,7 @@
 import { test, expect } from '@playwright/test'
 import { open_reader } from './helpers/setup.js'
 import { CHAT_URL, parse_chat_request, fulfil_chat, answer_request } from './helpers/openrouter_mock.js'
+import { chapter_combobox, open_chapter_list } from './helpers/reader.js'
 
 const DEMO_BOOK = `./tests/fixtures/book.epub`
 
@@ -254,11 +255,11 @@ test.describe( `Pass 23 — Edge Cases & Error States`, () => {
         await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible( { timeout: 10_000 } )
 
         // Use TOC dropdown to jump directly to last chapter (faster than navigating through all)
-        const toc_select = page.locator( `select` ).first()
-        const option_count = await toc_select.locator( `option` ).count()
+        const options = await open_chapter_list( page )
+        const option_count = await options.count()
 
         expect( option_count ).toBeGreaterThan( 1 )
-        await toc_select.selectOption( { index: option_count - 1 } )
+        await options.nth( option_count - 1 ).click()
 
         const next_btn = page.getByRole( `button`, { name: /Next/ } )
         await expect( next_btn ).toBeDisabled()
@@ -271,10 +272,10 @@ test.describe( `Pass 23 — Edge Cases & Error States`, () => {
         await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible( { timeout: 10_000 } )
 
         // Select a different chapter via TOC dropdown
-        const select = page.locator( `select` ).first()
-        await expect( select ).toBeVisible()
-        expect( await select.locator( `option` ).count() ).toBeGreaterThan( 3 )
-        await select.selectOption( { index: 3 } )
+        await expect( chapter_combobox( page ) ).toBeVisible()
+        const options = await open_chapter_list( page )
+        expect( await options.count() ).toBeGreaterThan( 3 )
+        await options.nth( 3 ).click()
 
         // Progress should show chapter 4
         await expect( page.locator( `text=/^\\d+\\s*\\/\\s*\\d+\\s*·\\s*\\d+%$/` ).first() ).toContainText( `4` )
@@ -400,7 +401,7 @@ test.describe( `Pass 23 — Edge Cases & Error States`, () => {
 
         await page.getByRole( `button`, { name: `Settings` } ).click()
         await expect( page.getByText( `Theme`, { exact: true } ) ).toBeVisible()
-        await expect( page.getByText( `Font Size`, { exact: true } ) ).toBeVisible()
+        await expect( page.getByText( `Font size`, { exact: true } ) ).toBeVisible()
     } )
 
     // ── SWIPE NAVIGATION ────────────────────────────────────────

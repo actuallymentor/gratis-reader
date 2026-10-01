@@ -51,21 +51,36 @@ body {
 /* === Themes === */
 
 [data-theme="light"] {
-    --bg: #fafafa;
+    --bg: #fafbfc;
     --bg-surface: #ffffff;
     --text: #1a1a2e;
     --text-muted: #6b7280;
     --border: #e5e7eb;
     --bg-hover: #f3f4f6;
+    --field-bg: #fcfcfd;
+    --focus-halo: rgba(126, 192, 208, 0.27);
+    --overlay: rgba(26, 26, 46, 0.45);
+    --danger: #c0392b;
+    --danger-tint: rgba(192, 57, 43, 0.08);
+    --warning-tint: #fff4d6;
+    --warning-text: #7a5300;
 }
 
+/* Solarized-style deep blue */
 [data-theme="dark"] {
-    --bg: #0f0f1a;
-    --bg-surface: #1a1a2e;
-    --text: #e8e8f0;
-    --text-muted: #9ca3af;
-    --border: #2d2d44;
-    --bg-hover: #252540;
+    --bg: #002b36;
+    --bg-surface: #073642;
+    --text: #e6ecf0;
+    --text-muted: #aab6c1;
+    --border: #154856;
+    --bg-hover: #0b4352;
+    --field-bg: #02303c;
+    --focus-halo: rgba(126, 192, 208, 0.25);
+    --overlay: rgba(0, 20, 26, 0.6);
+    --danger: #f08a7e;
+    --danger-tint: rgba(240, 138, 126, 0.12);
+    --warning-tint: rgba(240, 192, 64, 0.16);
+    --warning-text: #f0c040;
 }
 
 [data-theme="sepia"] {
@@ -75,16 +90,23 @@ body {
     --text-muted: #7a6b57;
     --border: #d6cdb7;
     --bg-hover: #ede5d0;
+    --field-bg: #fcf9f1;
     --accent: #b8860b;
     --accent-light: rgba(184, 134, 11, 0.15);
     --accent-dark: #996f0a;
+    --focus-halo: rgba(184, 134, 11, 0.27);
+    --overlay: rgba(67, 52, 34, 0.45);
+    --danger: #a93226;
+    --danger-tint: rgba(169, 50, 38, 0.08);
+    --warning-tint: #f6e7bf;
+    --warning-text: #6b4a00;
 }
 
 /* === Global Elements === */
 
 h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-heading);
-    font-weight: 500;
+    font-weight: 400;
     line-height: 1.3;
 }
 
@@ -92,9 +114,11 @@ h1 { font-size: clamp(1.75rem, 1.2rem + 2.5vw, 3rem); }
 h2 { font-size: clamp(1.4rem, 1rem + 1.5vw, 2rem); }
 h3 { font-size: clamp(1.15rem, 0.95rem + 0.8vw, 1.5rem); }
 
+/* Inline interactive text: colour and underline */
 a {
     color: var(--accent);
-    text-decoration: none;
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
 }
 
 a:hover {
@@ -112,7 +136,60 @@ img {
     display: block;
 }
 
+/* === Focus === */
+
+/* A soft halo that meets the surface instead of a hard dark rim */
+:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 5px var(--focus-halo);
+}
+
+/* Forced colours drop shadows: keep the system focus indication */
+@media (forced-colors: active) {
+    :focus-visible {
+        outline: 2px solid CanvasText;
+        outline-offset: 2px;
+    }
+}
+
+/* === Motion === */
+
+:root {
+    --ease-out: cubic-bezier(.2, .8, .2, 1);
+    --duration-press: 160ms;
+}
+
+@keyframes shimmer {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(100%); }
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
 /* === Utility === */
+
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+}
 
 .prose {
     max-width: 65ch;

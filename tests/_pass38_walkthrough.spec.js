@@ -4,6 +4,8 @@
  */
 import { test, expect } from '@playwright/test'
 import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth, clear_storage } from './helpers/setup.js'
+import { confirm_in_modal } from './helpers/confirm_modal.js'
+import { chapter_combobox, expect_chapter } from './helpers/reader.js'
 
 test.describe( `Pass 38 — Onboarding`, () => {
 
@@ -62,10 +64,11 @@ test.describe( `Pass 38 — Library`, () => {
         await upload_demo_book( page )
         await page.goto( `/library` )
 
-        // Set up dialog handler to accept confirmation
-        page.on( `dialog`, dialog => dialog.accept() )
-
-        await page.getByRole( `button`, { name: /remove/i } ).click()
+        // Confirm in the remove modal
+        await confirm_in_modal( page, {
+            title: `Remove “Smart work beats hard work”?`,
+            action: () => page.getByRole( `button`, { name: /remove/i } ).click()
+        } )
 
         // Book should be gone
         await expect( page.getByRole( `heading`, { name: /smart work/i } ) ).not.toBeVisible()
@@ -306,14 +309,13 @@ test.describe( `Pass 38 — Edge cases`, () => {
         await upload_demo_book( page )
         await open_reader( page )
 
-        const toc = page.locator( `header select` )
-        await expect( toc ).toBeVisible()
+        await expect( chapter_combobox( page ) ).toBeVisible()
 
         // Rapidly press arrow right 5 times
         for( let i = 0; i < 5; i++ ) await page.keyboard.press( `ArrowRight` )
 
         // No crashes
-        await expect( toc ).toHaveValue( `5` )
+        await expect_chapter( page, 5 )
         expect( errors ).toEqual( [] )
         // Still in reader
         await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible( { timeout: 5000 } )

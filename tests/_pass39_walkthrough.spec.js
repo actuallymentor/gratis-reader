@@ -4,6 +4,8 @@
  */
 import { test, expect, open_seeded_reader } from './helpers/app_fixture.js'
 import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth, clear_storage } from './helpers/setup.js'
+import { confirm_in_modal } from './helpers/confirm_modal.js'
+import { chapter_combobox, chapter_labels, choose_chapter } from './helpers/reader.js'
 
 const get_saved_chapter_index = async page => page.evaluate( async () => {
     return new Promise( resolve => {
@@ -17,26 +19,6 @@ const get_saved_chapter_index = async page => page.evaluate( async () => {
         req.onerror = () => resolve( -1 )
     } )
 } )
-
-const accept_confirmation = async ( page, expected_message, action ) => {
-
-    const handled = new Promise( ( resolve, reject ) => {
-        page.once( `dialog`, async dialog => {
-            try {
-                expect( dialog.type() ).toBe( `confirm` )
-                expect( dialog.message() ).toBe( expected_message )
-                await dialog.accept()
-                resolve()
-            } catch ( error ) {
-                reject( error )
-            }
-        } )
-    } )
-
-    await action()
-    await handled
-
-}
 
 test.describe( `Pass 39 — Multi-step state transitions`, () => {
 
@@ -168,11 +150,10 @@ test.describe( `Pass 39 — Multi-step state transitions`, () => {
             await expect( page.getByRole( `heading`, { name: /smart work/i } ) ).toBeVisible()
 
             // Delete with confirmation
-            await accept_confirmation(
-                page,
-                `Remove "Smart work beats hard work" from your library?`,
-                () => page.getByRole( `button`, { name: /remove/i } ).click()
-            )
+            await confirm_in_modal( page, {
+                title: `Remove “Smart work beats hard work”?`,
+                action: () => page.getByRole( `button`, { name: /remove/i } ).click()
+            } )
 
             // Book should be gone, empty state shown
             await expect( page.getByText( /library is empty/i ) ).toBeVisible( { timeout: 5000 } )
@@ -289,13 +270,12 @@ test.describe( `Pass 39 — Multi-step state transitions`, () => {
             const progress = page.locator( `text=/^\\d+\\s*\\/\\s*\\d+\\s*·\\s*\\d+%$/` )
             const progress_before = await progress.textContent()
 
-            // Find and use the TOC select
-            const toc_select = page.locator( `select` ).first()
-            const options = await toc_select.locator( `option` ).all()
-            if( options.length > 2 ) {
+            // Find and use the TOC combobox
+            const labels = await chapter_labels( page )
+            if( labels.length > 2 ) {
             // Select a later chapter
-                await toc_select.selectOption( { index: 2 } )
-                await expect( toc_select ).toHaveValue( `2` )
+                await choose_chapter( page, 2 )
+                await expect( chapter_combobox( page ) ).toHaveValue( labels[ 2 ] )
                 await expect( progress ).not.toHaveText( progress_before )
             }
         } )

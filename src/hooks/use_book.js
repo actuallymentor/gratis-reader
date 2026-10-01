@@ -38,6 +38,7 @@ export const use_book = ( book_id, ahead_word_budget = 0 ) => {
     const [ loading, set_loading ] = useState( true )
     const [ chapter_loading, set_chapter_loading ] = useState( false )
     const [ chapter_error, set_chapter_error ] = useState( null )
+    const [ chapter_attempt, set_chapter_attempt ] = useState( 0 )
     const book_hash_ref = useRef( null )
 
     // Share pending/resolved parses across navigation and changing viewport budgets.
@@ -295,7 +296,10 @@ export const use_book = ( book_id, ahead_word_budget = 0 ) => {
             cancelled = true
         }
 
-    }, [ epub_data, current_chapter, load_chapter_content ] )
+    }, [ epub_data, current_chapter, load_chapter_content, chapter_attempt ] )
+
+    // Failed chapter loads drop their cache entry, so a retry parses again
+    const retry_chapter = useCallback( () => set_chapter_attempt( attempt => attempt + 1 ), [] )
 
     // Parse only enough following chapters to cover the viewport's source-word deficit.
     useEffect( () => {
@@ -371,6 +375,7 @@ export const use_book = ( book_id, ahead_word_budget = 0 ) => {
         loading,
         chapter_loading,
         chapter_error,
+        retry_chapter,
         resolve_asset,
         book_hash: book_hash_ref.current,
         source_language: epub_data?.metadata?.language || `en`

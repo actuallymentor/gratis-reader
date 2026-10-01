@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { setup_api_key, clear_storage } from './helpers/setup.js'
+import { confirm_in_modal } from './helpers/confirm_modal.js'
 
 test.describe( `Library`, () => {
 
@@ -66,11 +67,11 @@ test.describe( `Library`, () => {
         await page.locator( `input[type="file"]` ).setInputFiles( `./tests/fixtures/book.epub` )
         await expect( page.getByRole( `heading`, { name: `Smart work beats hard work` } ) ).toBeVisible( { timeout: 10_000 } )
 
-        // Accept the confirmation dialog
-        page.on( `dialog`, dialog => dialog.accept() )
-
-        // Click Remove
-        await page.getByRole( `button`, { name: `Remove` } ).click()
+        // Click Remove and confirm in the modal
+        await confirm_in_modal( page, {
+            title: `Remove “Smart work beats hard work”?`,
+            action: () => page.getByRole( `button`, { name: `Remove` } ).click()
+        } )
 
         // Book should be gone, empty state visible
         await expect( page.getByText( `Your library is empty` ) ).toBeVisible()

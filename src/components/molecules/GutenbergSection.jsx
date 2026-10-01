@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo, useDeferredValue } from 'react'
 import { useShallow } from 'zustand/react/shallow'
+import { Check, ChevronRight, SearchX } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import toast from 'react-hot-toast'
@@ -11,6 +12,8 @@ import { offer_parsed_book } from '../../modules/book_handoff.js'
 import GutenbergCard from './GutenbergCard.jsx'
 import GutenbergInfoModal from './GutenbergInfoModal.jsx'
 import Skeleton from '../atoms/Skeleton.jsx'
+import { Button } from '../atoms/Button.jsx'
+import LoadError from './LoadError.jsx'
 
 const Section = styled.section`
     margin-top: var(--space-3xl);
@@ -35,16 +38,18 @@ const SectionSubtitle = styled.p`
 
 const SearchInput = styled.input`
     width: 100%;
+    min-height: 2.5rem;
     padding: var(--space-s) var(--space-m);
     margin-top: var(--space-m);
     border: 1px solid var(--border);
     border-radius: var(--radius-m);
-    background: var(--bg-surface);
+    background: var(--field-bg);
     color: var(--text);
-    font-size: 0.9em;
+    font: inherit;
+    font-size: 0.95rem;
 
     &::placeholder { color: var(--text-muted); }
-    &:focus { outline: none; border-color: var(--accent); }
+    &:focus-visible { border-color: var(--accent); }
 `
 
 const PillToggle = styled.button`
@@ -62,11 +67,11 @@ const PillToggle = styled.button`
     &:hover { color: var(--text); }
 `
 
-const Arrow = styled.span`
-    display: inline-block;
-    transition: transform 0.2s ease;
+const Arrow = styled( ChevronRight )`
+    width: 1rem;
+    height: 1rem;
+    transition: transform 0.2s var(--ease-out);
     transform: rotate( ${ p => p.$open ? `90deg` : `0deg` } );
-    font-size: 0.85em;
 `
 
 const PillList = styled.div`
@@ -76,36 +81,56 @@ const PillList = styled.div`
     margin-top: var(--space-xs);
 `
 
+// Active filter: tint, border and a check mark, so the state never rests on colour alone
 const Pill = styled.button`
-    background: ${ p => p.$active ? `var(--accent)` : `var(--bg-hover)` };
-    color: ${ p => p.$active ? `white` : `var(--text-muted)` };
-    border: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3em;
+    background: ${ p => p.$active ? `var(--accent-light)` : `var(--bg-hover)` };
+    color: ${ p => p.$active ? `var(--text)` : `var(--text-muted)` };
+    border: 1px solid ${ p => p.$active ? `var(--accent)` : `transparent` };
     border-radius: 999px;
     padding: var(--space-xs) var(--space-m);
-    font-size: 0.78em;
+    font-size: 0.8rem;
     cursor: pointer;
-    transition: background 0.15s ease, color 0.15s ease;
+    transition: background var(--duration-press) ease, color var(--duration-press) ease;
     white-space: nowrap;
 
-    &:hover {
-        background: ${ p => p.$active ? `var(--accent)` : `var(--border)` };
-    }
+    svg { width: 0.875rem; height: 0.875rem; }
+
+    &:hover { background: ${ p => p.$active ? `var(--accent-light)` : `var(--border)` }; }
 `
 
-const NoResults = styled.p`
+const NoResults = styled.div`
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-s);
     color: var(--text-muted);
     text-align: center;
     padding: var(--space-2xl) 0;
+
+    > svg { width: 1.5rem; height: 1.5rem; color: var(--accent); }
 `
 
 const Grid = styled.div`
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: var(--space-l);
+    gap: var(--space-s);
+
+    @media (min-width: 600px) { gap: var(--space-l); }
 
     @media (min-width: 768px) {
         grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
     }
+`
+
+// Loading placeholders shaped like the cards they stand in for
+const SkeletonCard = styled( Skeleton )`
+    height: 7.75rem;
+    border-radius: var(--radius-m);
+
+    @media (min-width: 600px) { height: 23.75rem; }
 `
 
 // Strip "Category: " prefix from bookshelf names
@@ -117,7 +142,7 @@ const clean_shelf = name => name.replace( /^Category:\s*/i, `` )
 export default function GutenbergSection() {
 
     const navigate = useNavigate()
-    const { books: catalog, loading } = use_gutenberg()
+    const { books: catalog, loading, error: catalog_error, retry: retry_catalog } = use_gutenberg()
     const { books: library_books, add_book } = use_library_store( useShallow( ( { books, add_book } ) => ( { books, add_book } ) ) )
     const [ info_book, set_info_book ] = useState( null )
     const [ importing_id, set_importing_id ] = useState( null )
@@ -259,17 +284,24 @@ export default function GutenbergSection() {
             <SectionHeader>
                 <SectionTitle>Classic Library</SectionTitle>
             </SectionHeader>
-            <Grid>
+            <Grid aria-busy="true" aria-label="Loading the classic library">
                 { Array.from( { length: 6 } ).map( ( _, i ) =>
-                    <Skeleton key={ i } height="380px" />
+                    <SkeletonCard key={ i } />
                 ) }
             </Grid>
         </Section>
     }
 
+    if( catalog_error && !catalog.length ) return <Section>
+        <SectionHeader>
+            <SectionTitle>Classic Library</SectionTitle>
+        </SectionHeader>
+        <LoadError title="Couldn't load the classic library" error={ catalog_error } on_retry={ retry_catalog } />
+    </Section>
+
     if( !catalog.length ) return null
 
-    return <Section>
+    return <Section id="classic-library">
 
         <SectionHeader>
             <SectionTitle>Classic Library</SectionTitle>
@@ -277,14 +309,15 @@ export default function GutenbergSection() {
                 { catalog.length } public domain books from Project Gutenberg
             </SectionSubtitle>
             <SearchInput
-                type="text"
+                type="search"
+                aria-label="Search the classic library"
                 placeholder="Search by title, author, or keyword…"
                 value={ search }
                 onChange={ e => set_search( e.target.value ) }
             />
             { all_shelves.length > 0 && <>
-                <PillToggle onClick={ () => set_shelves_open( !shelves_open ) }>
-                    <Arrow $open={ shelves_open }>▶</Arrow>
+                <PillToggle aria-expanded={ shelves_open } onClick={ () => set_shelves_open( !shelves_open ) }>
+                    <Arrow $open={ shelves_open } strokeWidth={ 1.5 } aria-hidden="true" />
                     Browse by category{ active_shelf ? `: ${ active_shelf }` : `` }
                 </PillToggle>
                 { shelves_open && <PillList>
@@ -292,8 +325,10 @@ export default function GutenbergSection() {
                         <Pill
                             key={ shelf }
                             $active={ active_shelf === shelf }
+                            aria-pressed={ active_shelf === shelf }
                             onClick={ () => set_active_shelf( active_shelf === shelf ? null : shelf ) }
                         >
+                            { active_shelf === shelf && <Check strokeWidth={ 1.5 } aria-hidden="true" /> }
                             { shelf }
                         </Pill>
                     ) }
@@ -302,7 +337,15 @@ export default function GutenbergSection() {
         </SectionHeader>
 
         { filtered_catalog.length === 0 && ( search || active_shelf ) && <NoResults>
-            No books matching { search ? `"${ search }"` : `` }{ search && active_shelf ? ` in ` : `` }{ active_shelf || `` }
+            <SearchX strokeWidth={ 1.5 } aria-hidden="true" />
+            <p>No books matching { search ? `"${ search }"` : `` }{ search && active_shelf ? ` in ` : `` }{ active_shelf || `` }</p>
+            <Button onClick={ () => {
+                set_search( `` )
+                set_active_shelf( null )
+            } }
+            >
+                Clear search
+            </Button>
         </NoResults> }
 
         { filtered_catalog.length > 0 && <Grid>

@@ -13,6 +13,7 @@
 
 import { test, expect } from '@playwright/test'
 import { CHAT_URL, parse_chat_request, fulfil_chat, answer_request } from './helpers/openrouter_mock.js'
+import { chapter_combobox, open_chapter_list, chapter_labels, choose_chapter, expect_chapter } from './helpers/reader.js'
 
 const BASE = `http://localhost:5173`
 
@@ -381,14 +382,15 @@ test.describe( `Gratis Reader — Full Walkthrough`, () => {
         await start_btn.click()
         await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible( { timeout: 10_000 } )
 
-        // Look for the TOC select element
-        const toc_select = page.locator( `select` ).first()
-        const option_count = await toc_select.locator( `option` ).count()
+        // Look for the TOC combobox options
+        const options = await open_chapter_list( page )
+        const option_count = await options.count()
 
         if( option_count > 2 ) {
             // Jump to the third option
-            await toc_select.selectOption( { index: 2 } )
-            await expect( toc_select ).toHaveValue( `2` )
+            const third_label = await options.nth( 2 ).textContent()
+            await options.nth( 2 ).click()
+            await expect( chapter_combobox( page ) ).toHaveValue( third_label )
 
             // Footer should show "3 / X"
             await expect( page.locator( `footer` ) ).toContainText( `3 /` )
@@ -675,9 +677,8 @@ test.describe( `Gratis Reader — Full Walkthrough`, () => {
 
         if( total_chapters > 1 ) {
             // Use TOC dropdown to jump to last chapter
-            const toc_select = page.locator( `select` ).first()
-            await toc_select.selectOption( { index: total_chapters - 1 } )
-            await expect( toc_select ).toHaveValue( `${ total_chapters - 1 }` )
+            await choose_chapter( page, total_chapters - 1 )
+            await expect_chapter( page, total_chapters - 1 )
 
             // Next button should be disabled at last chapter
             const next_btn = page.getByRole( `button`, { name: /next/i } )
@@ -704,10 +705,9 @@ test.describe( `Gratis Reader — Full Walkthrough`, () => {
         }
 
         // The TOC value is the loop-completion barrier for all ten key presses.
-        const toc_select = page.locator( `select` ).first()
-        const total_chapters = await toc_select.locator( `option` ).count()
+        const total_chapters = ( await chapter_labels( page ) ).length
         const expected_index = Math.min( 10, total_chapters - 1 )
-        await expect( toc_select ).toHaveValue( `${ expected_index }` )
+        await expect_chapter( page, expected_index )
         await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible()
 
         // Footer should still be visible — page didn't crash

@@ -16,7 +16,7 @@ const SkeletonBlock = styled.div`
         var(--border) 75%
     );
     background-size: 200% 100%;
-    animation: ${ shimmer } 1.5s ease infinite;
+    animation: ${ shimmer } 1.8s linear infinite;
 `
 
 /**

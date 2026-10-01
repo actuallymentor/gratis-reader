@@ -84,10 +84,9 @@ test.describe( `Pass 37 — Settings key update resilience`, () => {
         const input = page.locator( `input[placeholder="sk-or-..."]` )
         await expect( input ).toBeVisible()
         await input.fill( `   ` )
-        await page.getByRole( `button`, { name: `Save` } ).click()
 
-        // Should show error toast
-        await expect( page.getByText( `Please enter an API key` ) ).toBeVisible( { timeout: 3000 } )
+        // Whitespace is no longer submittable: Save stays disabled instead of showing an error toast
+        await expect( page.getByRole( `button`, { name: `Save` } ) ).toBeDisabled()
     } )
 
     test( `BW159 settings key update shows network error on failure`, async ( { page } ) => {
@@ -105,8 +104,11 @@ test.describe( `Pass 37 — Settings key update resilience`, () => {
         await input.fill( `sk-or-new-key-123` )
         await page.getByRole( `button`, { name: `Save` } ).click()
 
-        // Should show network error, not "invalid key"
-        await expect( page.getByText( `Could not connect` ) ).toBeVisible( { timeout: 5000 } )
+        // Should show network error, not "invalid key" (now a modal instead of a toast)
+        const failure = page.getByRole( `dialog`, { name: `Couldn't save the API key` } )
+        await expect( failure ).toBeVisible( { timeout: 5000 } )
+        await expect( failure ).toContainText( `check your internet connection` )
+        await expect( page.getByText( /invalid.*api.*key/i ) ).toHaveCount( 0 )
     } )
 
     test( `BW160 settings key update shows invalid key on 401`, async ( { page } ) => {

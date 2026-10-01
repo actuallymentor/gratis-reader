@@ -1,5 +1,7 @@
 import { useId, useState } from 'react'
 import styled, { keyframes } from 'styled-components'
+import { Languages, MessageCircleQuestion, X } from 'lucide-react'
+import { Button, IconButton } from '../atoms/Button.jsx'
 
 const open_sheet = keyframes`
     from { transform: translateY(0.75rem); opacity: 0; }
@@ -27,26 +29,10 @@ const Sheet = styled.aside`
     }
 `
 
-const CloseButton = styled.button`
+const CloseSlot = styled.div`
     position: absolute;
-    top: var(--space-xs);
-    right: var(--space-xs);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 44px;
-    min-height: 44px;
-    border: 0;
-    border-radius: var(--radius-s);
-    background: transparent;
-    color: var(--text);
-    font-size: 1.5em;
-    line-height: 1;
-
-    &:hover,
-    &:focus-visible {
-        background: var(--bg-hover);
-    }
+    top: var(--space-s);
+    right: var(--space-s);
 `
 
 const SheetContent = styled.div`
@@ -120,23 +106,6 @@ const ActionRow = styled.div`
     margin-top: var(--space-s);
 `
 
-const ActionButton = styled.button`
-    min-height: 44px;
-    padding: 0 var(--space-s);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-s);
-    background: transparent;
-    color: var(--text-muted);
-    font-size: 0.78em;
-    font-weight: 600;
-
-    &:hover,
-    &:focus-visible {
-        background: var(--bg-hover);
-        color: var(--text);
-    }
-`
-
 const OriginalSentence = styled.div`
     margin-top: var(--space-s);
     padding-top: var(--space-s);
@@ -198,9 +167,9 @@ export default function TranslationInfoSheet( {
         data-translation-info-sheet
         aria-label="Translation information"
     >
-        <CloseButton type="button" onClick={ on_close } aria-label="Close translation information">
-            ×
-        </CloseButton>
+        <CloseSlot>
+            <IconButton label="Close translation information" icon={ <X strokeWidth={ 1.5 } /> } onClick={ on_close } />
+        </CloseSlot>
 
         <SheetContent>
             <TranslationDetails>
@@ -216,18 +185,18 @@ export default function TranslationInfoSheet( {
             </TranslationDetails>
 
             <ActionRow>
-                <ActionButton
-                    type="button"
+                <Button
+                    icon={ <Languages strokeWidth={ 1.5 } /> }
                     aria-expanded={ show_original }
                     aria-controls={ original_id }
                     onClick={ () => set_show_original( visible => !visible ) }
                 >
                     Original
-                </ActionButton>
+                </Button>
 
-                <ActionButton type="button" onClick={ on_explain }>
+                <Button icon={ <MessageCircleQuestion strokeWidth={ 1.5 } /> } onClick={ on_explain }>
                     Explain
-                </ActionButton>
+                </Button>
             </ActionRow>
 
             { show_original && <OriginalSentence id={ original_id } data-original-sentence>

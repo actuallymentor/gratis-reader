@@ -7,6 +7,8 @@
 import { test, expect } from '@playwright/test'
 import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth } from './helpers/setup.js'
 import { CHAT_URL, parse_chat_request, fulfil_chat, answer_request } from './helpers/openrouter_mock.js'
+import { confirm_in_modal } from './helpers/confirm_modal.js'
+import { language_combobox } from './helpers/reader.js'
 
 // Echoes `[TR] <sentence>` for single and batched requests alike
 const echo_tr = route => {
@@ -254,7 +256,7 @@ test.describe( `Pass 27 — Coverage Expansion`, () => {
         await open_settings( page )
 
         // Click on the language input to open dropdown
-        const lang_input = page.locator( `input[placeholder*="anguage" i], input[placeholder*="earch" i]` ).first()
+        const lang_input = language_combobox( page )
         await expect( lang_input ).toBeVisible()
         await lang_input.fill( `French` )
 
@@ -350,14 +352,12 @@ test.describe( `Pass 27 — Coverage Expansion`, () => {
         // Find and click clear cache button
         const clear_btn = page.getByRole( `button`, { name: /clear/i } )
         await expect( clear_btn ).toBeVisible()
-        const dialog_message = page.waitForEvent( `dialog` ).then( async dialog => {
-            const message = dialog.message()
-            await dialog.dismiss()
-            return message
+        // The confirmation modal should appear; cancel it
+        await confirm_in_modal( page, {
+            title: /clear/i,
+            action: () => clear_btn.click(),
+            cancel: true
         } )
-        await clear_btn.click()
-
-        expect( await dialog_message ).toMatch( /clear/i )
     } )
 
     // ── Spec §7: Progress indicator format ──

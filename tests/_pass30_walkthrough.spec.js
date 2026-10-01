@@ -6,6 +6,7 @@
 import { test, expect } from '@playwright/test'
 import { setup_api_key, upload_demo_book, open_reader, mock_openrouter, mock_auth } from './helpers/setup.js'
 import { CHAT_URL, parse_chat_request, fulfil_chat, answer_request } from './helpers/openrouter_mock.js'
+import { chapter_combobox, open_chapter_list, language_combobox } from './helpers/reader.js'
 
 // Helper to open settings from reader
 const open_settings = async ( page ) => {
@@ -118,16 +119,15 @@ test.describe( `Pass 30 — Walkthrough`, () => {
     test( `BW84 TOC dropdown navigates to correct chapter`, async ( { page } ) => {
         await open_reader( page )
 
-        const toc = page.locator( `select` ).first()
-        await expect( toc ).toBeVisible()
-        expect( await toc.locator( `option` ).count() ).toBeGreaterThan( 1 )
+        await expect( chapter_combobox( page ) ).toBeVisible()
 
         const progress = page.locator( `text=/^\\d+\\s*\\/\\s*\\d+\\s*·\\s*\\d+%$/` ).first()
         const progress_before = await progress.textContent()
 
         // Select the last chapter
-        const last_option = await toc.locator( `option` ).last().getAttribute( `value` )
-        await toc.selectOption( last_option )
+        const options = await open_chapter_list( page )
+        expect( await options.count() ).toBeGreaterThan( 1 )
+        await options.last().click()
         await expect( progress ).not.toHaveText( progress_before )
         await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible()
     } )
@@ -138,7 +138,7 @@ test.describe( `Pass 30 — Walkthrough`, () => {
         await open_reader( page )
         await open_settings( page )
 
-        const lang_input = page.locator( `input[placeholder*="earch"]` ).first()
+        const lang_input = language_combobox( page )
         await expect( lang_input ).toBeVisible()
         await lang_input.fill( `Jap` )
 

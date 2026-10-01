@@ -5,6 +5,8 @@
 import { test, expect } from '@playwright/test'
 import { open_reader } from './helpers/setup.js'
 import { CHAT_URL, parse_chat_request, fulfil_chat, answer_request } from './helpers/openrouter_mock.js'
+import { confirm_in_modal } from './helpers/confirm_modal.js'
+import { chapter_combobox, chapter_labels, language_combobox } from './helpers/reader.js'
 
 const DEMO_BOOK = `./tests/fixtures/book.epub`
 
@@ -77,26 +79,6 @@ const get_saved_chapter_index = async page => page.evaluate( async () => {
     } )
 } )
 
-const accept_confirmation = async ( page, expected_message, action ) => {
-
-    const handled = new Promise( ( resolve, reject ) => {
-        page.once( `dialog`, async dialog => {
-            try {
-                expect( dialog.type() ).toBe( `confirm` )
-                expect( dialog.message() ).toBe( expected_message )
-                await dialog.accept()
-                resolve()
-            } catch ( error ) {
-                reject( error )
-            }
-        } )
-    } )
-
-    await action()
-    await handled
-
-}
-
 test.describe( `Browser Walkthrough`, () => {
 
     test.beforeEach( async ( { page } ) => {
@@ -161,11 +143,10 @@ test.describe( `Browser Walkthrough`, () => {
     test( `BW08 delete book → empty state`, async ( { page } ) => {
         await setup_key( page )
         await upload_book( page )
-        await accept_confirmation(
-            page,
-            `Remove "Smart work beats hard work" from your library?`,
-            () => page.getByRole( `button`, { name: /remove/i } ).click()
-        )
+        await confirm_in_modal( page, {
+            title: `Remove “Smart work beats hard work”?`,
+            action: () => page.getByRole( `button`, { name: /remove/i } ).click()
+        } )
         await expect( page.getByText( /library is empty/i ) ).toBeVisible()
         await expect( page.getByRole( `heading`, { name: `Smart work beats hard work` } ) ).not.toBeVisible()
     } )
@@ -294,9 +275,9 @@ test.describe( `Browser Walkthrough`, () => {
         await setup_key( page )
         await page.goto( `/library` )
         await page.getByRole( `button`, { name: `Settings` } ).click()
-        const drawer = page.locator( `aside` )
+        const drawer = page.getByRole( `dialog`, { name: `Settings` } )
 
-        await expect( drawer.getByText( `Font Size`, { exact: true } ) ).toBeVisible()
+        await expect( drawer.getByText( `Font size`, { exact: true } ) ).toBeVisible()
         await expect( drawer.getByText( `Theme`, { exact: true } ) ).toBeVisible()
         await expect( drawer.getByText( `LLM Model`, { exact: true } ) ).toBeVisible()
     } )
@@ -350,11 +331,10 @@ test.describe( `Browser Walkthrough`, () => {
         await setup_key( page )
         await page.goto( `/library` )
         await page.getByRole( `button`, { name: `Settings` } ).click()
-        await accept_confirmation(
-            page,
-            `Clear all cached translations? This cannot be undone.`,
-            () => page.getByRole( `button`, { name: /clear.*cache/i } ).click()
-        )
+        await confirm_in_modal( page, {
+            title: `Clear all cached translations?`,
+            action: () => page.getByRole( `button`, { name: /clear.*cache/i } ).click()
+        } )
         await expect( page.getByText( `Translation cache cleared` ) ).toBeVisible()
         await expect( page.getByText( `FONT SIZE` ) ).toBeVisible()
     } )
@@ -363,8 +343,10 @@ test.describe( `Browser Walkthrough`, () => {
         await setup_key( page )
         await page.goto( `/library` )
         await page.getByRole( `button`, { name: `Settings` } ).click()
-        page.on( `dialog`, d => d.accept() )
-        await page.getByRole( `button`, { name: /remove.*key/i } ).click()
+        await confirm_in_modal( page, {
+            title: `Remove your API key?`,
+            action: () => page.getByRole( `button`, { name: /remove.*key/i } ).click()
+        } )
         await page.waitForURL( `/`, { timeout: 5000 } )
         await expect( page.locator( `input[type="password"]` ) ).toBeVisible()
     } )
@@ -442,7 +424,7 @@ test.describe( `Browser Walkthrough`, () => {
         await page.waitForURL( /\/read\// )
 
         // Language modal should show — check the input value
-        const lang_input = page.locator( `input[placeholder*="language" i]` ).first()
+        const lang_input = language_combobox( page )
         await expect( lang_input ).toBeVisible( { timeout: 5000 } )
 
         // When not focused, the input shows the current value
@@ -698,11 +680,10 @@ test.describe( `Browser Walkthrough`, () => {
         // Go back to library and delete the book
         await page.goBack()
         await page.waitForURL( /\/library/ )
-        await accept_confirmation(
-            page,
-            `Remove "Smart work beats hard work" from your library?`,
-            () => page.getByRole( `button`, { name: /remove/i } ).click()
-        )
+        await confirm_in_modal( page, {
+            title: `Remove “Smart work beats hard work”?`,
+            action: () => page.getByRole( `button`, { name: /remove/i } ).click()
+        } )
 
         // The book is gone; its translations are deliberately kept (expensive, reusable on re-import)
         await expect.poll( () => get_store_count( page, `books` ) ).toBe( 0 )
@@ -885,20 +866,18 @@ test.describe( `Browser Walkthrough`, () => {
 
         await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible( { timeout: 10_000 } )
 
-        // TOC should be present as a select element
-        const toc = page.locator( `select` )
-        if( await toc.count() > 0 ) {
-            // Each option should have text content (not just "Section N" for every entry)
-            const options = toc.locator( `option` )
-            const count = await options.count()
-            expect( count ).toBeGreaterThan( 0 )
+        // TOC should be present as a chapter combobox
+        await expect( chapter_combobox( page ) ).toBeVisible()
 
-            // Verify at least one option has a meaningful label (not just "Section N")
-            const texts = await options.allTextContents()
-            const non_generic = texts.filter( t => !t.startsWith( `Section` ) )
-            // It's fine if some are generic, but at least the book should have one named chapter
-            expect( non_generic.length + texts.filter( t => t.startsWith( `Section` ) ).length ).toBe( count )
-        }
+        // Each option should have text content (not just "Section N" for every entry)
+        const texts = await chapter_labels( page )
+        const count = texts.length
+        expect( count ).toBeGreaterThan( 0 )
+
+        // Verify at least one option has a meaningful label (not just "Section N")
+        const non_generic = texts.filter( t => !t.startsWith( `Section` ) )
+        // It's fine if some are generic, but at least the book should have one named chapter
+        expect( non_generic.length + texts.filter( t => t.startsWith( `Section` ) ).length ).toBe( count )
     } )
 
     test( `BW64 case-insensitive epub upload validation`, async ( { page } ) => {
@@ -940,11 +919,10 @@ test.describe( `Browser Walkthrough`, () => {
         await page.waitForURL( /\/library/ )
 
         // Delete the book
-        await accept_confirmation(
-            page,
-            `Remove "Smart work beats hard work" from your library?`,
-            () => page.getByRole( `button`, { name: /remove/i } ).click()
-        )
+        await confirm_in_modal( page, {
+            title: `Remove “Smart work beats hard work”?`,
+            action: () => page.getByRole( `button`, { name: /remove/i } ).click()
+        } )
         await expect( page.getByRole( `heading`, { name: `Smart work beats hard work` } ) ).not.toBeVisible()
 
         // Navigate to the deleted book's reader URL

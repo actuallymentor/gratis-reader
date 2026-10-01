@@ -1,6 +1,7 @@
 import { test, expect, open_seeded_reader } from './helpers/app_fixture.js'
 import { mock_openrouter } from './helpers/setup.js'
 import { CHAT_URL, parse_chat_request, fulfil_chat, answer_request } from './helpers/openrouter_mock.js'
+import { language_combobox } from './helpers/reader.js'
 
 const system_prompt_from = request => {
     const body = request.postDataJSON()
@@ -43,10 +44,10 @@ test.describe( `Level & Language Changes`, () => {
 
         // Open settings and change level
         await page.getByRole( `button`, { name: `Settings` } ).click()
-        await expect( page.locator( `aside` ).filter( { hasText: `Target Language` } ) ).toBeVisible()
+        await expect( page.getByRole( `dialog`, { name: `Settings` } ).filter( { hasText: `Target Language` } ) ).toBeVisible()
 
         // Find and click a different level (pick the last level option)
-        const adult_level = page.getByRole( `button`, { name: /C1-C2 Adult/i } )
+        const adult_level = page.getByRole( `radio`, { name: /C1-C2\s*Adult/i } )
         await expect( adult_level ).toBeVisible()
         const changed_translation = page.waitForRequest( request =>
             request.url().includes( `openrouter.ai/api/v1/chat/completions` ) &&
@@ -89,10 +90,10 @@ test.describe( `Level & Language Changes`, () => {
 
         // Open settings
         await page.getByRole( `button`, { name: `Settings` } ).click()
-        await expect( page.locator( `aside` ).filter( { hasText: `Target Language` } ) ).toBeVisible()
+        await expect( page.getByRole( `dialog`, { name: `Settings` } ).filter( { hasText: `Target Language` } ) ).toBeVisible()
 
         // Change target language — find the language input/select and change it
-        const lang_input = page.locator( `input[placeholder*="language" i], input[list]` ).first()
+        const lang_input = language_combobox( page )
         await expect( lang_input ).toBeVisible()
 
         const changed_translation = page.waitForRequest( request =>
