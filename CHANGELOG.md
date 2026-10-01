@@ -16,6 +16,9 @@
 - Fetch the catalogue once per page load instead of on every library visit
 - Keep the Classic Library grid responsive while typing: deferred search, pre-indexed fields, memoised cards
 - Serve a 400px cover variant so cards stay sharp on high-density screens
+- Translate with a sliding pool of five requests instead of lock-step batches, and read all cached sentences of the window in one IndexedDB transaction
+- Honour Retry-After on rate limits, stop retrying a sentence after five failures, count billed empty responses, and cap runaway completions
+- Recover from a failed page chunk download by reloading once; refresh the catalogue on later library visits when it changed
 
 ### Fixed
 - Release EPUB archives after upload and failed parses so cover object URLs do not leak

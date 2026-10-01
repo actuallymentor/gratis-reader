@@ -8,6 +8,8 @@ const WORD_BOUNDARY_PUNCTUATION_RE = /(^[\p{P}\p{S}]+)|([\p{P}\p{S}]+$)/gu
 const WORD_WITH_LETTERS_RE = /\p{L}/u
 const WORD_LOOKUP_MEMORY_LIMIT = 250
 const WORD_LOOKUP_CONCURRENCY = 3
+// Runaway guard only: a gloss is a few tokens, but reasoning models bill their thinking
+const WORD_LOOKUP_MAX_TOKENS = 4_000
 const LOOKUP_CANCELLED = Symbol( `lookup_cancelled` )
 
 // A tap can join a prefetch. One caller leaving must not abort work the other still needs.
@@ -219,6 +221,7 @@ export const use_word_lookup = ( {
                     system_prompt: system,
                     user_message: user,
                     temperature: 0.1,
+                    max_tokens: WORD_LOOKUP_MAX_TOKENS,
                     signal: controller.signal
                 } )
 
@@ -243,6 +246,8 @@ export const use_word_lookup = ( {
                     // Cache writes should not invalidate a successful lookup.
                 }
             } catch ( error ) {
+                // An empty answer was still billed
+                if( error?.usage ) on_usage?.( error.usage )
                 // Word lookups are opportunistic; the reading flow should never break on lookup failure.
                 if( task.cancelled || error?.name === `AbortError` ) return LOOKUP_CANCELLED
 

@@ -194,6 +194,20 @@ export const get_book_index = ( book_id ) => read_record( `book_index`, book_id 
 export const save_book_index = ( index ) => write_record( `book_index`, index )
 
 /**
+ * Drops every cached chapter of a book hash, e.g. when the stored file changed under the same hash
+ * @param {string} book_hash
+ */
+export const delete_chapters = async ( book_hash ) => {
+    const db = await open_db()
+    return new Promise( ( resolve, reject ) => {
+        const tx = db.transaction( `chapters`, `readwrite` )
+        tx.objectStore( `chapters` ).delete( chapter_key_range( book_hash ) )
+        tx.oncomplete = () => resolve()
+        tx.onerror = () => reject( tx.error )
+    } )
+}
+
+/**
  * Gets parsed chapter elements
  * @param {string} key - `${ book_hash }:${ chapter_index }`
  * @returns {Promise<Object|undefined>} { key, parser_version, elements }
@@ -232,6 +246,32 @@ export const get_translation = async ( cache_key ) => {
         const request = tx.objectStore( `translations` ).get( cache_key )
         request.onsuccess = () => resolve( request.result?.translated || null )
         request.onerror = () => reject( request.error )
+    } )
+}
+
+/**
+ * Gets many cached translations in one read transaction
+ * @param {string[]} cache_keys
+ * @returns {Promise<Object>} cache_key → translated text, misses omitted
+ */
+export const get_translations = async ( cache_keys ) => {
+    if( !cache_keys.length ) return {}
+    const db = await open_db()
+    return new Promise( ( resolve, reject ) => {
+        const found = {}
+        let remaining = cache_keys.length
+        const tx = db.transaction( `translations`, `readonly` )
+        const store = tx.objectStore( `translations` )
+        // Settle on the last request's result, like single reads do, rather than on transaction completion
+        cache_keys.forEach( cache_key => {
+            const request = store.get( cache_key )
+            request.onsuccess = () => {
+                if( request.result?.translated ) found[cache_key] = request.result.translated
+                if( --remaining === 0 ) resolve( found )
+            }
+            request.onerror = () => reject( request.error )
+        } )
+        tx.onerror = () => reject( tx.error )
     } )
 }
 

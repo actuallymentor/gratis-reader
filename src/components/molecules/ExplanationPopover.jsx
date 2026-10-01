@@ -10,6 +10,9 @@ import { log } from 'mentie'
 import WordTooltipText from './WordTooltipText.jsx'
 import { clean_lookup_word, word_cache_key, use_word_lookup } from '../../hooks/use_word_lookup.js'
 
+// Runaway guard only; explanations are a paragraph, reasoning models bill thinking on top
+const EXPLANATION_MAX_TOKENS = 6_000
+
 const LOOKUP_UNAVAILABLE = `Lookup unavailable`
 const FLOATING_TOOLTIP_HALF_WIDTH = 130
 const FLOATING_TOOLTIP_TOP_GAP = 56
@@ -436,6 +439,7 @@ export default function ExplanationPopover( {
                     system_prompt: system,
                     user_message: user,
                     temperature: 0.7,
+                    max_tokens: EXPLANATION_MAX_TOKENS,
                     signal: controller.signal
                 } )
 

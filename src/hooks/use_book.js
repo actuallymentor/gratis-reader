@@ -2,9 +2,11 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { log } from 'mentie'
 import {
     get_book, save_book, delete_book,
-    get_book_index, save_book_index, get_chapter, save_chapter
+    get_book_index, save_book_index, get_chapter, save_chapter, delete_chapters
 } from '../modules/cache.js'
-import { parse_epub, extract_chapter_content, hash_buffer, book_index_from, PARSER_VERSION, HASH_BYTES } from '../modules/epub_parser.js'
+import {
+    parse_epub, load_epubjs, extract_chapter_content, hash_buffer, book_index_from, PARSER_VERSION, HASH_BYTES
+} from '../modules/epub_parser.js'
 import { take_parsed_book } from '../modules/book_handoff.js'
 import { segment_translation_text } from '../modules/translation_alignment.js'
 
@@ -142,10 +144,14 @@ export const use_book = ( book_id, ahead_word_budget = 0 ) => {
                 let parsed = handoff?.parsed || null
 
                 if( !parsed ) {
+                    // A parser that will not download says nothing about the book: keep it and stop here
+                    await load_epubjs()
+                    if( cancelled ) return
                     try {
                         parsed = await parse_epub( array_buffer )
                         adopt( parsed.book )
                     } catch ( parse_error ) {
+                        if( cancelled ) return
                         log.debug( `Initial parse failed:`, parse_error.message )
                     }
                 }
@@ -168,12 +174,13 @@ export const use_book = ( book_id, ahead_word_budget = 0 ) => {
                             const fresh_parsed = await parse_epub( fresh_buffer )
 
                             if( fresh_parsed.spine.length > 0 ) {
+                                // Own the replacement before anything else can fail or cancel
+                                parsed?.book?.destroy()
+                                parsed = fresh_parsed
+                                adopt( fresh_parsed.book )
                                 const updated = { ...book_record, file: new Blob( [ fresh_buffer ], { type: `application/epub+zip` } ) }
                                 await save_book( updated )
-                                parsed?.book?.destroy()
-                                adopt( fresh_parsed.book )
                                 array_buffer = fresh_buffer
-                                parsed = fresh_parsed
                                 book_record = updated
                                 log.info( `Re-imported Gutenberg book with ${ fresh_parsed.spine.length } spine items` )
                             } else {
@@ -181,9 +188,11 @@ export const use_book = ( book_id, ahead_word_budget = 0 ) => {
                             }
                         }
                     } catch ( heal_error ) {
+                        if( cancelled ) return
                         log.debug( `Self-heal failed:`, heal_error.message )
                     }
                 }
+                if( cancelled ) return
 
                 // If still broken after self-heal, remove the stale IndexedDB entry so the user can re-import
                 if( ( !parsed || parsed.spine.length === 0 ) && gutenberg_match ) {
@@ -199,6 +208,10 @@ export const use_book = ( book_id, ahead_word_budget = 0 ) => {
                 }
 
                 const book_hash = await hash_buffer( array_buffer )
+                if( cancelled ) return
+
+                // Same hash but a different file (size changed): the old chapters belong to the old file
+                if( index && index.book_hash === book_hash ) await delete_chapters( book_hash ).catch( () => {} )
                 if( cancelled ) return
 
                 book_hash_ref.current = book_hash

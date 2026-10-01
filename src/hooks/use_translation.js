@@ -10,6 +10,7 @@ import {
 import {
     save_translation,
     get_translation,
+    get_translations,
     delete_translation,
     add_token_usage,
     get_token_usage
@@ -20,6 +21,21 @@ import { use_settings_store } from '../stores/settings_store.js'
 const MAX_CONCURRENT = 5
 const FAILED_TRANSLATION_RETRY_CHECK_MS = 5_000
 const FAILED_TRANSLATION_RETRY_DELAYS_MS = [ 5_000, 15_000, 30_000, 60_000 ]
+// A sentence that keeps failing stops retrying until the user re-translates or changes context
+const FAILED_TRANSLATION_MAX_ATTEMPTS = 5
+// Runaway guard only: reasoning models bill their thinking as completion tokens
+const MAX_TOKENS_PADDING = 4_000
+const sentence_max_tokens = text => text.length * 2 + MAX_TOKENS_PADDING
+
+// Workers pull the next sentence as soon as they free up, so one slow request
+// never holds back the other four.
+const run_pool = ( pick_next, work, signal ) => Promise.all( Array.from( { length: MAX_CONCURRENT }, async () => {
+    while( !signal.aborted ) {
+        const item = pick_next()
+        if( !item ) return
+        await work( item )
+    }
+} ) )
 
 const translation_cache_key = ( sentence_id, target_language, level ) =>
     `${ sentence_id }:${ target_language }:${ level }`
@@ -165,20 +181,19 @@ export const use_translation = ( {
         failed_sentences_ref.current = next_failed_sentences
     }, [] )
 
-    const remember_failed_sentence = useCallback( ( sentence ) => {
+    const remember_failed_sentence = useCallback( ( sentence, error ) => {
         const existing_failure = failed_sentences_ref.current[sentence.id]
         const attempts = ( existing_failure?.attempts || 0 ) + 1
-        const retry_delay = FAILED_TRANSLATION_RETRY_DELAYS_MS[
+        const backoff = FAILED_TRANSLATION_RETRY_DELAYS_MS[
             Math.min( attempts - 1, FAILED_TRANSLATION_RETRY_DELAYS_MS.length - 1 )
         ]
+        // Honour the server's Retry-After; give up after the attempt cap
+        const retry_delay = Math.max( backoff, error?.retry_after_ms || 0 )
+        const retry_after = attempts >= FAILED_TRANSLATION_MAX_ATTEMPTS ? Infinity : Date.now() + retry_delay
 
         failed_sentences_ref.current = {
             ...failed_sentences_ref.current,
-            [sentence.id]: {
-                sentence,
-                attempts,
-                retry_after: Date.now() + retry_delay
-            }
+            [sentence.id]: { sentence, attempts, retry_after }
         }
     }, [] )
 
@@ -213,7 +228,8 @@ export const use_translation = ( {
         const user_message = build_translation_user_prompt( sentence.text, sentence.context || sentence.text )
 
         const { content, usage } = await chat_completion( {
-            api_key, model, system_prompt: options.system_prompt, user_message, signal
+            api_key, model, system_prompt: options.system_prompt, user_message, signal,
+            max_tokens: sentence_max_tokens( user_message )
         } )
 
         if( signal.aborted ) return { id: sentence.id, skipped: true }
@@ -238,105 +254,110 @@ export const use_translation = ( {
 
     }, [ api_key, model, target_language, level ] )
 
-    // Translate a batch of sentences
-    const translate_batch = useCallback( async ( sentences_to_translate, signal, options = {} ) => {
+    // Results land one sentence at a time; React updates and usage are flushed once per task turn.
+    const pending_translations_ref = useRef( {} )
+    const pending_usage_ref = useRef( { prompt_tokens: 0, completion_tokens: 0 } )
+    const flush_timer_ref = useRef( null )
 
+    const flush_results = useCallback( () => {
+        flush_timer_ref.current = null
+        const new_translations = pending_translations_ref.current
+        const usage = pending_usage_ref.current
+        pending_translations_ref.current = {}
+        pending_usage_ref.current = { prompt_tokens: 0, completion_tokens: 0 }
+
+        if( Object.keys( new_translations ).length && mounted_ref.current ) {
+            set_translations( prev => ( { ...prev, ...new_translations } ) )
+        }
+        record_token_usage( usage )
+    }, [ record_token_usage ] )
+
+    const queue_result = useCallback( ( { id, translated, usage } ) => {
+        if( translated !== undefined ) pending_translations_ref.current[id] = translated
+        if( usage ) {
+            pending_usage_ref.current.prompt_tokens += usage.prompt_tokens || 0
+            pending_usage_ref.current.completion_tokens += usage.completion_tokens || 0
+        }
+        flush_timer_ref.current ??= setTimeout( flush_results, 0 )
+    }, [ flush_results ] )
+
+    // Translate one sentence, deduplicated against identical in-flight requests
+    const translate_one = useCallback( async ( sentence, signal, options = {} ) => {
+
+        const cache_key = translation_cache_key( sentence.id, target_language, level )
+        const version = translation_versions_ref.current[sentence.id] || 0
+        const request_key = `${ cache_key }:${ version }`
+
+        if( translation_requests_ref.current[request_key] && !options.bypass_cache ) return undefined
+        translation_requests_ref.current = { ...translation_requests_ref.current, [request_key]: true }
+
+        try {
+            const result = await translate_sentence( sentence, signal, { ...options, version } )
+            if( result.skipped ) return undefined
+
+            translations_ref.current = { ...translations_ref.current, [result.id]: result.translated }
+            forget_failed_sentence( result.id )
+            queue_result( result )
+            return result.translated
+        } catch ( error ) {
+            // A billed failure (empty answer) still counts towards usage
+            if( error?.usage ) queue_result( { id: sentence.id, usage: error.usage } )
+            if( signal.aborted || is_abort_error( error ) ) return undefined
+
+            remember_failed_sentence( sentence, error )
+            log.warn( `Translation failed:`, error?.message || error )
+            log.debug( `Failed translation details:`, error )
+            return undefined
+        } finally {
+            const next_requests = { ...translation_requests_ref.current }
+            delete next_requests[request_key]
+            translation_requests_ref.current = next_requests
+        }
+
+    }, [ target_language, level, translate_sentence, forget_failed_sentence, remember_failed_sentence, queue_result ] )
+
+    // Run a worker pool over whatever pick_next hands out, sharing one system prompt
+    const translate_pool = useCallback( async ( pick_next, signal, options = {} ) => {
         const system_prompt = options.cache_only
             ? undefined
             : build_translation_system_prompt(
                 source_language, target_language, level_info.code, level_info.label
             )
-        const batch_translations = {}
+        const translated = {}
 
-        // Process in chunks of MAX_CONCURRENT
-        for( let i = 0; i < sentences_to_translate.length; i += MAX_CONCURRENT ) {
+        await run_pool( pick_next, async sentence => {
+            const result = await translate_one( sentence, signal, { ...options, system_prompt } )
+            if( result !== undefined ) translated[sentence.id] = result
+        }, signal )
 
+        return translated
+    }, [ source_language, target_language, level_info, translate_one ] )
 
-            // Check for cancellation before starting each chunk
-            if( signal.aborted ) return
+    // Translate a fixed list of sentences
+    const translate_batch = useCallback( ( sentences_to_translate, signal, options = {} ) => {
+        const queue = [ ...sentences_to_translate ]
+        return translate_pool( () => queue.shift(), signal, options )
+    }, [ translate_pool ] )
 
-            const chunk = sentences_to_translate.slice( i, i + MAX_CONCURRENT )
+    // Read every cached sentence of the window in one transaction before any request goes out
+    const hydrate_from_cache = useCallback( async ( sentences, signal ) => {
+        const keys_by_id = new Map( sentences
+            .filter( sentence => !translations_ref.current[sentence.id] )
+            .map( sentence => [ sentence.id, translation_cache_key( sentence.id, target_language, level ) ] ) )
+        if( !keys_by_id.size ) return
 
-            const results = await Promise.allSettled(
-                chunk.map( async ( sentence ) => {
+        const cached = await get_translations( [ ...keys_by_id.values() ] ).catch( () => ( {} ) )
+        if( signal.aborted ) return
 
-                    const cache_key = translation_cache_key( sentence.id, target_language, level )
-                    const version = translation_versions_ref.current[sentence.id] || 0
-                    const request_key = `${ cache_key }:${ version }`
+        const found = {}
+        keys_by_id.forEach( ( key, id ) => {
+            if( cached[key] ) found[id] = cached[key]
+        } )
+        if( !Object.keys( found ).length ) return
 
-                    if( translation_requests_ref.current[request_key] && !options.bypass_cache ) {
-                        return { id: sentence.id, skipped: true }
-                    }
-
-                    translation_requests_ref.current = {
-                        ...translation_requests_ref.current,
-                        [request_key]: true
-                    }
-
-                    try {
-                        return await translate_sentence( sentence, signal, {
-                            ...options,
-                            system_prompt,
-                            version
-                        } )
-                    } finally {
-                        const next_requests = { ...translation_requests_ref.current }
-                        delete next_requests[request_key]
-                        translation_requests_ref.current = next_requests
-                    }
-
-                } )
-            )
-
-            // Update translations state with successful results, log failures
-            // Accumulate token usage from API calls in this chunk
-            const new_translations = {}
-            let chunk_prompt = 0
-            let chunk_completion = 0
-
-            results.forEach( ( result, index ) => {
-                const sentence = chunk[index]
-
-                if( result.status === `fulfilled` ) {
-                    if( result.value.skipped ) return
-
-                    new_translations[result.value.id] = result.value.translated
-                    forget_failed_sentence( result.value.id )
-
-                    if( result.value.usage ) {
-                        chunk_prompt += result.value.usage.prompt_tokens || 0
-                        chunk_completion += result.value.usage.completion_tokens || 0
-                    }
-                } else {
-                    if( signal.aborted || is_abort_error( result.reason ) ) return
-
-                    remember_failed_sentence( sentence )
-                    log.warn( `Translation failed:`, result.reason?.message || result.reason )
-                    log.debug( `Failed translation details:`, result )
-                }
-            } )
-
-            if( Object.keys( new_translations ).length > 0 ) {
-                translations_ref.current = { ...translations_ref.current, ...new_translations }
-                set_translations( prev => ( { ...prev, ...new_translations } ) )
-                Object.assign( batch_translations, new_translations )
-            }
-
-            record_token_usage( { prompt_tokens: chunk_prompt, completion_tokens: chunk_completion } )
-        }
-
-        return batch_translations
-
-    }, [
-        source_language,
-        target_language,
-        level,
-        level_info,
-        record_token_usage,
-        translate_sentence,
-        forget_failed_sentence,
-        remember_failed_sentence
-    ] )
+        translations_ref.current = { ...translations_ref.current, ...found }
+        if( mounted_ref.current ) set_translations( prev => ( { ...prev, ...found } ) )
+    }, [ target_language, level ] )
 
     // Follow the live admission window without restarting useful in-flight requests.
     useEffect( () => {
@@ -358,19 +379,21 @@ export const use_translation = ( {
             const attempted = new Set()
 
             try {
-                while( !controller.signal.aborted ) {
-                    // Re-read after every chunk: scrolling can remove or add queued work.
-                    const chunk = requested_ref.current.filter( sentence =>
-                        !translations_ref.current[sentence.id] && !attempted.has( sentence.id )
-                            && !failed_sentences_ref.current[sentence.id]
-                    ).slice( 0, MAX_CONCURRENT )
-                    if( !chunk.length ) break
-                    chunk.forEach( sentence => attempted.add( sentence.id ) )
-                    await translate_batch( chunk, controller.signal, {
-                        cache_only: !can_request,
-                        is_eligible
-                    } )
+                await hydrate_from_cache( requested_ref.current, controller.signal )
+
+                // Re-read on every pick: scrolling can remove or add queued work.
+                const pick_next = () => {
+                    const sentence = requested_ref.current.find( candidate =>
+                        !translations_ref.current[candidate.id] && !attempted.has( candidate.id )
+                            && !failed_sentences_ref.current[candidate.id]
+                    )
+                    if( sentence ) attempted.add( sentence.id )
+                    return sentence
                 }
+                await translate_pool( pick_next, controller.signal, {
+                    cache_only: !can_request,
+                    is_eligible
+                } )
             } catch ( error ) {
                 if( !is_abort_error( error ) ) log.error( `Translation failed:`, error )
             } finally {
@@ -401,7 +424,7 @@ export const use_translation = ( {
             schedule_translation_ref.current = null
             controller.abort()
         }
-    }, [ target_language, level, api_key, is_online, translate_batch, begin_translation, finish_translation, register_controller ] )
+    }, [ target_language, level, api_key, is_online, translate_pool, hydrate_from_cache, begin_translation, finish_translation, register_controller ] )
 
     useEffect( () => schedule_translation_ref.current?.(), [ requested_sentences ] )
 
@@ -412,6 +435,7 @@ export const use_translation = ( {
 
         const retry_failed_translations = async () => {
             if( retry_running_ref.current ) return
+            if( !Object.keys( failed_sentences_ref.current ).length ) return
 
             const now = Date.now()
             const sentences_by_id = new Map( requested_ref.current.map( sentence => [ sentence.id, sentence ] ) )
@@ -535,6 +559,8 @@ export const use_translation = ( {
             mounted_ref.current = false
             abort_active_translations()
             active_operations_ref.current.clear()
+            clearTimeout( flush_timer_ref.current )
+            flush_timer_ref.current = null
         }
     }, [ abort_active_translations ] )
 

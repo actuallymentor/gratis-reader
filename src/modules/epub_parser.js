@@ -13,10 +13,24 @@ export const HASH_BYTES = 8192
  * @param {number} [timeout_ms=15000] - Max time to wait for epubjs to parse
  * @returns {Promise<Object>} { metadata, toc, spine, cover_url, book }
  */
+/**
+ * Loads the epubjs module on demand: with JSZip and xmldom it is a third of the
+ * bundle and only needed once a book is opened. A failed download is a network
+ * problem, never a verdict on the book, so callers can tell the two apart.
+ * @returns {Promise<Function>} The ePub factory
+ */
+export const load_epubjs = async () => {
+    try {
+        const { default: ePub } = await import( `epubjs` )
+        return ePub
+    } catch ( error ) {
+        throw Object.assign( new Error( `Could not load the EPUB parser: ${ error.message }` ), { code: `module_load` } )
+    }
+}
+
 export const parse_epub = async ( array_buffer, timeout_ms = 15_000 ) => {
 
-    // epubjs (with JSZip and xmldom) is a third of the bundle and only needed once a book is opened
-    const { default: ePub } = await import( `epubjs` )
+    const ePub = await load_epubjs()
     const book = ePub( array_buffer )
 
     // epubjs hangs forever on corrupt/non-epub data — race against a timeout

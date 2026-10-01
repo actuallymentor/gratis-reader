@@ -140,7 +140,7 @@ function GutenbergCard( { book, on_info, on_read, is_importing, is_imported } ) 
                     <source
                         type="image/webp"
                         srcSet={ `${ base }-xs.webp 64w, ${ base }-sm.webp 128w, ${ base }-md.webp 200w, ${ base }-lg.webp 400w` }
-                        sizes="(max-width: 767px) calc(100vw - 4rem), 280px"
+                        sizes="(max-width: 480px) calc(100vw - 4rem), (max-width: 767px) calc((100vw - 5.5rem) / 2), 280px"
                     />
                     <img
                         src={ `${ base }.jpg` }

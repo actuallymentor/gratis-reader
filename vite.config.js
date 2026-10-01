@@ -46,13 +46,12 @@ export default defineConfig( {
                 ]
             },
             workbox: {
+                // Fonts are subset per script and content-hashed; cache the ones a reader uses instead of precaching all
                 globPatterns: [ `**/*.{js,css,html}` ],
-                // Fonts are subset per script; cache the ones a reader actually uses instead of precaching all
-                globIgnores: [ `fonts/**` ],
                 navigateFallbackDenylist: [ /^\/gutenberg_epubs\// ],
                 runtimeCaching: [
                     {
-                        urlPattern: ( { url } ) => url.pathname.startsWith( `/fonts/` ),
+                        urlPattern: ( { url } ) => url.pathname.endsWith( `.woff2` ),
                         handler: `CacheFirst`,
                         options: {
                             cacheName: `fonts`,
