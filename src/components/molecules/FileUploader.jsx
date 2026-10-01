@@ -68,18 +68,20 @@ export default function FileUploader( { on_upload_complete } ) {
             const array_buffer = await file.arrayBuffer()
             const book_hash = await hash_buffer( array_buffer )
 
-            // Parse to extract metadata
-            const { metadata, cover_url } = await parse_epub( array_buffer )
+            // Parse to extract metadata, then release the archive once the cover is copied out
+            const { metadata, cover_url, book } = await parse_epub( array_buffer )
 
             // Convert cover URL to blob if available
             let cover_blob = null
-            if( cover_url ) {
-                try {
+            try {
+                if( cover_url ) {
                     const response = await fetch( cover_url )
                     if( response.ok ) cover_blob = await response.blob()
-                } catch ( error ) {
-                    log.debug( `Could not fetch cover blob:`, error.message )
                 }
+            } catch ( error ) {
+                log.debug( `Could not fetch cover blob:`, error.message )
+            } finally {
+                book.destroy()
             }
 
             // Create book record

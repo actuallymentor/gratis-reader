@@ -2,6 +2,12 @@ import ePub from 'epubjs'
 import { log } from 'mentie'
 import { split_sentences } from './sentence_splitter.js'
 
+// Bump when extract_chapter_content or the splitter changes shape: cached chapters are rebuilt.
+export const PARSER_VERSION = 1
+
+// Book identity hashes only the archive head, which is enough to tell files apart cheaply
+export const HASH_BYTES = 8192
+
 /**
  * Parses an EPUB file and extracts metadata + content structure
  * @param {ArrayBuffer} array_buffer - The EPUB file data
@@ -17,8 +23,15 @@ export const parse_epub = async ( array_buffer, timeout_ms = 15_000 ) => {
     const timeout = new Promise( ( _, reject ) =>
         timeout_id = setTimeout( () => reject( new Error( `epub parse timed out after ${ timeout_ms }ms` ) ), timeout_ms )
     )
-    await Promise.race( [ book.ready, timeout ] )
-    clearTimeout( timeout_id )
+    try {
+        await Promise.race( [ book.ready, timeout ] )
+    } catch ( error ) {
+        // A failed parse still holds the archive and any object URLs it minted
+        book.destroy()
+        throw error
+    } finally {
+        clearTimeout( timeout_id )
+    }
 
     // Load metadata — guard against epubjs failing to parse (e.g. image-heavy epubs)
     const metadata = await book.loaded?.metadata || {}
@@ -48,6 +61,17 @@ export const parse_epub = async ( array_buffer, timeout_ms = 15_000 ) => {
     return { metadata, toc, spine, cover_url, book }
 
 }
+
+/**
+ * Reduces a parsed EPUB to the plain, storable structure the reader navigates with
+ * @param {Object} parsed - Result of parse_epub
+ * @returns {{ metadata: Object, toc: Array<{ href: string, label: string }>, spine: Array<{ href: string }> }}
+ */
+export const book_index_from = ( { metadata, toc, spine } ) => ( {
+    metadata: { title: metadata.title, creator: metadata.creator, language: metadata.language },
+    toc: toc.map( ( { href, label } ) => ( { href, label } ) ),
+    spine: spine.map( ( { href } ) => ( { href } ) )
+} )
 
 /**
  * Extracts text content from a single spine item as structured paragraphs/sentences
@@ -226,7 +250,7 @@ export const extract_chapter_content = async ( book, spine_item, book_hash, chap
  */
 export const hash_buffer = async ( buffer ) => {
 
-    const slice = buffer.slice( 0, 8192 )
+    const slice = buffer.slice( 0, HASH_BYTES )
     const hash_buffer = await crypto.subtle.digest( `SHA-256`, slice )
     const hash_array = Array.from( new Uint8Array( hash_buffer ) )
     return hash_array.map( b => b.toString( 16 ).padStart( 2, `0` ) ).join( `` ).slice( 0, 12 )

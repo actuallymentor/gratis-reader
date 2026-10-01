@@ -6,6 +6,7 @@ import { log } from 'mentie'
 import { use_gutenberg } from '../../hooks/use_gutenberg.js'
 import { use_library_store } from '../../stores/library_store.js'
 import { parse_epub } from '../../modules/epub_parser.js'
+import { offer_parsed_book } from '../../modules/book_handoff.js'
 import GutenbergCard from './GutenbergCard.jsx'
 import GutenbergInfoModal from './GutenbergInfoModal.jsx'
 import Skeleton from '../atoms/Skeleton.jsx'
@@ -191,7 +192,8 @@ export default function GutenbergSection() {
             }
 
             const array_buffer = await response.arrayBuffer()
-            const { metadata, cover_url } = await parse_epub( array_buffer )
+            const parsed = await parse_epub( array_buffer )
+            const { metadata, cover_url } = parsed
 
             // Fetch cover as blob
             let cover_blob = null
@@ -226,6 +228,8 @@ export default function GutenbergSection() {
 
             await add_book( book_record )
             toast.success( `Added "${ book_record.title }"` )
+            // The reader opens next: let it reuse this parse instead of re-reading the blob
+            offer_parsed_book( book_id, { parsed, array_buffer } )
             navigate( `/read/${ book_id }` )
 
         } catch ( error ) {

@@ -178,9 +178,9 @@ test.describe( `Pass 41 — Coverage Gaps`, () => {
     } )
 
 
-    // ── 5. Deleting a book removes orphaned translations from IDB ──
+    // ── 5. Deleting a book keeps its translations (expensive data, reused on re-import) ──
 
-    test( `BW212 deleting a book removes translations from IndexedDB`, async ( { page } ) => {
+    test( `BW212 deleting a book keeps cached translations in IndexedDB`, async ( { page } ) => {
 
         // Upload and read to populate translation cache
         await upload_demo_book( page )
@@ -202,8 +202,9 @@ test.describe( `Pass 41 — Coverage Gaps`, () => {
             () => page.getByRole( `button`, { name: `Remove` } ).click()
         )
 
-        // Verify translations were cleaned up
-        await expect.poll( () => get_store_count( page, `translations` ) ).toBe( 0 )
+        // Verify the book itself is gone while its translations survive
+        await expect.poll( () => get_store_count( page, `books` ) ).toBe( 0 )
+        expect( await get_store_count( page, `translations` ) ).toBeGreaterThan( 0 )
 
     } )
 

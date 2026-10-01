@@ -1,6 +1,6 @@
 
 const DB_NAME = `gratis_reader`
-const DB_VERSION = 4
+const DB_VERSION = 5
 
 // Cached connection to avoid reopening on every operation
 let cached_db = null
@@ -54,6 +54,16 @@ export const open_db = () => {
             // Token usage tracking store (per-book cumulative totals)
             if( !db.objectStoreNames.contains( `token_usage` ) ) {
                 db.createObjectStore( `token_usage`, { keyPath: `book_id` } )
+            }
+
+            // Parsed EPUB structure (metadata, toc, spine) so reopening a book skips the zip parse
+            if( !db.objectStoreNames.contains( `book_index` ) ) {
+                db.createObjectStore( `book_index`, { keyPath: `book_id` } )
+            }
+
+            // Parsed chapter elements keyed `${ book_hash }:${ chapter_index }`
+            if( !db.objectStoreNames.contains( `chapters` ) ) {
+                db.createObjectStore( `chapters`, { keyPath: `key` } )
             }
         }
 
@@ -116,50 +126,77 @@ export const get_book = async ( id ) => {
     } )
 }
 
-/**
- * Deletes a book and its associated translations + progress
- * @param {string} id - The book ID (also the book hash used in sentence IDs)
- */
-export const delete_book = async ( id ) => {
+// Simple single-store helpers: one short transaction per call
+const read_record = async ( store_name, key ) => {
     const db = await open_db()
+    return new Promise( ( resolve, reject ) => {
+        const request = db.transaction( store_name, `readonly` ).objectStore( store_name ).get( key )
+        request.onsuccess = () => resolve( request.result )
+        request.onerror = () => reject( request.error )
+    } )
+}
 
-    // Delete the book record + progress + token usage in one transaction
-    await new Promise( ( resolve, reject ) => {
-        const tx = db.transaction( [ `books`, `progress`, `token_usage` ], `readwrite` )
-        tx.objectStore( `books` ).delete( id )
-        tx.objectStore( `progress` ).delete( id )
-        tx.objectStore( `token_usage` ).delete( id )
+const write_record = async ( store_name, record ) => {
+    const db = await open_db()
+    return new Promise( ( resolve, reject ) => {
+        const tx = db.transaction( store_name, `readwrite` )
+        tx.objectStore( store_name ).put( record )
         tx.oncomplete = () => resolve()
         tx.onerror = () => reject( tx.error )
     } )
-
-    const delete_prefixed_entries = async ( store_name, hash_prefix ) => {
-        if( !db.objectStoreNames.contains( store_name ) ) return
-
-        await new Promise( ( resolve, reject ) => {
-            const tx = db.transaction( store_name, `readwrite` )
-            const store = tx.objectStore( store_name )
-            const request = store.openCursor()
-
-            request.onsuccess = ( e ) => {
-                const cursor = e.target.result
-                if( !cursor ) return
-                if( cursor.key.startsWith( `${ hash_prefix }:` ) ) cursor.delete()
-                cursor.continue()
-            }
-
-            tx.oncomplete = () => resolve()
-            tx.onerror = () => reject( tx.error )
-        } )
-    }
-
-    // Clean up orphaned language artifacts (keys start with the raw book hash, without "book_" prefix)
-    const hash_prefix = id.replace( /^book_/, `` )
-    await delete_prefixed_entries( `translations`, hash_prefix )
-    await delete_prefixed_entries( `meanings`, hash_prefix )
 }
 
-// --- Translation cache operations ---
+const chapter_key_range = book_hash => IDBKeyRange.bound( `${ book_hash }:`, `${ book_hash }:\uffff` )
+
+/**
+ * Deletes a book, its reading progress, token usage, and parsed structure.
+ * Cached translations are deliberately kept: they are expensive to recreate and
+ * their keys are content hashes, so a re-import of the same book reuses them.
+ * @param {string} id
+ */
+export const delete_book = async ( id ) => {
+    const db = await open_db()
+    const index = await read_record( `book_index`, id )
+
+    await new Promise( ( resolve, reject ) => {
+        const tx = db.transaction( [ `books`, `progress`, `token_usage`, `book_index`, `chapters` ], `readwrite` )
+        tx.objectStore( `books` ).delete( id )
+        tx.objectStore( `progress` ).delete( id )
+        tx.objectStore( `token_usage` ).delete( id )
+        tx.objectStore( `book_index` ).delete( id )
+        if( index?.book_hash ) tx.objectStore( `chapters` ).delete( chapter_key_range( index.book_hash ) )
+        tx.oncomplete = () => resolve()
+        tx.onerror = () => reject( tx.error )
+    } )
+}
+
+// --- Parsed structure operations ---
+
+/**
+ * Gets the parsed EPUB structure for a book
+ * @param {string} book_id
+ * @returns {Promise<Object|undefined>} { book_id, book_hash, parser_version, metadata, toc, spine }
+ */
+export const get_book_index = ( book_id ) => read_record( `book_index`, book_id )
+
+/**
+ * Saves the parsed EPUB structure for a book
+ * @param {Object} index - { book_id, book_hash, parser_version, metadata, toc, spine }
+ */
+export const save_book_index = ( index ) => write_record( `book_index`, index )
+
+/**
+ * Gets parsed chapter elements
+ * @param {string} key - `${ book_hash }:${ chapter_index }`
+ * @returns {Promise<Object|undefined>} { key, parser_version, elements }
+ */
+export const get_chapter = ( key ) => read_record( `chapters`, key )
+
+/**
+ * Saves parsed chapter elements
+ * @param {Object} chapter - { key, parser_version, elements }
+ */
+export const save_chapter = ( chapter ) => write_record( `chapters`, chapter )
 
 /**
  * Saves a translation cache entry

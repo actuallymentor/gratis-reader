@@ -7,6 +7,12 @@
   viewport scans, lighter word spans, and fewer full-page re-renders during Turbo lookups
 - Position word tooltips with inline styles instead of a new stylesheet rule per scroll frame
 - Split sentences without re-slicing the paragraph at every punctuation mark
+- Reopen books from cached structure and chapters instead of re-parsing the EPUB
+- Open imported Gutenberg books from the import's parse instead of a second one
+- Keep cached translations when a book is removed; they are reused on re-import
+
+### Fixed
+- Release EPUB archives after upload and failed parses so cover object URLs do not leak
 
 ## [1.22.0] - 2026-09-30
 
