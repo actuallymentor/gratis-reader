@@ -11,7 +11,7 @@ const QUOTE_CHARS = `"'“”‘’`
 
 // Sticky regexes read ahead in place instead of slicing the remaining text per terminal.
 const NEXT_WORD_RE = /\s+(\S)/y
-const NON_SPACE_RE = /\S/y
+const REMAINING_TEXT_RE = /\s*\S/y
 const QUOTE_THEN_UPPER_RE = new RegExp( `\\s+[${ QUOTE_CHARS }]\\s*[A-Z]`, `y` )
 const INITIAL_RE = /^[a-z](\.[a-z])*$/i
 const DIGIT_RE = /\d/
@@ -44,6 +44,7 @@ export const split_sentences = ( text ) => {
         const sentence = text.slice( sentence_start, end ).trim()
         if( sentence ) sentences.push( sentence )
         sentence_start = end
+        word_start = end
     }
 
     for( let i = 0; i < text.length; i++ ) {
@@ -61,7 +62,7 @@ export const split_sentences = ( text ) => {
 
         // CJK terminals (。！？) always split — no space or uppercase required
         if( cjk ) {
-            if( match_at( NON_SPACE_RE, text, i + 1 ) ) push_sentence( i + 1 )
+            if( match_at( REMAINING_TEXT_RE, text, i + 1 ) ) push_sentence( i + 1 )
             continue
         }
 

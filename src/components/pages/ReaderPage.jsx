@@ -713,7 +713,12 @@ export default function ReaderPage() {
 
     // Match TOC entries to spine items by href (strip hash fragments); the reader re-renders often.
     const toc_labels = useMemo( () => {
-        const labels_by_href = new Map( chapters.map( c => [ c.href?.split( `#` )[0], c.label ] ) )
+        const labels_by_href = new Map()
+        // Several TOC entries can point into one file; the first one names the chapter.
+        chapters.forEach( c => {
+            const href = c.href?.split( `#` )[0]
+            if( !labels_by_href.has( href ) ) labels_by_href.set( href, c.label )
+        } )
         return spine.map( spine_item => labels_by_href.get( spine_item?.href?.split( `#` )[0] ) )
     }, [ spine, chapters ] )
 
