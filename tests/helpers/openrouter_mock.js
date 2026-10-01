@@ -23,32 +23,35 @@ export const parse_chat_request = ( body ) => {
     const system = body?.messages?.find( message => message.role === `system` )?.content || ``
     const user = body?.messages?.find( message => message.role === `user` )?.content || ``
     const base = { system, user, model: body?.model, sentences: [], context: null, sentence: null, words: [], word: null }
-    const context_match = user.match( /Context \(for reference only — do NOT translate this\):\n"""\n([\s\S]*?)\n"""/ )
+
+    // The system prompt says what kind of request this is; book text inside the user
+    // message must never change the classification.
+    if( system.includes( `explaining a translation` ) ) return { ...base, kind: `explanation` }
+    if( user.includes( `Adapted translation:` ) && !system.includes( `You are a dictionary` ) && !system.includes( `language teacher helping` ) ) return { ...base, kind: `meaning` }
+
+    if( system.includes( `You are a dictionary` ) ) {
+        const sentence_end = user.lastIndexOf( `"\n\nWord` )
+        const sentence = user.startsWith( `Sentence: "` ) && sentence_end > 0 ? user.slice( `Sentence: "`.length, sentence_end ) : null
+        const tail = sentence_end > 0 ? user.slice( sentence_end + 1 ) : ``
+        if( tail.startsWith( `\n\nWords: ` ) ) return { ...base, kind: `word_batch`, sentence, words: JSON.parse( tail.slice( `\n\nWords: `.length ) ) }
+        if( tail.startsWith( `\n\nWord: ` ) ) {
+            const word = tail.slice( `\n\nWord: `.length )
+            return { ...base, kind: `word`, sentence, words: [ word ], word }
+        }
+        return { ...base, kind: `unknown` }
+    }
+
+    const context_match = user.match( /^Context \(for reference only — do NOT translate this\):\n"""\n([\s\S]*?)\n"""\n\n/ )
     const context = context_match ? context_match[1] : null
+    const after_context = context_match ? user.slice( context_match[0].length ) : user
 
-    if( user.includes( `Explain this translation` ) ) return { ...base, kind: `explanation` }
-    if( user.includes( `Adapted translation:` ) ) return { ...base, kind: `meaning` }
-
-    const batch_match = user.match( /Translate these sentences:\n([\s\S]*)$/ )
-    if( batch_match ) {
-        const { sentences = [] } = JSON.parse( batch_match[1].trim() )
+    if( after_context.startsWith( `Translate these sentences:\n` ) ) {
+        const { sentences = [] } = JSON.parse( after_context.slice( `Translate these sentences:\n`.length ).trim() )
         return { ...base, kind: `sentence_batch`, sentences, context }
     }
-
-    const sentence_match = user.match( /Translate this sentence:\n([\s\S]*)$/ )
-    if( sentence_match ) {
-        const sentence = sentence_match[1].trim()
+    if( after_context.startsWith( `Translate this sentence:\n` ) ) {
+        const sentence = after_context.slice( `Translate this sentence:\n`.length ).trim()
         return { ...base, kind: `sentence`, sentences: [ sentence ], sentence, context }
-    }
-
-    const word_batch_match = user.match( /^Sentence: "([\s\S]*)"\n\nWords: (\[[\s\S]*\])$/ )
-    if( word_batch_match ) {
-        return { ...base, kind: `word_batch`, sentence: word_batch_match[1], words: JSON.parse( word_batch_match[2] ) }
-    }
-
-    const word_match = user.match( /^Sentence: "([\s\S]*)"\n\nWord: (.+)$/ )
-    if( word_match ) {
-        return { ...base, kind: `word`, sentence: word_match[1], words: [ word_match[2] ], word: word_match[2] }
     }
 
     return { ...base, kind: `unknown` }

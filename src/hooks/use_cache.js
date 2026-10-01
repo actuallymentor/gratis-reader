@@ -35,7 +35,8 @@ export const use_cache = () => {
 
         const context_suffix = lookup_context ? `:${ encodeURIComponent( lookup_context ) }` : ``
         const keys_by_word = new Map( words.map( word => [ word, `word:${ word.toLowerCase() }:${ source_lang }:${ target_lang }${ context_suffix }` ] ) )
-        const found = {}
+        // Null prototype: a word like "constructor" must not resolve to Object.prototype
+        const found = Object.create( null )
         const missing = []
 
         keys_by_word.forEach( ( key, word ) => {

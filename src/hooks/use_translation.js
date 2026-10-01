@@ -46,6 +46,8 @@ const translation_cache_key = ( sentence_id, target_language, level ) =>
     `${ sentence_id }:${ target_language }:${ level }`
 
 const is_abort_error = error => error?.name === `AbortError`
+// Rate limits and server outages are worth waiting out; anything else means the request shape itself failed
+const is_retryable_outage = error => error?.status === 429 || error?.status >= 500 || error?.name === `TypeError`
 
 const remove_store_key = ( store, key ) => {
     if( !store[key] ) return store
@@ -365,10 +367,14 @@ export const use_translation = ( {
             const cached = options.bypass_cache ? {} : await get_translations( askable.map( member => member.cache_key ) ).catch( () => ( {} ) )
             if( signal.aborted ) return translated
 
+            const is_current = ( { sentence, version } ) => version === ( translation_versions_ref.current[sentence.id] || 0 )
+
             for( const member of members ) {
                 const { sentence, cache_key } = member
                 const from_cache = cached[cache_key]
                 if( askable.includes( member ) && !from_cache ) continue
+                // A forced re-translation that started meanwhile must not be undone by this read
+                if( !is_current( member ) ) continue
                 const result = from_cache
                     ? { id: sentence.id, translated: from_cache, from_cache: true }
                     : { id: sentence.id, translated: sentence.text, from_cache: false }
@@ -401,8 +407,17 @@ export const use_translation = ( {
             } catch ( error ) {
                 if( error?.usage ) queue_result( { id: pending[0].sentence.id, usage: error.usage } )
                 if( signal.aborted || is_abort_error( error ) ) return translated
-                pending.forEach( member => remember_failed_sentence( member.sentence, error ) )
-                log.warn( `Batch translation failed:`, error?.message || error )
+                if( is_retryable_outage( error ) ) {
+                    pending.forEach( member => remember_failed_sentence( member.sentence, error ) )
+                    log.warn( `Batch translation failed:`, error?.message || error )
+                    return translated
+                }
+                // A provider that rejects the batch shape (or returned nothing) can still answer single sentences
+                log.warn( `Batch translation rejected; retrying sentences one by one:`, error?.message || error )
+                for( const member of pending ) {
+                    if( signal.aborted ) return translated
+                    await single( member )
+                }
                 return translated
             }
 
@@ -428,6 +443,7 @@ export const use_translation = ( {
                     created_at: new Date().toISOString()
                 } ).catch( error => log.debug( `Could not cache translation:`, error.message ) )
                 if( signal.aborted ) return translated
+                if( !is_current( member ) ) continue
 
                 translated[sentence.id] = await settle( sentence, signal, Promise.resolve( { id: sentence.id, translated: answer, from_cache: false } ) )
             }

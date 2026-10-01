@@ -14,6 +14,9 @@ const WORD_LOOKUP_MAX_TOKENS = 4_000
 const word_batch_max_tokens = count => count * 16 + WORD_LOOKUP_MAX_TOKENS
 const LOOKUP_CANCELLED = Symbol( `lookup_cancelled` )
 
+// Rate limits and server outages are worth waiting out; anything else means the request shape itself failed
+const is_retryable_outage = error => error?.status === 429 || error?.status >= 500 || error?.name === `TypeError`
+
 // A tap can join a prefetch. One caller leaving must not abort work the other still needs.
 const wait_for_lookup = ( task, signal ) => {
     const consumer = {}
@@ -306,16 +309,29 @@ export const use_word_lookup = ( {
         const lookup_context = cache_by_context ? context : ``
         const seen = new Set()
         const candidates = []
+        const joined_tasks = new Set()
         words.forEach( word => {
             const clean_word = clean_lookup_word( word )
             if( !clean_word ) return
             const cache_key = word_cache_key( clean_word, source_language, target_language, lookup_context )
             if( seen.has( cache_key ) ) return
             seen.add( cache_key )
-            if( word_translations_ref.current[cache_key] || loading_words_ref.current[cache_key] || lookup_errors_ref.current[cache_key] ) return
+            if( word_translations_ref.current[cache_key] || lookup_errors_ref.current[cache_key] ) return
+            // Words another request already owns are joined, so this caller keeps them alive too
+            if( loading_words_ref.current[cache_key] ) {
+                const owner = lookup_tasks_ref.current[cache_key]
+                if( owner ) joined_tasks.add( owner )
+                return
+            }
             candidates.push( { word: clean_word, cache_key } )
         } )
-        if( !candidates.length ) return
+
+        const join_existing = async () => {
+            const outcomes = await Promise.all( [ ...joined_tasks ].map( task => wait_for_lookup( task, signal ) ) )
+            // An owner that gave up (deselection) leaves our words unresolved: pick them up ourselves
+            if( outcomes.includes( LOOKUP_CANCELLED ) && !signal?.aborted ) return lookup_words( words, { signal, context } )
+        }
+        if( !candidates.length ) return joined_tasks.size ? join_existing() : undefined
 
         // One shared task: taps joining any of these words wait on the same request
         const task = { cancelled: false, settled: false, consumers: new Set(), controller: null, promise: null }
@@ -351,14 +367,13 @@ export const use_word_lookup = ( {
             let slot_acquired = false
             const fallback = []
             let outstanding = candidates
+            const controller = new AbortController()
+            task.controller = controller
 
             try {
                 await acquire_lookup_slot()
                 slot_acquired = true
                 if( task.cancelled || !mounted_ref.current ) return LOOKUP_CANCELLED
-
-                const controller = new AbortController()
-                task.controller = controller
 
                 const cached = await get_word_translations( candidates.map( c => c.word ), source_language, target_language, lookup_context )
                 if( controller.signal.aborted || task.cancelled ) return LOOKUP_CANCELLED
@@ -393,27 +408,42 @@ export const use_word_lookup = ( {
                 if( error?.usage ) on_usage?.( error.usage )
                 if( task.cancelled || error?.name === `AbortError` ) return LOOKUP_CANCELLED
 
-                const failed_errors = { ...lookup_errors_ref.current }
-                outstanding.forEach( ( { cache_key } ) => {
-                    failed_errors[cache_key] = true
-                    remember_lookup_key( cache_key )
-                } )
-                lookup_errors_ref.current = failed_errors
+                if( is_retryable_outage( error ) ) {
+                    const failed_errors = { ...lookup_errors_ref.current }
+                    outstanding.forEach( ( { cache_key } ) => {
+                        failed_errors[cache_key] = true
+                        remember_lookup_key( cache_key )
+                    } )
+                    lookup_errors_ref.current = failed_errors
+                } else {
+                    // A provider that rejects the batch shape can still answer single words
+                    fallback.push( ...outstanding )
+                    forget( outstanding.map( c => c.cache_key ) )
+                }
             } finally {
-                task.settled = true
                 forget( candidates.map( c => c.cache_key ) )
                 refresh_lookup_state()
                 if( slot_acquired ) release_lookup_slot()
             }
 
-            for( const { word } of fallback ) {
-                if( task.cancelled || signal?.aborted ) return LOOKUP_CANCELLED
-                await lookup_word( word, { retry: false, signal, context } )
+            // Fallbacks belong to this task: joined taps keep them alive, and a cancelled
+            // fallback reports as cancelled so a waiting tap retries instead of hanging.
+            try {
+                for( const { word } of fallback ) {
+                    if( task.cancelled ) return LOOKUP_CANCELLED
+                    const outcome = await lookup_word( word, { retry: false, signal: controller.signal, context } )
+                    if( outcome === LOOKUP_CANCELLED && task.cancelled ) return LOOKUP_CANCELLED
+                }
+            } finally {
+                task.settled = true
             }
         }
 
         task.promise = run_lookup()
-        return wait_for_lookup( task, signal )
+        const own_result = wait_for_lookup( task, signal )
+        if( !joined_tasks.size ) return own_result
+        const [ result ] = await Promise.all( [ own_result, join_existing() ] )
+        return result
 
     }, [
         api_key, model, source_language, target_language, cache_by_context, is_online, on_usage,
