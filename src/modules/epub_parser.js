@@ -3,7 +3,8 @@ import { split_sentences } from './sentence_splitter.js'
 
 // Bump when extract_chapter_content or the splitter changes shape: cached chapters are rebuilt.
 // v2: image elements carry their path inside the EPUB archive instead of the raw relative src.
-export const PARSER_VERSION = 2
+// v3: that path stays URI-encoded; epubjs decodes it once when reading from the archive.
+export const PARSER_VERSION = 3
 
 // Book identity hashes only the archive head, which is enough to tell files apart cheaply
 export const HASH_BYTES = 8192
@@ -95,7 +96,8 @@ const EXTERNAL_SRC_RE = /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i
 const archive_path = ( src, spine_item ) => {
     if( EXTERNAL_SRC_RE.test( src ) ) return src
     const chapter_url = spine_item.url || `/${ spine_item.href }`
-    return decodeURI( new URL( src, `https://epub.invalid${ chapter_url.startsWith( `/` ) ? `` : `/` }${ chapter_url }` ).pathname )
+    // Keep the pathname encoded: the archive decodes it, and decoding twice breaks names with "%"
+    return new URL( src, `https://epub.invalid${ chapter_url.startsWith( `/` ) ? `` : `/` }${ chapter_url }` ).pathname
 }
 
 /**

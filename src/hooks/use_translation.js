@@ -436,37 +436,48 @@ export const use_translation = ( {
             }
 
             const [ { sentence: { context } } ] = pending
-            const user_message = build_translation_batch_user_prompt( pending.map( member => member.sentence.text ), context )
 
             let answers = null
+            let admitted = pending
             try {
-                const { content, usage } = await with_request_slot( signal, () => chat_completion( {
-                    api_key, model, user_message, signal, json: true,
-                    system_prompt: options.batch_system_prompt,
-                    max_tokens: sentence_max_tokens( user_message )
-                } ) )
-                queue_result( { id: pending[0].sentence.id, usage } )
+                const { content, usage } = await with_request_slot( signal, () => {
+                    // Waiting for a slot can outlast the window: send only what is still wanted
+                    admitted = pending.filter( member => !options.is_eligible || options.is_eligible( member.sentence.id ) )
+                    if( admitted.length < 2 ) return { content: null }
+                    const user_message = build_translation_batch_user_prompt( admitted.map( member => member.sentence.text ), context )
+                    return chat_completion( {
+                        api_key, model, user_message, signal, json: true,
+                        system_prompt: options.batch_system_prompt,
+                        max_tokens: sentence_max_tokens( user_message )
+                    } )
+                } )
+                if( content === null ) {
+                    // Nothing or a single sentence left: the single path keeps the exact single prompt
+                    for( const member of admitted ) await single( member )
+                    return translated
+                }
+                queue_result( { id: admitted[0].sentence.id, usage } )
                 if( signal.aborted ) return translated
-                answers = extract_string_array( content, `translations`, pending.length )
+                answers = extract_string_array( content, `translations`, admitted.length )
                 if( !answers ) log.warn( `Batch translation returned an unusable answer; retrying sentences one by one` )
             } catch ( error ) {
-                if( error?.usage ) queue_result( { id: pending[0].sentence.id, usage: error.usage } )
+                if( error?.usage ) queue_result( { id: admitted[0].sentence.id, usage: error.usage } )
                 if( signal.aborted || is_abort_error( error ) ) return translated
                 if( is_retryable_outage( error ) ) {
-                    pending.forEach( member => remember_failed_sentence( member.sentence, error ) )
+                    admitted.forEach( member => remember_failed_sentence( member.sentence, error ) )
                     log.warn( `Batch translation failed:`, error?.message || error )
                     return translated
                 }
                 // A provider that rejects the batch shape (or returned nothing) can still answer single sentences
                 log.warn( `Batch translation rejected; retrying sentences one by one:`, error?.message || error )
-                for( const member of pending ) {
+                for( const member of admitted ) {
                     if( signal.aborted ) return translated
                     await single( member )
                 }
                 return translated
             }
 
-            for( const [ index, member ] of pending.entries() ) {
+            for( const [ index, member ] of admitted.entries() ) {
                 const { sentence, cache_key, version } = member
                 const answer = answers?.[index]
                 if( signal.aborted ) return translated

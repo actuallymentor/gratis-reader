@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.24.1] - 2026-10-01
+
+### Fixed
+- Keep the reader mounted when its prefetched code arrives after a book was already opened
+- Load chapter images whose file names contain "%"; image paths are decoded once
+- Resolve each chapter image once, so repeated images cannot leak blob URLs
+- Re-check the reading window before sending a queued paragraph batch, so scrolled-away sentences are not translated
+
 ## [1.24.0] - 2026-10-01
 
 ### Fixed

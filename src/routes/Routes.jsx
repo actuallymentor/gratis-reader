@@ -20,7 +20,8 @@ const LazyReaderPage = lazy( load_reader )
 // Every book gets a fresh reader: chapter index, content and caches never leak between books
 const BookReader = () => {
     const { book_id } = useParams()
-    const Reader = reader_module?.default || LazyReaderPage
+    // Chosen once: switching from the lazy wrapper to the loaded module mid-read would remount the reader
+    const [ Reader ] = useState( () => reader_module?.default || LazyReaderPage )
     return <Reader key={ book_id } />
 }
 

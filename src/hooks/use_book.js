@@ -68,11 +68,20 @@ export const use_book = ( book_id, ahead_word_budget = 0 ) => {
 
     }, [ epub_data, chapter_cache ] )
 
-    // Chapter images live inside the archive: open it on demand and hand back a loadable URL
-    const resolve_asset = useCallback( async ( src ) => {
-        if( !epub_data ) throw new Error( `Book not loaded` )
-        return resolve_archive_asset( await epub_data.open_book(), src )
-    }, [ epub_data ] )
+    // Chapter images live inside the archive: open it on demand and hand back a loadable URL.
+    // One resolution per path, so two copies of an image cannot mint two blob URLs.
+    const asset_urls = useMemo( () => new Map(), [ epub_data ] )
+    const resolve_asset = useCallback( ( src ) => {
+        if( !epub_data ) return Promise.reject( new Error( `Book not loaded` ) )
+        if( !asset_urls.has( src ) ) {
+            const pending = epub_data.open_book().then( book => resolve_archive_asset( book, src ) ).catch( error => {
+                asset_urls.delete( src )
+                throw error
+            } )
+            asset_urls.set( src, pending )
+        }
+        return asset_urls.get( src )
+    }, [ epub_data, asset_urls ] )
 
     // Never expose read-ahead from the previous chapter during navigation.
     const ahead_chapters_content = ahead_content?.epub_data === epub_data
