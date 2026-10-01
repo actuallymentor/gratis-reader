@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import styled from 'styled-components'
 
 const Card = styled.div`
@@ -120,12 +120,12 @@ const ActionButton = styled.button`
  * Card for a Gutenberg catalog book
  * @param {Object} props
  * @param {Object} props.book - Gutenberg catalog entry
- * @param {Function} props.on_info - Opens the detail modal
- * @param {Function} props.on_read - Imports and opens the book for reading
+ * @param {Function} props.on_info - Opens the detail modal, receives the book
+ * @param {Function} props.on_read - Imports and opens the book for reading, receives the book
  * @param {boolean} props.is_importing - Whether the book is currently being imported
  * @param {boolean} props.is_imported - Whether the book is already in the user's library
  */
-export default function GutenbergCard( { book, on_info, on_read, is_importing, is_imported } ) {
+function GutenbergCard( { book, on_info, on_read, is_importing, is_imported } ) {
 
     const [ cover_failed, set_cover_failed ] = useState( false )
     const author = book.authors?.[0]?.name || `Unknown`
@@ -139,8 +139,8 @@ export default function GutenbergCard( { book, on_info, on_read, is_importing, i
                 ? <picture>
                     <source
                         type="image/webp"
-                        srcSet={ `${ base }-xs.webp 64w, ${ base }-sm.webp 128w, ${ base }-md.webp 200w` }
-                        sizes="(max-width: 480px) 128px, 200px"
+                        srcSet={ `${ base }-xs.webp 64w, ${ base }-sm.webp 128w, ${ base }-md.webp 200w, ${ base }-lg.webp 400w` }
+                        sizes="(max-width: 767px) calc(100vw - 4rem), 280px"
                     />
                     <img
                         src={ `${ base }.jpg` }
@@ -159,12 +159,12 @@ export default function GutenbergCard( { book, on_info, on_read, is_importing, i
         </Body>
 
         <ButtonRow>
-            <ActionButton onClick={ on_info }>
+            <ActionButton onClick={ () => on_info( book ) }>
                 Info
             </ActionButton>
             <ActionButton
                 $primary
-                onClick={ on_read }
+                onClick={ () => on_read( book ) }
                 disabled={ is_importing }
             >
                 { is_importing ? `Loading…` : is_imported ? `Open` : `Read` }
@@ -174,3 +174,5 @@ export default function GutenbergCard( { book, on_info, on_read, is_importing, i
     </Card>
 
 }
+
+export default memo( GutenbergCard )

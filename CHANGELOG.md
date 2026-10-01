@@ -14,6 +14,8 @@
 - Serve fonts from the app itself (no render-blocking Google Fonts round trips); cache them offline
 - Ship a minified, client-only Gutenberg catalogue (`data/gutenberg_catalog.json` keeps the full records) and cache it offline
 - Fetch the catalogue once per page load instead of on every library visit
+- Keep the Classic Library grid responsive while typing: deferred search, pre-indexed fields, memoised cards
+- Serve a 400px cover variant so cards stay sharp on high-density screens
 
 ### Fixed
 - Release EPUB archives after upload and failed parses so cover object URLs do not leak

@@ -1,4 +1,5 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useDeferredValue } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 import { useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import toast from 'react-hot-toast'
@@ -107,6 +108,9 @@ const Grid = styled.div`
     }
 `
 
+// Strip "Category: " prefix from bookshelf names
+const clean_shelf = name => name.replace( /^Category:\s*/i, `` )
+
 /**
  * Browsable section of public domain books from the Gutenberg catalog
  */
@@ -114,15 +118,14 @@ export default function GutenbergSection() {
 
     const navigate = useNavigate()
     const { books: catalog, loading } = use_gutenberg()
-    const { books: library_books, add_book } = use_library_store()
+    const { books: library_books, add_book } = use_library_store( useShallow( ( { books, add_book } ) => ( { books, add_book } ) ) )
     const [ info_book, set_info_book ] = useState( null )
     const [ importing_id, set_importing_id ] = useState( null )
     const [ search, set_search ] = useState( `` )
+    // Keep typing responsive: the grid re-filters with the deferred value
+    const deferred_search = useDeferredValue( search )
     const [ active_shelf, set_active_shelf ] = useState( null )
     const [ shelves_open, set_shelves_open ] = useState( false )
-
-    // Strip "Category: " prefix from bookshelf names
-    const clean_shelf = name => name.replace( /^Category:\s*/i, `` )
 
     // Deduplicated, sorted list of all bookshelves across the catalog
     const all_shelves = useMemo( () => {
@@ -133,38 +136,44 @@ export default function GutenbergSection() {
         return [ ...shelf_set ].sort()
     }, [ catalog ] )
 
+    // Lower-case search fields once per catalogue instead of per keystroke
+    const searchable_catalog = useMemo( () => catalog.map( book => ( {
+        book,
+        title: book.title?.toLowerCase() || ``,
+        author: book.authors?.[0]?.name?.toLowerCase() || ``,
+        summary: book.summaries?.[0]?.toLowerCase() || ``,
+        shelves: ( book.bookshelves || [] ).map( clean_shelf )
+    } ) ), [ catalog ] )
+
     // Filter by active bookshelf first, then rank by search query
     const filtered_catalog = useMemo( () => {
 
         // Start with bookshelf filter
         const base = active_shelf
-            ? catalog.filter( book => ( book.bookshelves || [] ).some( s => clean_shelf( s ) === active_shelf ) )
-            : catalog
+            ? searchable_catalog.filter( entry => entry.shelves.includes( active_shelf ) )
+            : searchable_catalog
 
-        const q = search.toLowerCase().trim()
-        if( !q ) return base
+        const q = deferred_search.toLowerCase().trim()
+        if( !q ) return base.map( entry => entry.book )
 
         const title_matches = []
         const author_matches = []
         const summary_matches = []
 
-        for( const book of base ) {
-            const title = book.title?.toLowerCase() || ``
-            const author = book.authors?.[0]?.name?.toLowerCase() || ``
-            const summary = book.summaries?.[0]?.toLowerCase() || ``
-
+        for( const { book, title, author, summary } of base ) {
             if( title.includes( q ) ) title_matches.push( book )
             else if( author.includes( q ) ) author_matches.push( book )
             else if( summary.includes( q ) ) summary_matches.push( book )
         }
 
         return [ ...title_matches, ...author_matches, ...summary_matches ]
-    }, [ catalog, search, active_shelf ] )
+    }, [ searchable_catalog, deferred_search, active_shelf ] )
 
-    // Check if a gutenberg book is already in the user's library
-    const is_imported = useCallback( ( gutenberg_id ) => {
-        return library_books.some( b => b.id === `book_gutenberg_${ gutenberg_id }` )
-    }, [ library_books ] )
+    // Gutenberg ids already in the user's library
+    const imported_ids = useMemo(
+        () => new Set( library_books.map( b => b.id ) ),
+        [ library_books ]
+    )
 
     // Import a gutenberg book or open it if already imported
     const handle_read = useCallback( async ( book ) => {
@@ -301,10 +310,10 @@ export default function GutenbergSection() {
                 <GutenbergCard
                     key={ book.id }
                     book={ book }
-                    on_info={ () => set_info_book( book ) }
-                    on_read={ () => handle_read( book ) }
+                    on_info={ set_info_book }
+                    on_read={ handle_read }
                     is_importing={ importing_id === book.id }
-                    is_imported={ is_imported( book.id ) }
+                    is_imported={ imported_ids.has( `book_gutenberg_${ book.id }` ) }
                 />
             ) }
         </Grid> }

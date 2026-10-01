@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import toast from 'react-hot-toast'
+import { useShallow } from 'zustand/react/shallow'
 import { use_library_store } from '../../stores/library_store.js'
 import BookCard from '../molecules/BookCard.jsx'
 import FileUploader from '../molecules/FileUploader.jsx'
@@ -90,7 +91,9 @@ const UploadSection = styled.div`
 export default function LibraryPage() {
 
     const navigate = useNavigate()
-    const { books, loading, load_books, remove_book } = use_library_store()
+    const { books, loading, load_books, remove_book } = use_library_store( useShallow(
+        ( { books, loading, load_books, remove_book } ) => ( { books, loading, load_books, remove_book } )
+    ) )
     const [ settings_open, set_settings_open ] = useState( false )
     const [ is_offline, set_is_offline ] = useState( !navigator.onLine )
 
