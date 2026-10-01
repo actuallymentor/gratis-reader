@@ -178,6 +178,8 @@ export default function GutenbergSection() {
         }
 
         set_importing_id( book.id )
+        let parsed = null
+        let handed_off = false
 
         try {
 
@@ -192,7 +194,7 @@ export default function GutenbergSection() {
             }
 
             const array_buffer = await response.arrayBuffer()
-            const parsed = await parse_epub( array_buffer )
+            parsed = await parse_epub( array_buffer )
             const { metadata, cover_url } = parsed
 
             // Fetch cover as blob
@@ -230,12 +232,14 @@ export default function GutenbergSection() {
             toast.success( `Added "${ book_record.title }"` )
             // The reader opens next: let it reuse this parse instead of re-reading the blob
             offer_parsed_book( book_id, { parsed, array_buffer } )
+            handed_off = true
             navigate( `/read/${ book_id }` )
 
         } catch ( error ) {
             log.error( `Failed to import Gutenberg book:`, error )
             toast.error( `Could not load this book` )
         } finally {
+            if( !handed_off ) parsed?.book?.destroy()
             set_importing_id( null )
         }
 

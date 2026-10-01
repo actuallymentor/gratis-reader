@@ -43,12 +43,14 @@ export const use_book = ( book_id, ahead_word_budget = 0 ) => {
     const load_chapter_content = useCallback( index => {
 
         if( !chapter_cache.has( index ) ) {
-            const key = `${ book_hash_ref.current }:${ index }`
+            // The hash travels with this epub_data: a book switch mid-load must not relabel sentences
+            const { book_hash } = epub_data
+            const key = `${ book_hash }:${ index }`
             const pending = get_chapter( key ).catch( () => undefined ).then( async cached => {
                 if( cached?.parser_version === PARSER_VERSION ) return { elements: cached.elements }
 
                 const book = await epub_data.open_book()
-                const content = await extract_chapter_content( book, epub_data.spine[index], book_hash_ref.current, index )
+                const content = await extract_chapter_content( book, epub_data.spine[index], book_hash, index )
                 save_chapter( { key, parser_version: PARSER_VERSION, elements: content.elements } ).catch( error =>
                     log.debug( `Could not cache chapter ${ index }:`, error.message )
                 )
@@ -75,19 +77,30 @@ export const use_book = ( book_id, ahead_word_budget = 0 ) => {
 
         let cancelled = false
         const handoff = take_parsed_book( book_id )
-        // Whichever archive this effect ends up owning is destroyed on cleanup
-        let opened_book = handoff?.parsed.book || null
+        // Whichever archive this effect ends up owning is destroyed on cleanup;
+        // archives that arrive after cleanup are destroyed on the spot.
+        let opened_book = null
+        const adopt = ( book ) => {
+            if( cancelled ) {
+                book?.destroy?.()
+                throw new Error( `Book load cancelled` )
+            }
+            opened_book = book
+            return book
+        }
+        if( handoff ) adopt( handoff.parsed.book )
 
         // Opens the epubjs archive at most once, only when a chapter is missing from the cache.
         const lazy_opener = ( book_record, parsed = null ) => {
             let opening = parsed ? Promise.resolve( parsed.book ) : null
-            if( parsed ) opened_book = parsed.book
             return () => {
                 opening ||= book_record.file.arrayBuffer()
                     .then( parse_epub )
-                    .then( fresh => {
-                        opened_book = fresh.book
-                        return fresh.book
+                    .then( fresh => adopt( fresh.book ) )
+                    .catch( error => {
+                        // A transient failure must not poison every later chapter request
+                        opening = null
+                        throw error
                     } )
                 return opening
             }
@@ -96,7 +109,7 @@ export const use_book = ( book_id, ahead_word_budget = 0 ) => {
         const load = async () => {
             try {
                 set_loading( true )
-                const book_record = await get_book( book_id )
+                let book_record = await get_book( book_id )
 
                 // If the effect was cancelled (StrictMode cleanup), bail silently
                 if( cancelled ) return
@@ -114,9 +127,11 @@ export const use_book = ( book_id, ahead_word_budget = 0 ) => {
                 const file_hash = index && await hash_buffer( await book_record.file.slice( 0, HASH_BYTES ).arrayBuffer() )
                 if( cancelled ) return
 
-                if( index?.parser_version === PARSER_VERSION && index.book_hash === file_hash ) {
+                const index_matches_file = index?.parser_version === PARSER_VERSION
+                    && index.book_hash === file_hash && index.file_size === book_record.file.size
+                if( index_matches_file ) {
                     book_hash_ref.current = index.book_hash
-                    set_epub_data( { ...book_index_from( index ), open_book: lazy_opener( book_record ) } )
+                    set_epub_data( { ...book_index_from( index ), book_hash: index.book_hash, open_book: lazy_opener( book_record ) } )
                     set_loading( false )
                     log.info( `Book restored:`, index.metadata?.title, `with`, index.spine.length, `spine items` )
                     return
@@ -129,6 +144,7 @@ export const use_book = ( book_id, ahead_word_budget = 0 ) => {
                 if( !parsed ) {
                     try {
                         parsed = await parse_epub( array_buffer )
+                        adopt( parsed.book )
                     } catch ( parse_error ) {
                         log.debug( `Initial parse failed:`, parse_error.message )
                     }
@@ -150,14 +166,15 @@ export const use_book = ( book_id, ahead_word_budget = 0 ) => {
                         if( response.ok && is_epub ) {
                             const fresh_buffer = await response.arrayBuffer()
                             const fresh_parsed = await parse_epub( fresh_buffer )
-                            if( cancelled ) return
 
                             if( fresh_parsed.spine.length > 0 ) {
                                 const updated = { ...book_record, file: new Blob( [ fresh_buffer ], { type: `application/epub+zip` } ) }
                                 await save_book( updated )
                                 parsed?.book?.destroy()
+                                adopt( fresh_parsed.book )
                                 array_buffer = fresh_buffer
                                 parsed = fresh_parsed
+                                book_record = updated
                                 log.info( `Re-imported Gutenberg book with ${ fresh_parsed.spine.length } spine items` )
                             } else {
                                 fresh_parsed.book.destroy()
@@ -181,16 +198,20 @@ export const use_book = ( book_id, ahead_word_budget = 0 ) => {
                     return
                 }
 
-                book_hash_ref.current = await hash_buffer( array_buffer )
+                const book_hash = await hash_buffer( array_buffer )
+                if( cancelled ) return
+
+                book_hash_ref.current = book_hash
                 const structure = book_index_from( parsed )
-                save_book_index( { book_id, book_hash: book_hash_ref.current, parser_version: PARSER_VERSION, ...structure } )
+                save_book_index( { book_id, book_hash, file_size: book_record.file.size, parser_version: PARSER_VERSION, ...structure } )
                     .catch( error => log.debug( `Could not cache book structure:`, error.message ) )
-                set_epub_data( { ...structure, open_book: lazy_opener( book_record, parsed ) } )
+                set_epub_data( { ...structure, book_hash, open_book: lazy_opener( book_record, parsed ) } )
                 set_loading( false )
 
                 log.info( `Book loaded:`, parsed.metadata?.title, `with`, parsed.spine.length, `spine items` )
 
             } catch ( error ) {
+                if( cancelled ) return
                 log.error( `Failed to load book:`, error )
                 set_loading( false )
             }

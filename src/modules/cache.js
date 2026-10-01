@@ -1,3 +1,5 @@
+import { log } from 'mentie'
+
 
 const DB_NAME = `gratis_reader`
 const DB_VERSION = 5
@@ -73,8 +75,14 @@ export const open_db = () => {
             cached_db.onclose = () => {
                 cached_db = null 
             }
+            // Another tab is upgrading the schema: let go so its open request is not blocked
+            cached_db.onversionchange = () => {
+                cached_db.close()
+                cached_db = null
+            }
             resolve( cached_db )
         }
+        request.onblocked = () => log.warn( `IndexedDB upgrade is blocked by another open tab of this app` )
         request.onerror = () => reject( request.error )
 
     } )
