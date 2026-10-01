@@ -19,6 +19,7 @@
 - Translate with a sliding pool of five requests instead of lock-step batches, and read all cached sentences of the window in one IndexedDB transaction
 - Honour Retry-After on rate limits, stop retrying a sentence after five failures, count billed empty responses, and cap runaway completions
 - Recover from a failed page chunk download by reloading once; refresh the catalogue on later library visits when it changed
+- Ask OpenAI reasoning models for low reasoning effort: same translation quality in a blinded study, about half the cost
 - Translate the sentences of a paragraph in one request (up to eight) and look up all words of a sentence in one request; anything a batch answer misses falls back to single requests, and cache entries stay per sentence and per word
 
 ### Fixed

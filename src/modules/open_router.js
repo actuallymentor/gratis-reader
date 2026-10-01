@@ -34,6 +34,12 @@ export const validate_api_key = async ( api_key ) => {
 
 }
 
+// OpenAI's GPT-5+ models reason by default and bill the thinking as completion tokens.
+// For translation, low effort scored best in our study and costs about half; Anthropic
+// models ignore the setting on OpenRouter, and older OpenAI models reject it.
+const REASONING_MODEL_RE = /^openai\/gpt-[5-9]/
+export const reasoning_for = ( model ) => REASONING_MODEL_RE.test( model || `` ) ? { effort: `low` } : undefined
+
 // Rate-limit and overload responses may say when to come back
 const retry_after_ms = ( response ) => {
     const header = response.headers.get( `retry-after` )
@@ -89,7 +95,8 @@ export const chat_completion = async ( { api_key, model, system_prompt, user_mes
                 ],
                 temperature,
                 ...max_tokens ? { max_tokens } : {},
-                ...json ? { response_format: { type: `json_object` } } : {}
+                ...json ? { response_format: { type: `json_object` } } : {},
+                ...reasoning_for( model ) ? { reasoning: reasoning_for( model ) } : {}
             } ),
             signal: request_controller.signal
         } )
