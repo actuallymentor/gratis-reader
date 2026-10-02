@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.27.0] - 2026-10-02
+
+### Changed
+- The welcome screen is now a landing page: a headline and the API key form up front, illustrated sections on level-adapted rewriting, tap-to-peek and your private in-browser shelf
+- The key field no longer grabs focus on load, so phones show the page before the keyboard
+
 ## [1.26.0] - 2026-10-02
 
 ### Changed

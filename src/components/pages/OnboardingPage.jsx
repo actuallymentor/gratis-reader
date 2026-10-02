@@ -1,43 +1,160 @@
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import styled from 'styled-components'
-import { AlertTriangle, Loader2 } from 'lucide-react'
+import styled, { css, keyframes } from 'styled-components'
+import { AlertTriangle, BookOpen, Code, Loader2 } from 'lucide-react'
 import { Button } from '../atoms/Button.jsx'
 import HelpButton from '../molecules/HelpButton.jsx'
+import { HeroArt, LevelArt, PeekArt, ShelfArt } from '../molecules/LandingArt.jsx'
 import toast from 'react-hot-toast'
 import { KEY_FORMAT_HINT, looks_like_api_key, validate_api_key } from '../../modules/open_router.js'
 import { use_settings_store } from '../../stores/settings_store.js'
 
-const Container = styled.div`
+/* ===============================
+// Layout
+// =============================== */
+
+const Page = styled.div`
     min-height: 100dvh;
     display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: var(--space-m);
+    flex-direction: column;
 `
 
-const Card = styled.div`
+// Shared content width: header, hero, sections, separators and footer all align to it
+const Width = styled.div`
+    width: 100%;
+    max-width: 72rem;
+    margin: 0 auto;
+    padding: 0 var(--space-m);
+
+    @media (min-width: 600px) { padding: 0 var(--space-xl); }
+`
+
+const Header = styled( Width )`
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 4rem;
+`
+
+const Brand = styled.span`
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-s);
+    font-family: var(--font-heading);
+    font-size: 1.125rem;
+
+    svg { width: 1.25rem; height: 1.25rem; color: var(--accent); }
+`
+
+const HeaderLink = styled.a`
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4em;
+    min-height: 2.75rem;
+    padding: 0 var(--space-xs);
+    color: var(--text-muted);
+    font-size: 0.9375rem;
+    text-decoration: none;
+
+    svg { width: 1rem; height: 1rem; }
+    &:hover { color: var(--text); text-decoration: underline; }
+`
+
+// Content arrival: short rise + fade, staggered per child
+const arrive = keyframes`
+    from { opacity: 0; transform: translateY( 4px ); }
+    to { opacity: 1; transform: none; }
+`
+
+const stagger = css`
+    & > * { animation: ${ arrive } 320ms var(--ease-out) both; }
+    ${ [ 1, 2, 3, 4 ].map( n => `& > *:nth-child(${ n + 1 }) { animation-delay: ${ n * 60 }ms; }` ).join( `\n` ) }
+`
+
+/* ===============================
+// Hero
+// =============================== */
+
+// Mobile: centered introduction with a compact inset artwork above it. Desktop: text | artwork.
+const Hero = styled( Width )`
+    display: grid;
+    gap: var(--space-xl);
+    padding-top: var(--space-l);
+    padding-bottom: var(--space-3xl);
+
+    @media (min-width: 880px) {
+        grid-template-columns: minmax( 0, 1fr ) minmax( 0, 1fr );
+        align-items: center;
+        gap: var(--space-3xl);
+        padding-top: var(--space-2xl);
+        padding-bottom: 5rem;
+    }
+`
+
+const HeroText = styled.div`
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    ${ stagger }
+
+    @media (min-width: 880px) {
+        align-items: flex-start;
+        text-align: left;
+    }
+`
+
+const HeroArtwork = styled.div`
+    order: -1;
+    width: 100%;
+    max-width: 16rem;
+    margin: 0 auto;
+    animation: ${ arrive } 320ms var(--ease-out) both;
+
+    @media (min-width: 880px) {
+        order: 0;
+        max-width: 30rem;
+    }
+`
+
+const Headline = styled.h1`
+    font-size: clamp( 2.25rem, 1.4rem + 3.2vw, 3.5rem );
+    line-height: 1.12;
+    letter-spacing: -0.01em;
+    max-width: 14ch;
+
+    @media (min-width: 880px) { max-width: 16ch; }
+`
+
+// Marker-style highlight: keeps body text colour, so contrast is unaffected by the accent
+const Mark = styled.span`
+    background: linear-gradient( transparent 58%, var(--accent-light) 58%, var(--accent-light) 92%, transparent 92% );
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+`
+
+const Lede = styled.p`
+    margin-top: var(--space-m);
+    max-width: 34rem;
+    color: var(--text-muted);
+    font-size: clamp( 1.0625rem, 1rem + 0.35vw, 1.25rem );
+    line-height: 1.5;
+`
+
+/* ===============================
+// Key form
+// =============================== */
+
+const Form = styled.form`
+    width: 100%;
+    max-width: 28rem;
+    margin-top: var(--space-xl);
+    padding: var(--space-l);
     background: var(--bg-surface);
     border: 1px solid var(--border);
     border-radius: var(--radius-l);
-    padding: var(--space-xl) var(--space-l);
-    max-width: 26rem;
-    width: 100%;
-    box-shadow: var(--shadow-m);
-
-    @media (min-width: 600px) { padding: var(--space-2xl); }
-`
-
-const AppTitle = styled.h1`
-    color: var(--accent);
-    font-size: 1.75rem;
-    margin-bottom: var(--space-xs);
-`
-
-const Subtitle = styled.p`
-    color: var(--text-muted);
-    margin-bottom: var(--space-xl);
-    line-height: 1.5;
+    box-shadow: var(--shadow-l);
+    text-align: left;
 `
 
 const LabelRow = styled.div`
@@ -83,22 +200,108 @@ const FieldError = styled.p`
     svg { width: 1rem; height: 1rem; flex-shrink: 0; margin-top: 0.1rem; }
 `
 
-const Actions = styled.div`
+const FormFooter = styled.div`
     display: flex;
-    justify-content: flex-end;
-    margin-top: var(--space-l);
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--space-m);
+    margin-top: var(--space-m);
+`
+
+const HelpText = styled.p`
+    flex: 1 1 12rem;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    line-height: 1.5;
 `
 
 const Spinner = styled( Loader2 )`
     animation: spin 1s linear infinite;
 `
 
-const HelpText = styled.p`
-    font-size: 0.85rem;
-    color: var(--text-muted);
-    margin-top: var(--space-l);
-    line-height: 1.5;
+/* ===============================
+// Feature sections
+// =============================== */
+
+// Thin rule across the full content width
+const Rule = styled.hr`
+    border: 0;
+    border-top: 1px solid var(--border);
 `
+
+// Desktop alternates text and artwork sides; mobile stacks text first, artwork after
+const Section = styled.section`
+    display: grid;
+    gap: var(--space-l);
+    padding: var(--space-3xl) 0;
+    align-items: center;
+
+    @media (min-width: 880px) {
+        grid-template-columns: minmax( 0, 1fr ) minmax( 0, 1fr );
+        gap: var(--space-3xl);
+        padding: 5rem 0;
+
+        ${ p => p.$flip && css`& > :first-child { order: 2; }` }
+    }
+`
+
+const SectionText = styled.div`
+    max-width: 30rem;
+`
+
+const SectionArt = styled.div`
+    width: 100%;
+    max-width: 22rem;
+
+    @media (min-width: 880px) {
+        max-width: 26rem;
+        justify-self: center;
+    }
+`
+
+const SectionTitle = styled.h2`
+    font-size: clamp( 1.5rem, 1.1rem + 1.4vw, 2.125rem );
+    line-height: 1.2;
+`
+
+const SectionBody = styled.p`
+    margin-top: var(--space-m);
+    color: var(--text-muted);
+    line-height: 1.6;
+    max-width: 65ch;
+`
+
+const Footer = styled( Width )`
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--space-s) var(--space-l);
+    margin-top: auto;
+    padding-top: var(--space-l);
+    padding-bottom: var(--space-l);
+    color: var(--text-muted);
+    font-size: 0.875rem;
+`
+
+const SECTIONS = [
+    {
+        title: `Rewritten, not just translated`,
+        body: `Each sentence is rewritten for your level, from first words to fluent. Simpler vocabulary and grammar while you learn, the full texture once you are ready for it.`,
+        Art: LevelArt,
+    },
+    {
+        title: `Tap to peek`,
+        body: `Tap a sentence to see the original. Tap a word for its meaning. Long press to ask why it was translated that way.`,
+        Art: PeekArt,
+    },
+    {
+        title: `Your shelf, in your browser`,
+        body: `Drop in any EPUB or open one of 1,857 public domain classics. No accounts and no tracking: books, key and translations stay on this device.`,
+        Art: ShelfArt,
+    },
+]
 
 const VALIDATE_DEBOUNCE_MS = 800
 
@@ -151,62 +354,104 @@ export default function OnboardingPage() {
 
     }
 
-    const handle_key_down = ( e ) => {
-        if( e.key === `Enter` ) connect()
+    const submit = ( e ) => {
+        e.preventDefault()
+        if( !loading ) connect()
     }
 
-    return <Container>
-        <Card>
+    return <Page>
 
-            <AppTitle>Gratis Reader</AppTitle>
-            <Subtitle>
-                Read any book in a new language, adapted to your level.
-            </Subtitle>
+        <Header as="header">
+            <Brand>
+                <BookOpen strokeWidth={ 1.5 } aria-hidden="true" />
+                Gratis Reader
+            </Brand>
+            <HeaderLink href="https://github.com/actuallymentor/gratis-reader" target="_blank" rel="noopener noreferrer">
+                <Code strokeWidth={ 1.5 } aria-hidden="true" />
+                Source
+            </HeaderLink>
+        </Header>
 
-            <LabelRow>
-                <Label htmlFor="openrouter-key">OpenRouter API key</Label>
-                <HelpButton title="Why an OpenRouter key?" topic="the API key">
-                    <p>Translations come from AI models on OpenRouter. Your key lets Gratis Reader call them on your account, so you pay OpenRouter directly for what you read, usually fractions of a cent per page.</p>
-                    <p>The key is stored only in this browser and sent only to OpenRouter. Create one at openrouter.ai/keys.</p>
-                </HelpButton>
-            </LabelRow>
-            <Input
-                id="openrouter-key"
-                type="password"
-                placeholder="sk-or-..."
-                value={ key }
-                $invalid={ !!error }
-                aria-invalid={ !!error }
-                aria-describedby={ error ? `openrouter-key-error` : undefined }
-                onChange={ ( e ) => {
-                    set_key( e.target.value )
-                    if( error ) set_error( null )
-                } }
-                onKeyDown={ handle_key_down }
-                disabled={ loading }
-                autoFocus
-            />
-            { error && <FieldError id="openrouter-key-error" role="alert">
-                <AlertTriangle strokeWidth={ 1.5 } aria-hidden="true" />
-                { error }
-            </FieldError> }
+        <main>
 
-            <Actions>
-                <Button variant="primary" onClick={ connect } disabled={ loading || !key.trim() } icon={ loading ? <Spinner strokeWidth={ 1.5 } /> : null }>
-                    { loading ? `Connecting…` : `Connect` }
-                </Button>
-            </Actions>
+            <Hero>
 
-            { loading && <span className="visually-hidden" role="status" aria-live="polite">
-                Checking OpenRouter API key...
-            </span> }
+                <HeroText>
 
-            <HelpText>
-                Get a key at <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer">openrouter.ai/keys</a>.
-                It stays in your browser and is never sent to our servers.
-            </HelpText>
+                    <Headline>Read any book in <Mark>the language you&apos;re learning</Mark></Headline>
+                    <Lede>Every sentence rewritten for your level. Tap for the original, tap a word for its meaning.</Lede>
 
-        </Card>
-    </Container>
+                    <Form onSubmit={ submit } noValidate aria-label="Connect OpenRouter">
+
+                        <LabelRow>
+                            <Label htmlFor="openrouter-key">OpenRouter API key</Label>
+                            <HelpButton title="Why an OpenRouter key?" topic="the API key">
+                                <p>Translations come from AI models on OpenRouter. Your key lets Gratis Reader call them on your account, so you pay OpenRouter directly for what you read, usually fractions of a cent per page.</p>
+                                <p>The key is stored only in this browser and sent only to OpenRouter. Create one at openrouter.ai/keys.</p>
+                            </HelpButton>
+                        </LabelRow>
+                        <Input
+                            id="openrouter-key"
+                            type="password"
+                            autoComplete="off"
+                            placeholder="sk-or-..."
+                            value={ key }
+                            $invalid={ !!error }
+                            aria-invalid={ !!error }
+                            aria-describedby={ error ? `openrouter-key-error` : `openrouter-key-help` }
+                            onChange={ ( e ) => {
+                                set_key( e.target.value )
+                                if( error ) set_error( null )
+                            } }
+                            disabled={ loading }
+                        />
+                        { error && <FieldError id="openrouter-key-error" role="alert">
+                            <AlertTriangle strokeWidth={ 1.5 } aria-hidden="true" />
+                            { error }
+                        </FieldError> }
+
+                        <FormFooter>
+                            <HelpText id="openrouter-key-help">
+                                Get a key at <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer">openrouter.ai/keys</a>. It stays in your browser.
+                            </HelpText>
+                            <Button type="submit" variant="primary" disabled={ loading || !key.trim() } icon={ loading ? <Spinner strokeWidth={ 1.5 } /> : null }>
+                                { loading ? `Connecting…` : `Connect` }
+                            </Button>
+                        </FormFooter>
+
+                        { loading && <span className="visually-hidden" role="status" aria-live="polite">
+                            Checking OpenRouter API key...
+                        </span> }
+
+                    </Form>
+
+                </HeroText>
+
+                <HeroArtwork><HeroArt /></HeroArtwork>
+
+            </Hero>
+
+            <Width>
+                { SECTIONS.map( ( { title, body, Art }, index ) => <Fragment key={ title }>
+                    <Rule />
+                    <Section $flip={ index % 2 === 0 } aria-labelledby={ `feature-${ index }` }>
+                        <SectionText>
+                            <SectionTitle id={ `feature-${ index }` }>{ title }</SectionTitle>
+                            <SectionBody>{ body }</SectionBody>
+                        </SectionText>
+                        <SectionArt><Art /></SectionArt>
+                    </Section>
+                </Fragment> ) }
+                <Rule />
+            </Width>
+
+        </main>
+
+        <Footer as="footer">
+            <span>Free and open source, MIT licensed.</span>
+            <span>Bring your own <a href="https://openrouter.ai" target="_blank" rel="noopener noreferrer">OpenRouter</a> key.</span>
+        </Footer>
+
+    </Page>
 
 }

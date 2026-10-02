@@ -38,6 +38,8 @@ body {
     --accent-dark: #5ba3b3;
     /* Dark ink for text on an accent fill (white on the accent is ~2:1) */
     --accent-contrast: #1a1a2e;
+    /* Secondary accent for artwork and chart pairing, never for text */
+    --coral: #e07c5a;
 
     --radius-s: 6px;
     --radius-m: 10px;
