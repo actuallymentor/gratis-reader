@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.26.0] - 2026-10-02
+
+### Changed
+- Point out a wrongly shaped API key while you type (keys start with `sk-or-`), before the online check on Connect or Save
+- Show a spinner, and announce it to screen readers, while a classic is loading or an upload is being processed
+- Mark the selected proficiency level with a check, not only a tint
+- Let the reader's text size follow the browser's own text-size setting as well as the slider
+- Say why you landed back in the library when a book is no longer there
+
+### Fixed
+- Larger tap targets for compact card actions, switch rows, category pills, theme segments and dialog header buttons, without any two targets overlapping
+- A long press on a compact action no longer swallows the next tap
+- Cards, the upload area and buttons no longer stay highlighted after a tap on touch screens
+- A failed load no longer shows two Retry buttons at once; retry from the dialog closes it smoothly
+- Only one classic imports at a time; a second tap while one is loading is ignored
+- Chapter headings, the progress bar and loading placeholders have proper semantics for assistive technology; word tooltips read their text aloud again
+- The update badge uses the same soft focus halo as everything else
+
 ## [1.25.0] - 2026-10-01
 
 ### Changed

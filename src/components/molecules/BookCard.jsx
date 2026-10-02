@@ -13,12 +13,14 @@ const Card = styled.article`
     overflow: hidden;
     transition: background var(--duration-press) ease, transform var(--duration-press) ease, box-shadow var(--duration-press) ease;
 
-    &:hover { background: var(--bg-hover); }
+    @media (hover: hover) {
+        &:hover { background: var(--bg-hover); }
+    }
 
     /* The card clips its corners, so it carries the halo when its link has keyboard focus */
     &:has( > a:focus-visible ) { box-shadow: 0 0 0 5px var(--focus-halo); }
 
-    @media (min-width: 600px) {
+    @media (min-width: 600px) and (hover: hover) {
         &:hover {
             background: var(--bg-surface);
             transform: translateY(-1px);

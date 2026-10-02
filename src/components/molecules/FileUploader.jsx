@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback } from 'react'
 import styled from 'styled-components'
-import { Upload } from 'lucide-react'
+import { Loader2, Upload } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { log } from 'mentie'
 import { parse_epub, hash_buffer } from '../../modules/epub_parser.js'
@@ -29,9 +29,12 @@ const DropZone = styled.label`
     }
     background: ${ p => p.$active ? `var(--accent-light)` : `transparent` };
 
-    &:hover {
-        border-color: var(--accent);
-        background: var(--accent-light);
+    /* Only devices that really hover: a tapped zone would otherwise stay tinted */
+    @media (hover: hover) {
+        &:hover {
+            border-color: var(--accent);
+            background: var(--accent-light);
+        }
     }
 
     &:focus-within {
@@ -43,6 +46,14 @@ const DropZone = styled.label`
 const DropText = styled.p`
     color: var(--text-muted);
     margin-bottom: var(--space-s);
+
+    .spin {
+        display: inline-block;
+        width: 1rem;
+        height: 1rem;
+        vertical-align: -0.125em;
+        animation: spin 1s linear infinite;
+    }
 `
 
 const DropAccent = styled.span`
@@ -170,7 +181,9 @@ export default function FileUploader( { on_upload_complete } ) {
         onDrop={ handle_drop }
     >
         { is_uploading
-            ? <DropText>Processing...</DropText>
+            ? <DropText role="status">
+                <Loader2 className="spin" strokeWidth={ 1.5 } aria-hidden="true" /> Processing…
+            </DropText>
             : <>
                 <Upload strokeWidth={ 1.5 } aria-hidden="true" />
                 <DropText>

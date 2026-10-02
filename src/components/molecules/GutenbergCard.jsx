@@ -1,6 +1,6 @@
 import { memo, useState } from 'react'
 import styled from 'styled-components'
-import { BookOpen, Info } from 'lucide-react'
+import { BookOpen, Info, Loader2 } from 'lucide-react'
 import { Button } from '../atoms/Button.jsx'
 import ExpandingAction from '../atoms/ExpandingAction.jsx'
 
@@ -21,7 +21,9 @@ const Card = styled.article`
         gap: 0;
         padding: 0;
         overflow: hidden;
+    }
 
+    @media (min-width: 600px) and (hover: hover) {
         &:hover {
             transform: translateY(-1px);
             box-shadow: var(--shadow-m);
@@ -111,6 +113,8 @@ const ButtonRow = styled.div`
     justify-content: flex-end;
     gap: var(--space-s);
     margin-top: var(--space-s);
+
+    .spin { animation: spin 1s linear infinite; }
 `
 
 /**
@@ -157,9 +161,10 @@ function GutenbergCard( { book, on_info, on_read, is_importing, is_imported } ) 
                 <ExpandingAction icon={ <Info strokeWidth={ 1.5 } /> } label="Info" onClick={ () => on_info( book ) } />
                 <Button
                     variant="primary"
-                    icon={ <BookOpen strokeWidth={ 1.5 } /> }
+                    icon={ is_importing ? <Loader2 className="spin" strokeWidth={ 1.5 } aria-hidden="true" /> : <BookOpen strokeWidth={ 1.5 } /> }
                     onClick={ () => on_read( book ) }
                     disabled={ is_importing }
+                    aria-live={ is_importing ? `polite` : undefined }
                 >
                     { is_importing ? `Loading…` : is_imported ? `Open` : `Read` }
                 </Button>

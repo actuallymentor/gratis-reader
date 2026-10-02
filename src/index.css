@@ -36,6 +36,8 @@ body {
     --accent: #7ec0d0;
     --accent-light: rgba(126, 192, 208, 0.15);
     --accent-dark: #5ba3b3;
+    /* Dark ink for text on an accent fill (white on the accent is ~2:1) */
+    --accent-contrast: #1a1a2e;
 
     --radius-s: 6px;
     --radius-m: 10px;

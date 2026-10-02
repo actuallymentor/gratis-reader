@@ -76,6 +76,7 @@ const Segmented = styled.div`
 `
 
 const Segment = styled.button`
+    position: relative;
     min-height: 2rem;
     padding: 0 var(--space-s);
     border: none;
@@ -92,6 +93,13 @@ const Segment = styled.button`
 
     /* Its own selection shadow would otherwise replace the global focus halo */
     &:focus-visible { box-shadow: 0 0 0 5px var(--focus-halo); }
+
+    /* 32px face, 44px target: segments touch sideways, so only extend vertically */
+    &::before {
+        content: '';
+        position: absolute;
+        inset: -0.375rem 0;
+    }
 `
 
 const HelpText = styled.p`

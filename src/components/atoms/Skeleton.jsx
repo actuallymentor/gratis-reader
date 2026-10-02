@@ -26,7 +26,7 @@ const SkeletonBlock = styled.div`
  * @param {string} [props.height] - CSS height
  */
 export default function Skeleton( { width, height, ...rest } ) {
-    return <SkeletonBlock $width={ width } $height={ height } { ...rest } />
+    return <SkeletonBlock aria-hidden="true" $width={ width } $height={ height } { ...rest } />
 }
 
 // Skeleton for a line of text
@@ -42,7 +42,7 @@ export const SkeletonLine = styled( SkeletonBlock )`
 export function SkeletonParagraph( { lines = 3 } ) {
     return <div style={ { marginBottom: `var(--space-l)` } }>
         { Array.from( { length: lines } ).map( ( _, i ) =>
-            <SkeletonLine key={ i } $height="1.2em" />
+            <SkeletonLine key={ i } aria-hidden="true" $height="1.2em" />
         ) }
     </div>
 }

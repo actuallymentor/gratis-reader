@@ -46,24 +46,29 @@ export default function LoadError( { error, title, on_retry } ) {
 
     if( !error ) return null
 
+    // From the modal: animate out (its on_close dismisses it), then reload
     const retry = () => {
-        set_dismissed( true )
+        if( close_ref.current ) close_ref.current()
+        else set_dismissed( true )
         on_retry()
     }
 
     return <>
-        <Notice role="status">
+        { dismissed && <Notice role="status">
             <AlertTriangle strokeWidth={ 1.5 } aria-hidden="true" />
             <span>{ title }. { error }</span>
             <Button icon={ <RotateCw strokeWidth={ 1.5 } /> } onClick={ retry }>Retry</Button>
-        </Notice>
+        </Notice> }
         { !dismissed && <Modal
             title={ title }
             width="28rem"
             close_ref={ fn => {
                 close_ref.current = fn
             } }
-            on_close={ () => set_dismissed( true ) }
+            on_close={ () => {
+                close_ref.current = null
+                set_dismissed( true )
+            } }
         >
             <p>{ error }</p>
             <Actions>

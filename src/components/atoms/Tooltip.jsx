@@ -3,7 +3,7 @@ import styled from 'styled-components'
 
 const TooltipContainer = styled.div`
     position: absolute;
-    bottom: calc(100% + 8px);
+    bottom: calc(100% + 0.5rem);
     left: 50%;
     transform: translateX(-50%);
     padding: var(--space-xs) var(--space-s);
@@ -12,7 +12,7 @@ const TooltipContainer = styled.div`
     border-radius: var(--radius-s);
     font-size: 0.8em;
     white-space: nowrap;
-    max-width: 250px;
+    max-width: 15.625rem;
     overflow: hidden;
     text-overflow: ellipsis;
     pointer-events: ${ p => p.$dismissible ? `auto` : `none` };
@@ -23,7 +23,7 @@ const TooltipContainer = styled.div`
 
     /* Prevent overflow on narrow viewports */
     @media (max-width: 480px) {
-        max-width: 200px;
+        max-width: 12.5rem;
         white-space: normal;
         word-break: break-word;
     }
@@ -127,7 +127,6 @@ export default function Tooltip( {
             $dismissible={ !!on_dismiss }
             role={ on_dismiss ? `button` : undefined }
             tabIndex={ on_dismiss ? 0 : undefined }
-            aria-label={ on_dismiss ? `Dismiss word tooltip` : undefined }
             onPointerDown={ e => {
                 if( on_dismiss ) e.stopPropagation()
             } }
@@ -135,6 +134,7 @@ export default function Tooltip( {
             onKeyDown={ dismiss_with_keyboard }
         >
             { loading ? `...` : content || fallback_content }
+            { on_dismiss && <span className="visually-hidden">, dismiss</span> }
         </TooltipContainer> }
     </Wrapper>
 

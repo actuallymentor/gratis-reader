@@ -20,9 +20,11 @@ const Fill = styled.div`
  * Simple progress bar
  * @param {Object} props
  * @param {number} props.percent - 0-100
+ * @param {string} [props.label] - Accessible name, e.g. "Reading progress"
  */
-export default function ProgressBar( { percent = 0 } ) {
-    return <Track>
-        <Fill $percent={ Math.min( 100, Math.max( 0, percent ) ) } />
+export default function ProgressBar( { percent = 0, label = `Progress` } ) {
+    const clamped = Math.round( Math.min( 100, Math.max( 0, percent ) ) )
+    return <Track role="progressbar" aria-label={ label } aria-valuemin={ 0 } aria-valuemax={ 100 } aria-valuenow={ clamped }>
+        <Fill $percent={ clamped } />
     </Track>
 }

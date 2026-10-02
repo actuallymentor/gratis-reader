@@ -9,6 +9,10 @@ const REQUEST_TIMEOUT_MS = 60_000
  * @returns {Promise<boolean>} true if valid, false if server rejects
  * @throws {Error} On network failure or timeout
  */
+// Cheap shape check for debounced field validation; the real check is validate_api_key
+export const KEY_FORMAT_HINT = `OpenRouter keys start with sk-or-`
+export const looks_like_api_key = ( value ) => /^sk-or-/.test( value.trim() )
+
 export const validate_api_key = async ( api_key ) => {
 
     const timeout_controller = new AbortController()

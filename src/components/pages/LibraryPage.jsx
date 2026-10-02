@@ -54,6 +54,16 @@ const BookGrid = styled.div`
     }
 `
 
+// Loading placeholders shaped like the cards they stand in for: a row on phones, a cover card wider
+const SkeletonCard = styled( Skeleton )`
+    height: 7.75rem;
+    border-radius: var(--radius-m);
+
+    @media (min-width: 600px) { height: 23.75rem; }
+`
+
+const reduced_motion = () => window.matchMedia?.( `(prefers-reduced-motion: reduce)` ).matches
+
 const EmptyState = styled.div`
     display: flex;
     flex-direction: column;
@@ -158,9 +168,9 @@ export default function LibraryPage() {
                 <FileUploader />
             </UploadSection>
 
-            { loading && <BookGrid>
+            { loading && <BookGrid aria-busy="true" aria-label="Loading your library">
                 { Array.from( { length: 4 } ).map( ( _, i ) =>
-                    <Skeleton key={ i } height="280px" />
+                    <SkeletonCard key={ i } />
                 ) }
             </BookGrid> }
 
@@ -170,7 +180,7 @@ export default function LibraryPage() {
                 <EmptyText>
                     Upload an EPUB file to start reading in a new language, or pick a free classic below.
                 </EmptyText>
-                <Button onClick={ () => document.getElementById( `classic-library` )?.scrollIntoView( { behavior: `smooth`, block: `start` } ) }>
+                <Button onClick={ () => document.getElementById( `classic-library` )?.scrollIntoView( { behavior: reduced_motion() ? `auto` : `smooth`, block: `start` } ) }>
                     Browse classics
                 </Button>
             </EmptyState> }

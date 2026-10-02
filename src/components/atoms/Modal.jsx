@@ -82,6 +82,7 @@ export default function Modal( { title, on_close, variant = `center`, width, hea
     const dialog_ref = useRef( null )
     const opener_ref = useRef( null )
     const closing_ref = useRef( false )
+    const exit_timer_ref = useRef( null )
     const title_id = useId()
 
     const request_close = useCallback( () => {
@@ -89,7 +90,7 @@ export default function Modal( { title, on_close, variant = `center`, width, hea
         if( !on_close || !dialog || closing_ref.current ) return
         closing_ref.current = true
         dialog.dataset.closing = `true`
-        setTimeout( () => {
+        exit_timer_ref.current = setTimeout( () => {
             dialog.close()
             on_close()
         }, window.matchMedia?.( `(prefers-reduced-motion: reduce)` ).matches ? 0 : EXIT_MS )
@@ -111,6 +112,7 @@ export default function Modal( { title, on_close, variant = `center`, width, hea
         target?.focus()
 
         return () => {
+            clearTimeout( exit_timer_ref.current )
             if( dialog.open ) dialog.close()
             // Unmounting skips the browser's own focus restoration
             const opener = opener_ref.current
@@ -145,7 +147,8 @@ export default function Modal( { title, on_close, variant = `center`, width, hea
     >
         <Header>
             <Title id={ title_id }>{ title }</Title>
-            <div style={ { display: `flex`, gap: `var(--space-xs)` } }>
+            { /* 12px apart so the two 44px tap areas never overlap */ }
+            <div style={ { display: `flex`, gap: `0.75rem` } }>
                 { header_actions }
                 { on_close && <IconButton label="Close" data-modal-close icon={ <X strokeWidth={ 1.5 } /> } onClick={ request_close } /> }
             </div>

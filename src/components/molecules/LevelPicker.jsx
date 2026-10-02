@@ -1,4 +1,5 @@
 import styled from 'styled-components'
+import { Check } from 'lucide-react'
 import { LEVELS } from '../../modules/prompts.js'
 
 const Grid = styled.div`
@@ -18,16 +19,28 @@ const LevelCard = styled.button`
     text-align: left;
     transition: background var(--duration-press) ease, border-color var(--duration-press) ease, transform var(--duration-press) ease;
 
-    &:hover {
-        border-color: var(--accent);
-        transform: translateY(-1px);
+    @media (hover: hover) {
+        &:hover {
+            border-color: var(--accent);
+            transform: translateY(-1px);
+        }
     }
 
     &:active { transform: scale(0.985); }
 `
 
+// Selected: a check beside the code, so the state never rests on colour alone
+const Mark = styled( Check )`
+    position: absolute;
+    top: var(--space-s);
+    right: var(--space-s);
+    width: 1rem;
+    height: 1rem;
+    color: var(--accent-dark);
+`
+
 const LevelCode = styled.div`
-    font-weight: 700;
+    font-weight: 600;
     font-size: 0.9em;
     margin-bottom: var(--space-xs);
 `
@@ -67,6 +80,7 @@ export default function LevelPicker( { value, on_change } ) {
                 onClick={ () => on_change( level.code ) }
                 onKeyDown={ e => on_key_down( e, index ) }
             >
+                { level.code === value && <Mark strokeWidth={ 2 } aria-hidden="true" /> }
                 <LevelCode>{ level.cefr }</LevelCode>
                 <LevelLabel>{ level.label }</LevelLabel>
             </LevelCard>

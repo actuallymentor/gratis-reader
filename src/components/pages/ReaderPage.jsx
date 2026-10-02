@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import toast from 'react-hot-toast'
 import styled from 'styled-components'
 import { use_book } from '../../hooks/use_book.js'
 import { use_translation } from '../../hooks/use_translation.js'
@@ -72,7 +73,8 @@ const ReadingArea = styled.main`
     margin: 0 auto;
     padding: var(--space-xl) var(--space-l);
     padding-bottom: calc(var(--space-xl) + var(--reader-dock-height, 0px));
-    font-size: ${ p => p.$font_size }px;
+    /* The slider counts pixels at a 16px root; rem keeps the browser's own text size in play */
+    font-size: ${ p => p.$font_size / 16 }rem;
     font-family: ${ p => p.$font_family }, system-ui, sans-serif;
     line-height: 1.8;
     letter-spacing: 0.01em;
@@ -655,6 +657,7 @@ export default function ReaderPage() {
 
     useEffect( () => {
         if( !loading && !book_meta ) {
+            toast.error( `That book is no longer in your library` )
             navigate( `/library`, { replace: true } )
         }
     }, [ loading, book_meta, navigate ] )
@@ -815,7 +818,7 @@ export default function ReaderPage() {
                         · { format_cost( estimate_cost( token_usage.prompt_tokens, token_usage.completion_tokens, model ) ) }
                     </TokenStats> }
                 </StatusRow>
-                <ProgressBar percent={ progress } />
+                <ProgressBar percent={ progress } label="Book progress" />
                 <NavRow>
                     <Button icon={ <ChevronLeft strokeWidth={ 1.5 } /> } onClick={ prev_chapter } disabled={ current_chapter === 0 }>
                         Prev

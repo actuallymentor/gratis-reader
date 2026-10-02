@@ -1,4 +1,4 @@
-import { forwardRef, useRef, useState } from 'react'
+import { forwardRef, useEffect, useRef, useState } from 'react'
 import styled from 'styled-components'
 import { ButtonBase } from './Button.jsx'
 
@@ -9,6 +9,9 @@ const REVEAL_HOLD_MS = 3_000
 const Face = styled( ButtonBase )`
     gap: 0;
     padding: 0.2rem 0.5rem;
+
+    /* The collapsed face is 34px wide: a 5px lateral extension makes the target 44px */
+    &::before { inset: -0.375rem -0.3125rem; }
 
     .label {
         display: inline-block;
@@ -48,6 +51,12 @@ const ExpandingAction = forwardRef( ( { icon, label, onClick, variant = `quiet`,
 
     const [ revealed, set_revealed ] = useState( false )
     const press_ref = useRef( { timer: null, long: false, x: 0, y: 0 } )
+    const hold_ref = useRef( null )
+
+    useEffect( () => () => {
+        clearTimeout( press_ref.current.timer )
+        clearTimeout( hold_ref.current )
+    }, [] )
 
     const cancel_press = () => {
         clearTimeout( press_ref.current.timer )
@@ -56,11 +65,14 @@ const ExpandingAction = forwardRef( ( { icon, label, onClick, variant = `quiet`,
 
     const on_pointer_down = ( e ) => {
         if( e.pointerType !== `touch` ) return
+        // A fresh press forgets an earlier long press, so a real tap is never swallowed
+        clearTimeout( press_ref.current.timer )
         press_ref.current = { timer: null, long: false, x: e.clientX, y: e.clientY }
         press_ref.current.timer = setTimeout( () => {
             press_ref.current.long = true
             set_revealed( true )
-            setTimeout( () => set_revealed( false ), REVEAL_HOLD_MS )
+            clearTimeout( hold_ref.current )
+            hold_ref.current = setTimeout( () => set_revealed( false ), REVEAL_HOLD_MS )
         }, LONG_PRESS_MS )
     }
 
@@ -85,6 +97,7 @@ const ExpandingAction = forwardRef( ( { icon, label, onClick, variant = `quiet`,
     return <Face
         ref={ ref }
         type="button"
+        { ...rest }
         $variant={ variant }
         data-revealed={ revealed }
         onPointerDown={ on_pointer_down }
@@ -98,7 +111,6 @@ const ExpandingAction = forwardRef( ( { icon, label, onClick, variant = `quiet`,
         } }
         onContextMenu={ e => press_ref.current.long && e.preventDefault() }
         onClick={ on_click }
-        { ...rest }
     >
         { icon }
         <span className="label">{ label }</span>

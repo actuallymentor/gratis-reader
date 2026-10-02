@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useDeferredValue } from 'react'
+import { useState, useCallback, useMemo, useDeferredValue, useRef } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { Check, ChevronRight, SearchX } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -58,6 +58,7 @@ const PillToggle = styled.button`
     color: var(--text-muted);
     font-size: 0.82em;
     cursor: pointer;
+    min-height: 2.75rem;
     padding: var(--space-xs) 0;
     margin-top: var(--space-s);
     display: flex;
@@ -77,15 +78,18 @@ const Arrow = styled( ChevronRight )`
 const PillList = styled.div`
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-xs);
+    /* Row gap keeps the pills' invisible 4px extensions from overlapping */
+    gap: var(--space-s);
     margin-top: var(--space-xs);
 `
 
 // Active filter: tint, border and a check mark, so the state never rests on colour alone
 const Pill = styled.button`
+    position: relative;
     display: inline-flex;
     align-items: center;
     gap: 0.3em;
+    min-height: 2.25rem;
     background: ${ p => p.$active ? `var(--accent-light)` : `var(--bg-hover)` };
     color: ${ p => p.$active ? `var(--text)` : `var(--text-muted)` };
     border: 1px solid ${ p => p.$active ? `var(--accent)` : `transparent` };
@@ -97,6 +101,13 @@ const Pill = styled.button`
     white-space: nowrap;
 
     svg { width: 0.875rem; height: 0.875rem; }
+
+    /* 36px face + 4px above and below = a 44px target */
+    &::before {
+        content: '';
+        position: absolute;
+        inset: -0.25rem 0;
+    }
 
     &:hover { background: ${ p => p.$active ? `var(--accent-light)` : `var(--border)` }; }
 `
@@ -146,6 +157,8 @@ export default function GutenbergSection() {
     const { books: library_books, add_book } = use_library_store( useShallow( ( { books, add_book } ) => ( { books, add_book } ) ) )
     const [ info_book, set_info_book ] = useState( null )
     const [ importing_id, set_importing_id ] = useState( null )
+    // Mirror of importing_id for the guard: a ref keeps handle_read stable for the memoised cards
+    const importing_ref = useRef( null )
     const [ search, set_search ] = useState( `` )
     // Keep typing responsive: the grid re-filters with the deferred value
     const deferred_search = useDeferredValue( search )
@@ -211,6 +224,10 @@ export default function GutenbergSection() {
             return
         }
 
+        // One import at a time: a second would race the first for the spinner and the toast
+        if( importing_ref.current ) return
+
+        importing_ref.current = book.id
         set_importing_id( book.id )
         let parsed = null
         let handed_off = false
@@ -274,6 +291,7 @@ export default function GutenbergSection() {
             toast.error( `Could not load this book` )
         } finally {
             if( !handed_off ) parsed?.book?.destroy()
+            importing_ref.current = null
             set_importing_id( null )
         }
 

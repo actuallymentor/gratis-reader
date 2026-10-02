@@ -74,9 +74,9 @@ const BadgeButton = styled.button`
     border: 1px solid var(--accent-dark);
     border-radius: 999px;
     background: var(--accent);
-    color: #102027;
+    color: var(--accent-contrast);
     box-shadow: var(--shadow-m);
-    font-weight: 700;
+    font-weight: 500;
     line-height: 1.3;
     text-align: center;
     transition: filter 0.15s ease, transform 0.15s ease;
@@ -84,11 +84,6 @@ const BadgeButton = styled.button`
     &:hover {
         filter: brightness(0.95);
         transform: translateY(-1px);
-    }
-
-    &:focus-visible {
-        outline: 3px solid var(--text);
-        outline-offset: 3px;
     }
 
     &:disabled {

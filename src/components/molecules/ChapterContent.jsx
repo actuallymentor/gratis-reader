@@ -9,7 +9,7 @@ const Paragraph = styled.p`
 
 const Heading = styled.div`
     font-family: var(--font-heading);
-    font-weight: 500;
+    font-weight: 400;
     margin: var(--space-xl) 0 var(--space-l);
 
     &[data-level="1"] { font-size: 1.8em; }
@@ -98,7 +98,7 @@ function ChapterContent( { elements, translations, translation_selection, select
         switch ( element.type ) {
 
         case `heading`:
-            return <Heading key={ i } data-level={ element.level }>
+            return <Heading key={ i } role="heading" aria-level={ element.level } data-level={ element.level }>
                 { element.sentences.map( render_sentence ) }
             </Heading>
 

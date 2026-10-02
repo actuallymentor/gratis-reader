@@ -4,7 +4,7 @@ import { AlertTriangle, Check, KeyRound, Loader2, RotateCw } from 'lucide-react'
 import { Button } from '../atoms/Button.jsx'
 import Modal from '../atoms/Modal.jsx'
 import StatusPill from '../atoms/StatusPill.jsx'
-import { validate_api_key } from '../../modules/open_router.js'
+import { KEY_FORMAT_HINT, looks_like_api_key, validate_api_key } from '../../modules/open_router.js'
 
 // Attention sheen on a pending save: 1400ms pass, 1600ms quiet, starting after typing pauses
 const SHEEN_DELAY_MS = 800
@@ -150,6 +150,16 @@ export default function ApiKeySetting( { api_key, on_save } ) {
         const timer = setTimeout( () => set_attention( !document.hidden ), SHEEN_DELAY_MS )
         return () => clearTimeout( timer )
     }, [ draft, dirty, saving ] )
+
+    // Debounced shape check once typing pauses
+    useEffect( () => {
+        if( !editing ) return
+        const timer = setTimeout( () => {
+            if( draft.trim() && !looks_like_api_key( draft ) ) set_invalid( KEY_FORMAT_HINT )
+            else set_invalid( current => current === KEY_FORMAT_HINT ? null : current )
+        }, SHEEN_DELAY_MS )
+        return () => clearTimeout( timer )
+    }, [ draft, editing ] )
 
     const start_edit = () => {
         set_saved( false )

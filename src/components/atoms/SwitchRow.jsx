@@ -6,6 +6,7 @@ const Row = styled.button`
     justify-content: space-between;
     gap: var(--space-m);
     width: 100%;
+    min-height: 2.75rem;
     padding: var(--space-s) var(--space-m);
     border: 1px solid var(--border);
     border-radius: var(--radius-m);
@@ -17,7 +18,9 @@ const Row = styled.button`
     text-align: left;
     transition: background var(--duration-press) ease;
 
-    &:hover { background: var(--bg-hover); }
+    @media (hover: hover) {
+        &:hover { background: var(--bg-hover); }
+    }
 `
 
 const Track = styled.span`

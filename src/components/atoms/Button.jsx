@@ -79,7 +79,11 @@ export const ButtonBase = styled.button`
         height: 1rem;
     }
 
-    &:hover:not(:disabled) { transform: translateY(-1px); }
+    /* Lift only where a pointer can hover; a tap on touch would leave the face raised */
+    @media (hover: hover) {
+        &:hover:not(:disabled) { transform: translateY(-1px); }
+        &:hover:active:not(:disabled) { transform: translateY(-1px) scale(0.985); }
+    }
     &:active:not(:disabled) { transform: scale(0.985); }
 
     &:disabled {
@@ -112,7 +116,7 @@ const IconFace = styled( ButtonBase )`
         height: 1.25rem;
     }
 
-    /* Square tap target around a round face */
+    /* Square 44px tap target around a round face: neighbours need a 12px gap to stay clear of it */
     &::before { inset: -0.375rem; }
 `
 

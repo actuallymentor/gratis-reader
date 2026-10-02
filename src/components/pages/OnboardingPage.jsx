@@ -1,11 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import { AlertTriangle, Loader2 } from 'lucide-react'
 import { Button } from '../atoms/Button.jsx'
 import HelpButton from '../molecules/HelpButton.jsx'
 import toast from 'react-hot-toast'
-import { validate_api_key } from '../../modules/open_router.js'
+import { KEY_FORMAT_HINT, looks_like_api_key, validate_api_key } from '../../modules/open_router.js'
 import { use_settings_store } from '../../stores/settings_store.js'
 
 const Container = styled.div`
@@ -100,6 +100,8 @@ const HelpText = styled.p`
     line-height: 1.5;
 `
 
+const VALIDATE_DEBOUNCE_MS = 800
+
 export default function OnboardingPage() {
 
     const navigate = useNavigate()
@@ -110,6 +112,15 @@ export default function OnboardingPage() {
     const [ key, set_key ] = useState( env_key )
     const [ loading, set_loading ] = useState( false )
     const [ error, set_error ] = useState( null )
+
+    // Debounced shape check once typing pauses; a wrong-shaped key gets a hint, not a request
+    useEffect( () => {
+        const timer = setTimeout( () => {
+            if( key.trim() && !looks_like_api_key( key ) ) set_error( KEY_FORMAT_HINT )
+            else set_error( current => current === KEY_FORMAT_HINT ? null : current )
+        }, VALIDATE_DEBOUNCE_MS )
+        return () => clearTimeout( timer )
+    }, [ key ] )
 
     const connect = async () => {
 
