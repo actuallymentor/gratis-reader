@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.27.1] - 2026-10-02
+
+### Fixed
+- The landing page no longer implies that nothing leaves your device: it now says the text being translated goes to OpenRouter
+
 ## [1.27.0] - 2026-10-02
 
 ### Changed

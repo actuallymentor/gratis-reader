@@ -298,7 +298,7 @@ const SECTIONS = [
     },
     {
         title: `Your shelf, in your browser`,
-        body: `Drop in any EPUB or open one of 1,857 public domain classics. No accounts and no tracking: books, key and translations stay on this device.`,
+        body: `Drop in any EPUB or open one of 1,857 public domain classics. No accounts and no tracking: books, key and translations are stored on this device. Only the text being translated goes to OpenRouter.`,
         Art: ShelfArt,
     },
 ]
