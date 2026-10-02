@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.28.0] - 2026-10-02
+
+### Changed
+- The landing page illustrations move gently and pause when off screen, in a background tab, or when the device asks for reduced motion
+- The Connect button shimmers softly once a key is entered, like Save in settings
+- The landing headline no longer slides in; the page appears at once
+
+### Fixed
+- The pending Save button's tap area above and below the button works again while it shimmers
+
 ## [1.27.1] - 2026-10-02
 
 ### Fixed

@@ -1,17 +1,12 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import styled, { css, keyframes } from 'styled-components'
+import styled from 'styled-components'
 import { AlertTriangle, Check, KeyRound, Loader2, RotateCw } from 'lucide-react'
 import { Button } from '../atoms/Button.jsx'
+import use_attention, { ATTENTION_DELAY_MS } from '../../hooks/use_attention.js'
 import Modal from '../atoms/Modal.jsx'
 import StatusPill from '../atoms/StatusPill.jsx'
 import { KEY_FORMAT_HINT, looks_like_api_key, validate_api_key } from '../../modules/open_router.js'
 
-// Attention sheen on a pending save: 1400ms pass, 1600ms quiet, starting after typing pauses
-const SHEEN_DELAY_MS = 800
-const sheen = keyframes`
-    0% { transform: translateX(-120%) skewX(-18deg); }
-    46.7%, 100% { transform: translateX(260%) skewX(-18deg); }
-`
 
 const Row = styled.div`
     display: flex;
@@ -88,23 +83,9 @@ const Actions = styled.div`
     margin-top: var(--space-s);
 `
 
+// Stable width across Save / Saving…
 const SaveButton = styled( Button )`
-    overflow: hidden;
     min-width: 6.5rem;
-
-    ${ p => p.$attention && css`
-        &::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            bottom: 0;
-            left: 0;
-            width: 45%;
-            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.26), transparent);
-            animation: ${ sheen } 3000ms ease-in-out infinite;
-            pointer-events: none;
-        }
-    ` }
 
     .spin { animation: spin 1s linear infinite; }
 `
@@ -134,7 +115,6 @@ export default function ApiKeySetting( { api_key, on_save } ) {
     const [ invalid, set_invalid ] = useState( null )
     const [ failed, set_failed ] = useState( false )
     const [ saved, set_saved ] = useState( false )
-    const [ attention, set_attention ] = useState( false )
     const close_failed_ref = useRef( null )
     const retry_after_close_ref = useRef( false )
     const input_ref = useRef( null )
@@ -144,12 +124,7 @@ export default function ApiKeySetting( { api_key, on_save } ) {
     const dirty = editing && draft.trim().length > 0
 
     // Sheen only on a pending save, after typing pauses; not while saving or hidden
-    useEffect( () => {
-        set_attention( false )
-        if( !dirty || saving ) return
-        const timer = setTimeout( () => set_attention( !document.hidden ), SHEEN_DELAY_MS )
-        return () => clearTimeout( timer )
-    }, [ draft, dirty, saving ] )
+    const attention = use_attention( dirty && !saving, draft )
 
     // Debounced shape check once typing pauses
     useEffect( () => {
@@ -157,7 +132,7 @@ export default function ApiKeySetting( { api_key, on_save } ) {
         const timer = setTimeout( () => {
             if( draft.trim() && !looks_like_api_key( draft ) ) set_invalid( KEY_FORMAT_HINT )
             else set_invalid( current => current === KEY_FORMAT_HINT ? null : current )
-        }, SHEEN_DELAY_MS )
+        }, ATTENTION_DELAY_MS )
         return () => clearTimeout( timer )
     }, [ draft, editing ] )
 
@@ -234,7 +209,7 @@ export default function ApiKeySetting( { api_key, on_save } ) {
             <Button onClick={ stop_edit } disabled={ saving }>{ dirty ? `Discard` : `Cancel` }</Button>
             <SaveButton
                 variant="primary"
-                $attention={ attention }
+                attention={ attention }
                 disabled={ !dirty || saving }
                 icon={ saving ? <Loader2 className="spin" strokeWidth={ 1.5 } /> : null }
                 onClick={ save }

@@ -1,9 +1,10 @@
 import { Fragment, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import styled, { css, keyframes } from 'styled-components'
+import styled, { css } from 'styled-components'
 import { AlertTriangle, BookOpen, Code, Loader2 } from 'lucide-react'
 import { Button } from '../atoms/Button.jsx'
 import HelpButton from '../molecules/HelpButton.jsx'
+import use_attention from '../../hooks/use_attention.js'
 import { HeroArt, LevelArt, PeekArt, ShelfArt } from '../molecules/LandingArt.jsx'
 import toast from 'react-hot-toast'
 import { KEY_FORMAT_HINT, looks_like_api_key, validate_api_key } from '../../modules/open_router.js'
@@ -60,17 +61,6 @@ const HeaderLink = styled.a`
     &:hover { color: var(--text); text-decoration: underline; }
 `
 
-// Content arrival: short rise + fade, staggered per child
-const arrive = keyframes`
-    from { opacity: 0; transform: translateY( 4px ); }
-    to { opacity: 1; transform: none; }
-`
-
-const stagger = css`
-    & > * { animation: ${ arrive } 320ms var(--ease-out) both; }
-    ${ [ 1, 2, 3, 4 ].map( n => `& > *:nth-child(${ n + 1 }) { animation-delay: ${ n * 60 }ms; }` ).join( `\n` ) }
-`
-
 /* ===============================
 // Hero
 // =============================== */
@@ -96,7 +86,6 @@ const HeroText = styled.div`
     flex-direction: column;
     align-items: center;
     text-align: center;
-    ${ stagger }
 
     @media (min-width: 880px) {
         align-items: flex-start;
@@ -109,7 +98,6 @@ const HeroArtwork = styled.div`
     width: 100%;
     max-width: 16rem;
     margin: 0 auto;
-    animation: ${ arrive } 320ms var(--ease-out) both;
 
     @media (min-width: 880px) {
         order: 0;
@@ -354,6 +342,9 @@ export default function OnboardingPage() {
 
     }
 
+    // Connect is the next important action once a plausible key is in and typing has paused
+    const attention = use_attention( looks_like_api_key( key ) && !error && !loading, key )
+
     const submit = ( e ) => {
         e.preventDefault()
         if( !loading ) connect()
@@ -414,7 +405,7 @@ export default function OnboardingPage() {
                             <HelpText id="openrouter-key-help">
                                 Get a key at <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer">openrouter.ai/keys</a>. It stays in your browser.
                             </HelpText>
-                            <Button type="submit" variant="primary" disabled={ loading || !key.trim() } icon={ loading ? <Spinner strokeWidth={ 1.5 } /> : null }>
+                            <Button type="submit" variant="primary" attention={ attention } disabled={ loading || !key.trim() } icon={ loading ? <Spinner strokeWidth={ 1.5 } /> : null }>
                                 { loading ? `Connecting…` : `Connect` }
                             </Button>
                         </FormFooter>

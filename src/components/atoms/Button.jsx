@@ -1,5 +1,5 @@
 import { forwardRef } from 'react'
-import styled, { css } from 'styled-components'
+import styled, { css, keyframes } from 'styled-components'
 
 // Small pill faces with a larger invisible tap area (≥44px) that never overlaps neighbours:
 // the face is 2rem high, the ::before extends 6px vertically and 4px sideways.
@@ -92,15 +92,45 @@ export const ButtonBase = styled.button`
     }
 `
 
+// Attention sheen on the next important pending action: a 1400ms pass then 1600ms quiet, start to start 3000ms.
+// It lives in its own clipped track so the button never needs overflow: hidden, which would clip the hit area.
+const sheen = keyframes`
+    0% { transform: translateX( -120% ) skewX( -18deg ); }
+    46.7%, 100% { transform: translateX( 260% ) skewX( -18deg ); }
+`
+
+const SheenTrack = styled.span`
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    overflow: hidden;
+    pointer-events: none;
+
+    &::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        width: 45%;
+        background: linear-gradient( 90deg, transparent, rgba( 255, 255, 255, .26 ), transparent );
+        animation: ${ sheen } 3000ms ease-in-out infinite;
+    }
+
+    @media (prefers-reduced-motion: reduce) { display: none; }
+`
+
 /**
  * Pill button. Primary actions keep their label; icons are 16px Lucide glyphs.
  * @param {Object} props
  * @param {'primary'|'secondary'|'quiet'|'danger'|'danger_solid'} [props.variant=secondary]
  * @param {boolean} [props.block] - Stretch to the container width
  * @param {React.ReactNode} [props.icon] - Leading icon element
+ * @param {boolean} [props.attention] - Sheen marking the next important pending action (see use_attention)
  */
-export const Button = forwardRef( ( { variant = `secondary`, block = false, icon, children, type = `button`, ...rest }, ref ) => {
+export const Button = forwardRef( ( { variant = `secondary`, block = false, icon, attention = false, children, type = `button`, ...rest }, ref ) => {
     return <ButtonBase ref={ ref } type={ type } $variant={ variant } $block={ block } { ...rest }>
+        { attention && <SheenTrack aria-hidden="true" /> }
         { icon }
         { children }
     </ButtonBase>
