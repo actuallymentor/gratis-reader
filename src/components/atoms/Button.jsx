@@ -41,8 +41,8 @@ const variants = {
         &:hover:not(:disabled) { background: var(--danger-tint); }
     `,
     danger_solid: css`
-        background: var(--danger);
-        border-color: var(--danger);
+        background: var(--danger-solid);
+        border-color: var(--danger-solid);
         color: #ffffff;
 
         &:hover:not(:disabled) { filter: brightness(0.92); }

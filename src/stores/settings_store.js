@@ -42,7 +42,7 @@ export const use_settings_store = create(
         {
             name: `settings-storage`,
             version: 2,
-            migrate: ( state, version ) => {
+            migrate: ( state ) => {
                 // Repair retired/invalid IDs without resetting a reader's saved choice.
                 const model_updates = {
                     'anthropic/claude-sonnet-4-6': `anthropic/claude-sonnet-4.6`,
@@ -50,8 +50,8 @@ export const use_settings_store = create(
                     'google/gemini-2.0-flash-001': `google/gemini-3.8-flash`,
                 }
 
-                // "light" was the default before the System theme existed, not a reader's choice
-                const theme = version < 2 && ( !state.theme || state.theme === `light` ) ? `system` : state.theme
+                // Keep a stored theme: "light" may be a deliberate choice. Only missing values follow the device.
+                const theme = state.theme || `system`
 
                 return { ...state, theme, model: model_updates[state.model] || state.model || `openai/gpt-6-luna` }
             },

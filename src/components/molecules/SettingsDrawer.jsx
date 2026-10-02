@@ -89,6 +89,9 @@ const Segment = styled.button`
     transition: background var(--duration-press) ease, color var(--duration-press) ease;
 
     &:hover { color: var(--text); }
+
+    /* Its own selection shadow would otherwise replace the global focus halo */
+    &:focus-visible { box-shadow: 0 0 0 5px var(--focus-halo); }
 `
 
 const HelpText = styled.p`

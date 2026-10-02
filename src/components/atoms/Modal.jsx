@@ -126,9 +126,12 @@ export default function Modal( { title, on_close, variant = `center`, width, hea
         request_close()
     }
 
-    // A click on the dialog element itself is a click on the backdrop
+    // Only a click outside the dialog's box is a backdrop click; empty space inside it is not
     const on_click = ( e ) => {
-        if( e.target === dialog_ref.current ) request_close()
+        if( e.target !== dialog_ref.current ) return
+        const box = dialog_ref.current.getBoundingClientRect()
+        const outside = e.clientX < box.left || e.clientX > box.right || e.clientY < box.top || e.clientY > box.bottom
+        if( outside ) request_close()
     }
 
     return <Dialog

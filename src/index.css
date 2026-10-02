@@ -61,6 +61,7 @@ body {
     --focus-halo: rgba(126, 192, 208, 0.27);
     --overlay: rgba(26, 26, 46, 0.45);
     --danger: #c0392b;
+    --danger-solid: #c0392b;
     --danger-tint: rgba(192, 57, 43, 0.08);
     --warning-tint: #fff4d6;
     --warning-text: #7a5300;
@@ -78,6 +79,8 @@ body {
     --focus-halo: rgba(126, 192, 208, 0.25);
     --overlay: rgba(0, 20, 26, 0.6);
     --danger: #f08a7e;
+    /* White text needs a deeper red than the outline colour on deep blue */
+    --danger-solid: #c0392b;
     --danger-tint: rgba(240, 138, 126, 0.12);
     --warning-tint: rgba(240, 192, 64, 0.16);
     --warning-text: #f0c040;
@@ -97,6 +100,7 @@ body {
     --focus-halo: rgba(184, 134, 11, 0.27);
     --overlay: rgba(67, 52, 34, 0.45);
     --danger: #a93226;
+    --danger-solid: #a93226;
     --danger-tint: rgba(169, 50, 38, 0.08);
     --warning-tint: #f6e7bf;
     --warning-text: #6b4a00;

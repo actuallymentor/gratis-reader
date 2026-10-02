@@ -15,9 +15,7 @@ let theme_choice = `system`
 try {
     const saved_settings = JSON.parse( localStorage.getItem( `settings-storage` ) || `{}` )
     const saved_theme = saved_settings?.state?.theme
-    // Settings saved before the System theme stored the old "light" default
-    const legacy_default = saved_theme === `light` && ( saved_settings?.version ?? 0 ) < 2
-    if( THEMES.includes( saved_theme ) && !legacy_default ) theme_choice = saved_theme
+    if( THEMES.includes( saved_theme ) ) theme_choice = saved_theme
 } catch { /* corrupt settings — use default */ }
 apply_theme( theme_choice )
 

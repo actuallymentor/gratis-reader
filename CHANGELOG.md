@@ -3,7 +3,7 @@
 ## [1.25.0] - 2026-10-01
 
 ### Changed
-- Follow the device's light or dark mode by default (new System theme); dark mode uses a deep-blue palette
+- Add a System theme that follows the device's light or dark mode (default for new installs; saved choices are kept); dark mode uses a deep-blue palette
 - Show books as compact rows on phones, with cover, title and actions visible at a glance
 - Use clear icons throughout (settings menu, back, close, chapter arrows) instead of text symbols that some devices could not draw
 - Restyle buttons as small pills with larger tap areas; compact card actions show their label on hover, keyboard focus or a long press

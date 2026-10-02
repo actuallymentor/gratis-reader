@@ -55,6 +55,14 @@ export default function ConfirmModal( { title, children, confirm_label, acknowle
     const [ acknowledged, set_acknowledged ] = useState( false )
     const close_ref = useRef( null )
     const confirmed_ref = useRef( false )
+    // The first decision wins: buttons stay inert while the dialog animates out
+    const [ decided, set_decided ] = useState( false )
+    const decide = ( confirmed ) => {
+        if( decided ) return
+        set_decided( true )
+        confirmed_ref.current = confirmed
+        close_ref.current?.()
+    }
     const checkbox_id = useId()
 
     return <Modal
@@ -64,7 +72,10 @@ export default function ConfirmModal( { title, children, confirm_label, acknowle
         close_ref={ close => {
             close_ref.current = close
         } }
-        on_close={ () => confirmed_ref.current ? on_confirm() : on_cancel() }
+        on_close={ () => {
+            set_decided( true )
+            confirmed_ref.current ? on_confirm() : on_cancel()
+        } }
     >
         <Description>{ children }</Description>
         { acknowledgement && <Acknowledge htmlFor={ checkbox_id }>
@@ -72,14 +83,11 @@ export default function ConfirmModal( { title, children, confirm_label, acknowle
             <span>{ acknowledgement }</span>
         </Acknowledge> }
         <Actions>
-            <Button data-autofocus onClick={ () => close_ref.current?.() }>Cancel</Button>
+            <Button data-autofocus disabled={ decided } onClick={ () => decide( false ) }>Cancel</Button>
             <Button
                 variant={ danger ? `danger_solid` : `primary` }
-                disabled={ !!acknowledgement && !acknowledged }
-                onClick={ () => {
-                    confirmed_ref.current = true
-                    close_ref.current?.()
-                } }
+                disabled={ decided || !!acknowledgement && !acknowledged }
+                onClick={ () => decide( true ) }
             >
                 { confirm_label }
             </Button>

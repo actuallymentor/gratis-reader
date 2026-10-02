@@ -136,6 +136,7 @@ export default function ApiKeySetting( { api_key, on_save } ) {
     const [ saved, set_saved ] = useState( false )
     const [ attention, set_attention ] = useState( false )
     const close_failed_ref = useRef( null )
+    const retry_after_close_ref = useRef( false )
     const input_ref = useRef( null )
     const input_id = useId()
     const error_id = useId()
@@ -241,15 +242,19 @@ export default function ApiKeySetting( { api_key, on_save } ) {
             } }
             on_close={ () => {
                 set_failed( false )
-                input_ref.current?.focus()
+                // Retry once the dialog is gone, so a quick second failure gets its own dialog
+                if( retry_after_close_ref.current ) {
+                    retry_after_close_ref.current = false
+                    save()
+                } else input_ref.current?.focus()
             } }
         >
             <p>OpenRouter could not be reached to check the key. Your edit is kept; check your internet connection and try again.</p>
             <ModalActions>
                 <Button onClick={ () => close_failed_ref.current?.() }>Back to editing</Button>
                 <Button variant="primary" data-autofocus icon={ <RotateCw strokeWidth={ 1.5 } /> } onClick={ () => {
+                    retry_after_close_ref.current = true
                     close_failed_ref.current?.()
-                    save()
                 } }
                 >
                     Retry
