@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useId, useRef } from 'react'
 import styled, { keyframes } from 'styled-components'
 
 // Restrained abstract artwork for the landing page. Every shape reads its colour from theme
@@ -104,6 +104,9 @@ const ArtFrame = ( { view_box, children, ...rest } ) => {
 
     useEffect( () => {
 
+        // Without the observer the artwork simply stays on its static pose
+        if( !( `IntersectionObserver` in window ) ) return
+
         const svg = ref.current
         let visible = false
         const update = () => svg.toggleAttribute( `data-paused`, !visible || document.hidden )
@@ -136,69 +139,78 @@ const ACCENT_SHADES = { '--from': `var(--accent)`, '--to': `#a8d6e2` }
  * Hero: an open page where one sentence is rewritten (accent) beneath its original (muted),
  * and a tapped word (coral) shows its gloss in a small floating card.
  */
-export const HeroArt = props => <ArtFrame view_box="0 0 440 380" { ...props }>
+export const HeroArt = props => {
 
-    <defs>
-        <clipPath id="hero-rewrite-line"><rect x="128" y="184" width="230" height="8" rx="4" /></clipPath>
-        <linearGradient id="hero-glint" x1="0" x2="1">
-            <stop offset="0" stopColor="#ffffff" stopOpacity="0" />
-            <stop offset=".5" stopColor="#ffffff" stopOpacity=".7" />
-            <stop offset="1" stopColor="#ffffff" stopOpacity="0" />
-        </linearGradient>
-    </defs>
+    // Per-instance ids, so two heroes on one page never borrow each other's clip or gradient
+    const id = useId()
+    const clip_id = `${ id }-line`
+    const glint_id = `${ id }-glint`
 
-    { /* Soft backdrop: the large circle breathes, the small ones wander and warm */ }
-    <circle cx="250" cy="190" r="170" className="accent_soft breathe" style={ loop( 11, 2, { '--low': .55 } ) } />
-    <g className="drift" style={ loop( 13, 4, { '--dx': `-8px`, '--dy': `10px` } ) }>
-        <circle cx="380" cy="70" r="26" className="coral_soft" />
-    </g>
-    <g className="drift" style={ loop( 17, 9, { '--dx': `10px`, '--dy': `-6px` } ) }>
-        <circle cx="74" cy="318" r="16" className="gold_soft" />
-    </g>
+    return <ArtFrame view_box="0 0 440 380" { ...props }>
 
-    { /* Back page, slightly turned, swaying a little on its lower edge */ }
-    <g transform="rotate( -5 200 200 )">
-        <g className="sway" style={ loop( 14, 3, { '--angle': `1.6deg`, '--origin': `50% 100%` } ) }>
-            <rect x="70" y="58" width="270" height="300" rx="18" className="page" />
+        <defs>
+            <clipPath id={ clip_id }><rect x="128" y="184" width="230" height="8" rx="4" /></clipPath>
+            <linearGradient id={ glint_id } x1="0" x2="1">
+                <stop offset="0" stopColor="#ffffff" stopOpacity="0" />
+                <stop offset=".5" stopColor="#ffffff" stopOpacity=".7" />
+                <stop offset="1" stopColor="#ffffff" stopOpacity="0" />
+            </linearGradient>
+        </defs>
+
+        { /* Soft backdrop: the large circle breathes, the small ones wander and warm */ }
+        <circle cx="250" cy="190" r="170" className="accent_soft breathe" style={ loop( 11, 2, { '--low': .55 } ) } />
+        <g className="drift" style={ loop( 13, 4, { '--dx': `-8px`, '--dy': `10px` } ) }>
+            <circle cx="380" cy="70" r="26" className="coral_soft" />
         </g>
-    </g>
+        <g className="drift" style={ loop( 17, 9, { '--dx': `10px`, '--dy': `-6px` } ) }>
+            <circle cx="74" cy="318" r="16" className="gold_soft" />
+        </g>
 
-    { /* Front page stays still: it is the thing being read */ }
-    <g className="shadow">
-        <rect x="100" y="40" width="270" height="300" rx="18" className="page" />
-    </g>
+        { /* Back page, slightly turned, swaying a little on its lower edge */ }
+        <g transform="rotate( -5 200 200 )">
+            <g className="sway" style={ loop( 14, 3, { '--angle': `1.6deg`, '--origin': `50% 100%` } ) }>
+                <rect x="70" y="58" width="270" height="300" rx="18" className="page" />
+            </g>
+        </g>
 
-    <Words x={ 128 } y={ 76 } widths={ [ 54, 30, 72, 44 ] } />
-    <Words x={ 128 } y={ 98 } widths={ [ 38, 66, 28, 58 ] } />
-    <Words x={ 128 } y={ 120 } widths={ [ 70, 40, 52 ] } />
-
-    { /* The original sentence, faded… */ }
-    <g className="breathe" style={ loop( 9, 5, { '--low': .55 } ) }>
-        <Words x={ 128 } y={ 162 } widths={ [ 46, 58, 34, 62 ] } className="muted" />
-    </g>
-
-    { /* …and its rewrite for the reader's level, one word tapped, light flowing along it */ }
-    <Words x={ 128 } y={ 184 } widths={ [ 40, 52, 66, 36 ] } className="accent" highlight={ 2 } highlight_class="coral shade" highlight_style={ loop( 6, 1, CORAL_SHADES ) } />
-    <g clipPath="url(#hero-rewrite-line)">
-        <rect x="0" y="184" width="70" height="8" fill="url(#hero-glint)" className="sweep" style={ loop( 7.5, 2 ) } />
-    </g>
-
-    <Words x={ 128 } y={ 226 } widths={ [ 62, 36, 48, 50 ] } />
-    <Words x={ 128 } y={ 248 } widths={ [ 34, 70, 42 ] } />
-    <Words x={ 128 } y={ 270 } widths={ [ 58, 44, 64, 28 ] } />
-    <Words x={ 128 } y={ 292 } widths={ [ 48, 32 ] } />
-
-    { /* Gloss card above the tapped word, floating gently */ }
-    <g className="drift" style={ loop( 7, 0, { '--dy': `-5px` } ) }>
+        { /* Front page stays still: it is the thing being read */ }
         <g className="shadow">
-            <rect x="218" y="196" width="150" height="56" rx="12" className="page" />
+            <rect x="100" y="40" width="270" height="300" rx="18" className="page" />
         </g>
-        <path d="M 252 196 l 8 -8 l 8 8 z" className="page" />
-        <rect x="234" y="212" width="58" height="8" rx="4" className="coral shade" style={ loop( 6, 1, CORAL_SHADES ) } />
-        <rect x="234" y="230" width="104" height="6" rx="3" className="line" />
-    </g>
 
-</ArtFrame>
+        <Words x={ 128 } y={ 76 } widths={ [ 54, 30, 72, 44 ] } />
+        <Words x={ 128 } y={ 98 } widths={ [ 38, 66, 28, 58 ] } />
+        <Words x={ 128 } y={ 120 } widths={ [ 70, 40, 52 ] } />
+
+        { /* The original sentence, faded… */ }
+        <g className="breathe" style={ loop( 9, 5, { '--low': .55 } ) }>
+            <Words x={ 128 } y={ 162 } widths={ [ 46, 58, 34, 62 ] } className="muted" />
+        </g>
+
+        { /* …and its rewrite for the reader's level, one word tapped, light flowing along it */ }
+        <Words x={ 128 } y={ 184 } widths={ [ 40, 52, 66, 36 ] } className="accent" highlight={ 2 } highlight_class="coral shade" highlight_style={ loop( 6, 1, CORAL_SHADES ) } />
+        <g clipPath={ `url(#${ clip_id })` }>
+            <rect x="0" y="184" width="70" height="8" fill={ `url(#${ glint_id })` } className="sweep" style={ loop( 7.5, 2 ) } />
+        </g>
+
+        <Words x={ 128 } y={ 226 } widths={ [ 62, 36, 48, 50 ] } />
+        <Words x={ 128 } y={ 248 } widths={ [ 34, 70, 42 ] } />
+        <Words x={ 128 } y={ 270 } widths={ [ 58, 44, 64, 28 ] } />
+        <Words x={ 128 } y={ 292 } widths={ [ 48, 32 ] } />
+
+        { /* Gloss card above the tapped word, floating gently */ }
+        <g className="drift" style={ loop( 7, 0, { '--dy': `-5px` } ) }>
+            <g className="shadow">
+                <rect x="218" y="196" width="150" height="56" rx="12" className="page" />
+            </g>
+            <path d="M 252 196 l 8 -8 l 8 8 z" className="page" />
+            <rect x="234" y="212" width="58" height="8" rx="4" className="coral shade" style={ loop( 6, 1, CORAL_SHADES ) } />
+            <rect x="234" y="230" width="104" height="6" rx="3" className="line" />
+        </g>
+
+    </ArtFrame>
+
+}
 
 /**
  * Levels: the same paragraph at three levels, shorter and simpler at the top.

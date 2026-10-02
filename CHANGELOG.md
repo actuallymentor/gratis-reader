@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.28.1] - 2026-10-02
+
+### Fixed
+- Landing illustrations stay still, instead of failing, in browsers without visibility tracking
+- Each landing illustration uses its own internal references, so two on one page can't interfere
+
 ## [1.28.0] - 2026-10-02
 
 ### Changed
