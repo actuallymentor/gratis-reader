@@ -14,7 +14,7 @@
 - A long press on a compact action no longer swallows the next tap
 - Cards, the upload area and buttons no longer stay highlighted after a tap on touch screens
 - A failed load no longer shows two Retry buttons at once; retry from the dialog closes it smoothly
-- Only one classic imports at a time; a second tap while one is loading is ignored
+- Only one classic imports at a time; a tap on another Read while one is loading says which book is still loading
 - Chapter headings, the progress bar and loading placeholders have proper semantics for assistive technology; word tooltips read their text aloud again
 - The update badge uses the same soft focus halo as everything else
 

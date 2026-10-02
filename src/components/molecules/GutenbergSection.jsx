@@ -157,7 +157,7 @@ export default function GutenbergSection() {
     const { books: library_books, add_book } = use_library_store( useShallow( ( { books, add_book } ) => ( { books, add_book } ) ) )
     const [ info_book, set_info_book ] = useState( null )
     const [ importing_id, set_importing_id ] = useState( null )
-    // Mirror of importing_id for the guard: a ref keeps handle_read stable for the memoised cards
+    // The book being imported, for the guard: a ref keeps handle_read stable for the memoised cards
     const importing_ref = useRef( null )
     const [ search, set_search ] = useState( `` )
     // Keep typing responsive: the grid re-filters with the deferred value
@@ -224,10 +224,14 @@ export default function GutenbergSection() {
             return
         }
 
-        // One import at a time: a second would race the first for the spinner and the toast
-        if( importing_ref.current ) return
+        // One import at a time: a second would race the first for the spinner and the toast.
+        // Say so rather than ignore the tap; disabling every Read button would re-render all cards.
+        if( importing_ref.current ) {
+            toast( `Still loading "${ importing_ref.current.title }", one moment` )
+            return
+        }
 
-        importing_ref.current = book.id
+        importing_ref.current = book
         set_importing_id( book.id )
         let parsed = null
         let handed_off = false
