@@ -50,9 +50,24 @@ test.describe( `isolated app fixture`, () => {
             } )
         } )
 
+        test( `open_db reuses one connection that has the app stores`, async ( { page } ) => {
+
+            // The seed page is still loaded, so the module import needs no navigation
+            const result = await page.evaluate( async () => {
+                const { open_db } = await import( `/src/modules/cache.js` )
+                const first = await open_db()
+                const second = await open_db()
+                return { same: first === second, stores: [ ...first.objectStoreNames ] }
+            } )
+
+            expect( result.same ).toBe( true )
+            expect( result.stores ).toEqual( expect.arrayContaining( [ `books`, `translations`, `progress`, `token_usage` ] ) )
+
+        } )
+
         test( `shows first-open language selection`, async ( { page } ) => {
             await page.goto( SEEDED_READER_URL )
-            await expect( page.getByRole( `button`, { name: `Start Reading` } ) ).toBeVisible()
+            await expect( page.getByRole( `button`, { name: `Start Reading` } ) ).toBeVisible( { timeout: 15_000 } )
         } )
     } )
 

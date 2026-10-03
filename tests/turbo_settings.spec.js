@@ -1,11 +1,16 @@
 import { test, expect } from './helpers/app_fixture.js'
 
+// The 1857-book Gutenberg catalogue keeps /library's main thread busy for seconds
+// (clicks wait on "stable"); settings never read it, so serve an empty one
+const skip_gutenberg_catalogue = page => page.route( `**/gutenberg.json`, route => route.fulfill( { json: [] } ) )
+
 test.describe( `Turbo Mode settings`, () => {
 
     test.use( { app_state: `authenticated` } )
 
     test( `requires confirmation, supports cancel and Escape, and persists the choice`, async ( { page } ) => {
 
+        await skip_gutenberg_catalogue( page )
         await page.goto( `/library`, { waitUntil: `domcontentloaded` } )
         await page.getByRole( `button`, { name: `Settings` } ).click()
 
@@ -40,6 +45,7 @@ test.describe( `Turbo Mode settings`, () => {
         await expect( turbo_switch ).toBeChecked()
         expect( await persisted_turbo_mode() ).toBe( true )
 
+        // On survives a fresh hydration; turning it off needs no confirmation
         await page.reload( { waitUntil: `domcontentloaded` } )
         await page.getByRole( `button`, { name: `Settings` } ).click()
         await expect( turbo_switch ).toBeChecked()
@@ -48,9 +54,7 @@ test.describe( `Turbo Mode settings`, () => {
         await expect( dialog ).not.toBeVisible()
         expect( await persisted_turbo_mode() ).toBe( false )
 
-        await page.reload( { waitUntil: `domcontentloaded` } )
-        await page.getByRole( `button`, { name: `Settings` } ).click()
-        await expect( turbo_switch ).not.toBeChecked()
+        // Off is stored (above), so re-enabling asks for confirmation again
         await turbo_switch.click()
         await expect( dialog ).toBeVisible()
 

@@ -2,6 +2,7 @@ import { test, expect, open_seeded_reader } from './helpers/app_fixture.js'
 import { mock_openrouter } from './helpers/setup.js'
 import { CHAT_URL, parse_chat_request, fulfil_chat, answer_request } from './helpers/openrouter_mock.js'
 import { confirm_in_modal } from './helpers/confirm_modal.js'
+import { expect_chapter } from './helpers/reader.js'
 
 const INFO_SHEET = `[data-translation-info-sheet]`
 const READER_WORD = `span[data-sentence-id] [data-translation-word-index]`
@@ -18,6 +19,13 @@ const enter_reader_with_translations = async ( page ) => {
     await mock_openrouter( page )
     await open_seeded_reader( page )
     await expect( page.locator( READER_WORD ).first() ).toBeVisible( { timeout: 15_000 } )
+}
+
+// Collects uncaught page errors; attach before the action under test
+const collect_page_errors = page => {
+    const errors = []
+    page.on( `pageerror`, error => errors.push( error.message ) )
+    return errors
 }
 
 const open_explanation = async ( page ) => {
@@ -68,6 +76,11 @@ test.describe( `Sentence Interactions`, () => {
         await expect( page.getByRole( `dialog`, { name: `Translation Explanation` } ) ).not.toBeVisible()
         expect( word_lookup_calls ).toBe( expected_lookup_count )
 
+        // The sheet's Close control clears the tooltip and the selection
+        await page.getByRole( `button`, { name: `Close translation information` } ).click()
+        await expect( page.locator( READER_WORD_TOOLTIP ) ).not.toBeVisible()
+        await expect( word ).toHaveAttribute( `aria-pressed`, `false` )
+
     } )
 
     test( `same-fragment clicks move one tooltip without remounting the sheet`, async ( { page } ) => {
@@ -108,6 +121,16 @@ test.describe( `Sentence Interactions`, () => {
         expect( tooltip_box ).not.toBeNull()
         expect( horizontal_distance( tooltip_box, second_word_box ) )
             .toBeLessThan( horizontal_distance( tooltip_box, first_word_box ) )
+
+        // Moving back keeps the same sheet and leaves other sentences untouched
+        await first_word.click()
+        expect( await sheet.evaluate( element => element === window.__desktop_translation_sheet ) ).toBe( true )
+        await expect( first_word ).toHaveAttribute( `aria-pressed`, `true` )
+        await expect( second_word ).toHaveAttribute( `aria-pressed`, `false` )
+        await expect( page.locator( INFO_SHEET ) ).toHaveCount( 1 )
+        await expect(
+            page.locator( `span[data-sentence-id]` ).nth( 1 ).locator( `[aria-pressed="true"]` )
+        ).toHaveCount( 0 )
 
     } )
 
@@ -411,6 +434,110 @@ test.describe( `Sentence Interactions`, () => {
 
         await expect( dialog.getByText( `definition:keyboard:${ word_text }` ).first() ).toBeVisible( { timeout: 5000 } )
         expect( word_lookup_calls ).toBeGreaterThanOrEqual( 1 )
+
+    } )
+
+    test( `rapid clicks across words leave the last word selected`, async ( { page } ) => {
+
+        const errors = collect_page_errors( page )
+        await enter_reader_with_translations( page )
+
+        // Click up to eight words without waiting for each lookup to settle
+        const words = page.locator( READER_WORD )
+        const click_count = Math.min( await words.count(), 8 )
+        expect( click_count ).toBeGreaterThan( 1 )
+        for( let i = 0; i < click_count; i++ ) await words.nth( i ).click( { force: true } )
+
+        await expect( words.nth( click_count - 1 ) ).toHaveAttribute( `aria-pressed`, `true` )
+        await expect( page.locator( `${ READER_WORD }[aria-pressed="true"]` ) ).toHaveCount( 1 )
+        await expect( page.locator( INFO_SHEET ) ).toBeVisible()
+        expect( errors ).toEqual( [] )
+
+    } )
+
+    test( `explanation shows a loading state until its content arrives`, async ( { page } ) => {
+
+        let release_explanation
+        const explanation_gate = new Promise( resolve => {
+            release_explanation = resolve
+        } )
+
+        // Hold the explanation request until the loading state has been asserted
+        await page.route( CHAT_URL, async route => {
+            const request = parse_chat_request( route.request().postDataJSON() )
+            if( request.kind === `explanation` ) await explanation_gate
+            await fulfil_chat( route, answer_request( request, { explanation: () => `Explanation content here.` } ) )
+        } )
+
+        await open_seeded_reader( page )
+        await expect( page.locator( READER_WORD ).first() ).toBeVisible( { timeout: 15_000 } )
+
+        const dialog = await open_explanation( page )
+        await expect( dialog.getByText( `Explanation content here.` ) ).not.toBeVisible()
+
+        release_explanation()
+        await expect( dialog.getByText( `Explanation content here.` ) ).toBeVisible()
+
+    } )
+
+    test( `explanation keeps the chapter, blocks arrows, and closing it keeps the sheet`, async ( { page } ) => {
+
+        await enter_reader_with_translations( page )
+        await expect_chapter( page, 0 )
+
+        // Opening Explain never navigates
+        const dialog = await open_explanation( page )
+        await expect_chapter( page, 0 )
+
+        // Arrow keys are inert while the explanation is open
+        await page.keyboard.press( `ArrowRight` )
+        await expect( dialog ).toBeVisible()
+
+        // Escape closes only the explanation; the selected word's sheet stays
+        await page.keyboard.press( `Escape` )
+        await expect( dialog ).not.toBeVisible()
+        await expect( page.locator( INFO_SHEET ) ).toBeVisible()
+        await expect( page ).toHaveURL( /\/read\// )
+        await expect_chapter( page, 0 )
+
+        // The modal's Close button behaves the same
+        await page.locator( INFO_SHEET ).getByRole( `button`, { name: `Explain` } ).click()
+        await expect( dialog ).toBeVisible()
+        await dialog.getByRole( `button`, { name: `Close`, exact: true } ).click()
+        await expect( dialog ).not.toBeVisible()
+        await expect( page.locator( INFO_SHEET ) ).toBeVisible()
+        await expect_chapter( page, 0 )
+
+    } )
+
+    test( `chapter changes clear the sheet and explanation and never restore them`, async ( { page } ) => {
+
+        await enter_reader_with_translations( page )
+
+        const first_sentence = page.locator( `span[data-sentence-id]` ).first()
+        const first_id = await first_sentence.getAttribute( `data-sentence-id` )
+        const sheet = page.locator( INFO_SHEET )
+
+        // An open sheet does not block arrows, and the next chapter starts clean
+        await page.locator( READER_WORD ).first().click()
+        await expect( sheet ).toBeVisible()
+        await page.keyboard.press( `ArrowRight` )
+        await expect( first_sentence ).not.toHaveAttribute( `data-sentence-id`, first_id )
+        await expect( sheet ).not.toBeVisible()
+
+        // Returning does not restore the stale selection
+        await page.keyboard.press( `ArrowLeft` )
+        await expect( first_sentence ).toHaveAttribute( `data-sentence-id`, first_id )
+        await expect( sheet ).not.toBeVisible()
+        await expect( page.locator( `${ READER_WORD }[aria-pressed="true"]` ) ).toHaveCount( 0 )
+
+        // No user control reaches Next through the modal overlay; dispatch the
+        // production button event to isolate the chapter-change cleanup path
+        const dialog = await open_explanation( page )
+        await page.getByRole( `button`, { name: /Next/ } ).dispatchEvent( `click` )
+        await expect( first_sentence ).not.toHaveAttribute( `data-sentence-id`, first_id )
+        await expect( dialog ).not.toBeVisible()
+        await expect( sheet ).not.toBeVisible()
 
     } )
 

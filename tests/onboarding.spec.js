@@ -68,8 +68,75 @@ test.describe( `Onboarding`, () => {
         await page.locator( `input` ).fill( `sk-or-valid-test-key` )
         await page.getByRole( `button`, { name: `Connect` } ).click()
 
+        await expect( page.getByText( `Connected!` ) ).toBeVisible()
         await page.waitForURL( `**/library`, { timeout: 10_000 } )
         expect( page.url() ).toContain( `/library` )
+
+    } )
+
+    test( `submits the API key with Enter`, async ( { page } ) => {
+
+        await mock_auth( page )
+        await page.goto( `/` )
+        await page.locator( `input[type="password"]` ).fill( `sk-or-enter-key` )
+        await page.keyboard.press( `Enter` )
+
+        await page.waitForURL( `**/library`, { timeout: 10_000 } )
+
+    } )
+
+    test( `keeps Connect disabled for an empty or whitespace-only key`, async ( { page } ) => {
+
+        await mock_auth( page )
+        await page.goto( `/` )
+
+        const input = page.locator( `input` )
+        const connect = page.getByRole( `button`, { name: `Connect` } )
+
+        await input.fill( `` )
+        await expect( connect ).toBeDisabled()
+
+        await input.fill( `   ` )
+        await expect( connect ).toBeDisabled()
+
+        // Sanity: a real key enables it, so the disabled state above is meaningful
+        await input.fill( `sk-or-real-key` )
+        await expect( connect ).toBeEnabled()
+
+    } )
+
+    test( `shows a network error, not an invalid-key error, when validation cannot connect`, async ( { page } ) => {
+
+        await page.route( `**/openrouter.ai/api/v1/auth/key`, route => route.abort( `connectionrefused` ) )
+
+        await page.goto( `/` )
+        await page.locator( `input` ).fill( `sk-or-test-key-123` )
+        await page.getByRole( `button`, { name: `Connect` } ).click()
+
+        await expect( page.getByText( `Could not connect` ) ).toBeVisible()
+        await expect( page.getByText( /invalid api key/i ) ).toHaveCount( 0 )
+        await expect( page.locator( `input[type="password"]` ) ).toBeVisible()
+
+    } )
+
+    test( `sends protected routes back to onboarding without a key`, async ( { page } ) => {
+
+        for( const path of [ `/library`, `/read/fakeid` ] ) {
+            await page.goto( path )
+            await page.waitForURL( url => url.pathname === `/` )
+            await expect( page.locator( `input[type="password"]` ) ).toBeVisible()
+        }
+
+    } )
+
+    test( `still renders onboarding when the stored settings JSON is corrupt`, async ( { page } ) => {
+
+        // Seed the corrupt value before any app script runs: no extra navigation
+        await page.addInitScript( () => localStorage.setItem( `settings-storage`, `NOT VALID JSON!!!` ) )
+
+        await page.goto( `/` )
+        await expect( page.locator( `input[type="password"]` ) ).toBeVisible()
+        await expect( page.getByRole( `button`, { name: `Connect` } ) ).toBeVisible()
 
     } )
 
@@ -166,25 +233,23 @@ test.describe( `Onboarding`, () => {
         await page.getByRole( `button`, { name: `Connect` } ).click()
         await page.waitForURL( `**/library`, { timeout: 10_000 } )
 
-        // Reload — should still be on library
-        await page.reload( { waitUntil: `networkidle` } )
+        // Reload — should still be on library, not bounced to onboarding
+        await page.reload()
+        await expect( page.getByText( `Your library is empty` ) ).toBeVisible( { timeout: 15_000 } )
         expect( page.url() ).toContain( `/library` )
 
     } )
 
+} )
+
+test.describe( `Onboarding with a stored key`, () => {
+
+    test.use( { app_state: `authenticated` } )
+
     test( `redirects to library on load if key already exists`, async ( { page } ) => {
-
-        // Manually set key in storage
-        await page.goto( `/` )
-        await page.evaluate( () => {
-            const store = { state: { api_key: `sk-or-existing-key` }, version: 0 }
-            localStorage.setItem( `settings-storage`, JSON.stringify( store ) )
-        } )
-
         await page.goto( `/` )
         await page.waitForURL( `**/library`, { timeout: 5000 } )
         expect( page.url() ).toContain( `/library` )
-
     } )
 
 } )

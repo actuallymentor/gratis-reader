@@ -92,9 +92,17 @@ test.describe( `Level & Language Changes`, () => {
         await page.getByRole( `button`, { name: `Settings` } ).click()
         await expect( page.getByRole( `dialog`, { name: `Settings` } ).filter( { hasText: `Target Language` } ) ).toBeVisible()
 
-        // Change target language — find the language input/select and change it
+        // Opening the picker lists common languages first and offers search
         const lang_input = language_combobox( page )
-        await expect( lang_input ).toBeVisible()
+        await lang_input.click()
+        await expect( lang_input ).toHaveAttribute( `placeholder`, `Search languages...` )
+        const option_texts = await page.getByRole( `option` ).allTextContents()
+        const common = [ `Spanish`, `French`, `German`, `Italian`, `Portuguese` ]
+            .filter( language => option_texts.slice( 0, 10 ).some( text => text.includes( language ) ) )
+        expect( common.length ).toBeGreaterThanOrEqual( 3 )
+
+        await lang_input.fill( `Japan` )
+        await expect( page.getByRole( `option`, { name: `Japanese`, exact: true } ) ).toBeVisible()
 
         const changed_translation = page.waitForRequest( request =>
             request.url().includes( `openrouter.ai/api/v1/chat/completions` ) &&
@@ -110,6 +118,11 @@ test.describe( `Level & Language Changes`, () => {
 
         // New API calls should have been made
         expect( new_calls ).toBeGreaterThan( 0 )
+
+        // The choice is persisted for the next session
+        await expect.poll( () => page.evaluate( () =>
+            JSON.parse( localStorage.getItem( `settings-storage` ) ).state.last_language
+        ) ).toBe( `French` )
 
     } )
 

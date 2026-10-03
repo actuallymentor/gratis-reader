@@ -1,3 +1,4 @@
+import { readFileSync, existsSync } from 'node:fs'
 import { test, expect } from '@playwright/test'
 
 const mount_update_prompt = async ( page, options ) => {
@@ -294,15 +295,53 @@ test.describe( `PWA updates`, () => {
 
     } )
 
-    test( `PWA config uses a single prompt registration path`, async () => {
+} )
 
-        const { readFileSync } = await import( `fs` )
-        const vite_config = readFileSync( `./vite.config.js`, `utf-8` )
+// Static and config checks: no page, so they skip the navigating beforeEach above
+test.describe( `PWA config and static assets`, () => {
 
-        expect( vite_config ).toContain( `registerType: \`prompt\`` )
-        expect( vite_config ).toContain( `injectRegister: null` )
-        expect( vite_config ).not.toContain( `registerType: \`autoUpdate\`` )
+    const vite_config = () => readFileSync( `./vite.config.js`, `utf-8` )
 
+    test( `PWA config uses a single prompt registration path`, () => {
+
+        const config = vite_config()
+
+        expect( config ).toContain( `registerType: \`prompt\`` )
+        expect( config ).toContain( `injectRegister: null` )
+        expect( config ).not.toContain( `registerType: \`autoUpdate\`` )
+
+    } )
+
+    test( `manifest config declares an installable standalone app`, () => {
+
+        const config = vite_config()
+
+        expect( config ).toContain( `name: \`Gratis Reader\`` )
+        expect( config ).toContain( `short_name: \`Gratis Reader\`` )
+        expect( config ).toContain( `start_url: \`/\`` )
+        expect( config ).toContain( `display: \`standalone\`` )
+        expect( config ).toMatch( /theme_color: `#[0-9a-f]{6}`/i )
+        for( const icon of [ `/favicon.svg`, `/icon-192.png`, `/icon-512.png` ] ) {
+            expect( config ).toContain( `src: \`${ icon }\`` )
+        }
+
+    } )
+
+    test( `manifest icons are served`, async ( { request } ) => {
+        for( const icon of [ `/favicon.svg`, `/icon-192.png`, `/icon-512.png` ] ) {
+            const response = await request.get( icon )
+            expect( response.status(), icon ).toBe( 200 )
+        }
+    } )
+
+    test( `served HTML has a responsive viewport meta tag`, async ( { request } ) => {
+        const html = await ( await request.get( `/` ) ).text()
+        expect( html ).toMatch( /<meta name="viewport" content="[^"]*width=device-width/ )
+    } )
+
+    test( `test EPUB fixture is not leaked into public/`, () => {
+        expect( existsSync( `./public/book.epub` ) ).toBe( false )
+        expect( existsSync( `./tests/fixtures/book.epub` ) ).toBe( true )
     } )
 
 } )

@@ -8,9 +8,11 @@ export default defineConfig( {
     timeout: 60_000,
     expect: { timeout: 5_000 },
 
-    fullyParallel: false,
+    // Every test gets its own context and seeded IndexedDB, so tests in one file can run side by side
+    fullyParallel: true,
     retries: 0,
-    workers: 2,
+    // The shared dev server is the bottleneck: 4 workers measured only ~7% faster than 2 on 4 cores
+    workers: process.env.PW_WORKERS ? Number( process.env.PW_WORKERS ) : 2,
 
     reporter: `list`,
 

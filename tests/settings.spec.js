@@ -1,5 +1,5 @@
 import { execSync } from 'node:child_process'
-import { test, expect, open_seeded_reader } from './helpers/app_fixture.js'
+import { test, expect, open_seeded_reader, SEEDED_READER_URL } from './helpers/app_fixture.js'
 import { mock_openrouter } from './helpers/setup.js'
 import { confirm_in_modal } from './helpers/confirm_modal.js'
 
@@ -17,25 +17,63 @@ const expected_commit_hash = () => {
 
 }
 
+// Persisted zustand state, as the next page load will hydrate it
+const stored_settings = page => page.evaluate( () => JSON.parse( localStorage.getItem( `settings-storage` ) ) )
+
+const css_var = ( page, name ) => page.evaluate( variable =>
+    getComputedStyle( document.documentElement ).getPropertyValue( variable ).trim(), name )
+
+const theme_attribute = page => page.locator( `html` )
+
+const open_settings = async page => {
+    await page.getByRole( `button`, { name: `Settings` } ).click()
+    const drawer = page.getByRole( `dialog`, { name: `Settings` } )
+    await expect( drawer ).toBeVisible()
+    return drawer
+}
+
+// The 1857-book Gutenberg catalogue keeps /library's main thread busy for seconds
+// (clicks wait on "stable"); settings never read it, so serve an empty one
+const skip_gutenberg_catalogue = page => page.route( `**/gutenberg.json`, route => route.fulfill( { json: [] } ) )
+
+// IndexedDB record count for one store of the app database
+const store_count = ( page, store_name ) => page.evaluate( name => new Promise( resolve => {
+    const request = indexedDB.open( `gratis_reader` )
+    request.onsuccess = () => {
+        const count = request.result.transaction( name, `readonly` ).objectStore( name ).count()
+        count.onsuccess = () => resolve( count.result )
+        count.onerror = () => resolve( -1 )
+    }
+    request.onerror = () => resolve( -1 )
+} ), store_name )
+
 test.describe( `Settings`, () => {
 
     test.use( { app_state: `authenticated` } )
 
-    test( `Luna is the default and current model choices survive reloads`, async ( { page } ) => {
+    test.beforeEach( async ( { page } ) => {
+        await skip_gutenberg_catalogue( page )
+    } )
 
-        // Several full reloads verify persistence rather than only in-memory state.
-        test.setTimeout( 90_000 )
+    test( `Luna is the default, the model list is complete and the choice survives a reload`, async ( { page } ) => {
 
         await page.goto( `/library`, { waitUntil: `domcontentloaded` } )
-        await page.getByRole( `button`, { name: `Settings` } ).click()
-        await expect( page.getByLabel( `LLM Model` ) ).toHaveValue( `openai/gpt-6-luna` )
+        await open_settings( page )
 
-        for( const model of [ `google/gemini-3.8-flash`, `anthropic/claude-sonnet-5.5`, `openai/gpt-6-luna` ] ) {
-            await page.getByLabel( `LLM Model` ).selectOption( model )
-            await page.reload( { waitUntil: `domcontentloaded` } )
-            await page.getByRole( `button`, { name: `Settings` } ).click()
-            await expect( page.getByLabel( `LLM Model` ) ).toHaveValue( model )
+        const model_select = page.getByLabel( `LLM Model` )
+        await expect( model_select ).toHaveValue( `openai/gpt-6-luna` )
+        await expect( model_select.locator( `option[value="openai/gpt-6-luna"]` ) ).toHaveCount( 1 )
+        expect( await model_select.locator( `option` ).count() ).toBeGreaterThanOrEqual( 3 )
+
+        // Every choice is written to storage at once; ending on a non-default proves hydration
+        for( const model of [ `google/gemini-3.8-flash`, `openai/gpt-6-luna`, `anthropic/claude-sonnet-5.5` ] ) {
+            await model_select.selectOption( model )
+            await expect.poll( async () => ( await stored_settings( page ) ).state.model ).toBe( model )
         }
+
+        await page.reload( { waitUntil: `domcontentloaded` } )
+        await open_settings( page )
+        await expect( model_select ).toHaveValue( `anthropic/claude-sonnet-5.5` )
 
     } )
 
@@ -45,160 +83,106 @@ test.describe( `Settings`, () => {
         [ `google/gemini-2.0-flash-001`, `google/gemini-3.8-flash` ],
         [ `openai/gpt-4o-mini`, `openai/gpt-4o-mini` ],
     ] ) {
-        test( `saved ${ saved_model } restores as ${ expected_model }`, async ( { page } ) => {
+        test.describe( `legacy ${ saved_model }`, () => {
 
-            test.setTimeout( 60_000 )
+            // Seed version-0 storage before the first load, so one hydration runs the migration
+            test.use( {
+                storageState: async ( { baseURL }, use ) => use( {
+                    cookies: [],
+                    origins: [ {
+                        origin: new URL( baseURL ).origin,
+                        localStorage: [ {
+                            name: `settings-storage`,
+                            value: JSON.stringify( {
+                                state: { api_key: `sk-or-test-fake-key`, model: saved_model, font_size: 24 },
+                                version: 0
+                            } )
+                        } ]
+                    } ]
+                } )
+            } )
 
-            await page.goto( `/library`, { waitUntil: `domcontentloaded` } )
-            await page.evaluate( model => {
-                const saved = JSON.parse( localStorage.getItem( `settings-storage` ) )
-                saved.version = 0
-                saved.state.model = model
-                saved.state.font_size = 24
-                localStorage.setItem( `settings-storage`, JSON.stringify( saved ) )
-            }, saved_model )
+            test( `saved ${ saved_model } restores as ${ expected_model }`, async ( { page } ) => {
 
-            await page.reload( { waitUntil: `domcontentloaded` } )
-            await page.getByRole( `button`, { name: `Settings` } ).click()
-            await expect( page.getByLabel( `LLM Model` ) ).toHaveValue( expected_model )
-            await expect( page.locator( `input[type="range"]` ) ).toHaveValue( `24` )
+                await page.goto( `/library`, { waitUntil: `domcontentloaded` } )
+                await open_settings( page )
+                await expect( page.getByLabel( `LLM Model` ) ).toHaveValue( expected_model )
+                await expect( page.locator( `input[type="range"]` ) ).toHaveValue( `24` )
 
-            // The repaired selection must also survive subsequent hydration.
-            await page.reload( { waitUntil: `domcontentloaded` } )
-            await page.getByRole( `button`, { name: `Settings` } ).click()
-            await expect( page.getByLabel( `LLM Model` ) ).toHaveValue( expected_model )
+                // The repaired state is written back at the current version, so the next
+                // hydration reads it as-is instead of migrating again
+                await expect.poll( () => stored_settings( page ) ).toMatchObject( {
+                    version: 2,
+                    state: { model: expected_model, font_size: 24 }
+                } )
+
+            } )
 
         } )
     }
 
-    test( `settings drawer opens from gear icon on library`, async ( { page } ) => {
+    test( `library drawer shows display and model sections, closes via Close and Escape`, async ( { page } ) => {
 
         await page.goto( `/library` )
-        await page.getByRole( `button`, { name: `Settings` } ).click()
-        const drawer = page.getByRole( `dialog`, { name: `Settings` } )
+        const drawer = await open_settings( page )
 
         await expect( drawer.getByText( `Font size`, { exact: true } ) ).toBeVisible()
         await expect( drawer.getByText( `Theme`, { exact: true } ) ).toBeVisible()
         await expect( drawer.getByText( `LLM Model`, { exact: true } ) ).toBeVisible()
 
+        // Library drawer has no reading-language controls
+        await expect( drawer.getByText( `Target language`, { exact: true } ) ).toHaveCount( 0 )
+
+        await drawer.getByRole( `button`, { name: `Close`, exact: true } ).click()
+        await expect( drawer ).toBeHidden()
+
+        await open_settings( page )
+        await page.keyboard.press( `Escape` )
+        await expect( drawer ).toBeHidden()
+        await expect( page ).toHaveURL( /\/library$/ )
+
     } )
 
-    test( `theme change applies correct data attribute`, async ( { page } ) => {
+    test( `theme buttons set data-theme and visibly change the colours`, async ( { page } ) => {
 
         await page.goto( `/library` )
-        await page.getByRole( `button`, { name: `Settings` } ).click()
+        await open_settings( page )
 
-        // Switch to dark
         await page.getByRole( `button`, { name: `Dark` } ).click()
-        const dark_theme = await page.evaluate( () => document.documentElement.getAttribute( `data-theme` ) )
-        expect( dark_theme ).toBe( `dark` )
+        await expect( theme_attribute( page ) ).toHaveAttribute( `data-theme`, `dark` )
+        const dark_bg = await css_var( page, `--bg` )
 
-        // Switch to sepia
+        // Dark backgrounds have low average RGB
+        const body_bg = await page.evaluate( () => getComputedStyle( document.body ).backgroundColor )
+        const [ red, green, blue ] = body_bg.match( /\d+/g ).map( Number )
+        expect( ( red + green + blue ) / 3 ).toBeLessThan( 100 )
+
         await page.getByRole( `button`, { name: `Sepia` } ).click()
-        const sepia_theme = await page.evaluate( () => document.documentElement.getAttribute( `data-theme` ) )
-        expect( sepia_theme ).toBe( `sepia` )
+        await expect( theme_attribute( page ) ).toHaveAttribute( `data-theme`, `sepia` )
+        const sepia_bg = await css_var( page, `--bg` )
+        const sepia_accent = await css_var( page, `--accent` )
 
-        // Switch back to light
+        // Sepia swaps the default cyan accent for a warm one
+        expect( sepia_accent ).toBeTruthy()
+        expect( sepia_accent ).not.toContain( `7ec0d0` )
+
         await page.getByRole( `button`, { name: `Light` } ).click()
-        const light_theme = await page.evaluate( () => document.documentElement.getAttribute( `data-theme` ) )
-        expect( light_theme ).toBe( `light` )
+        await expect( theme_attribute( page ) ).toHaveAttribute( `data-theme`, `light` )
+        const light_bg = await css_var( page, `--bg` )
+
+        // Three distinct backgrounds
+        expect( new Set( [ dark_bg, sepia_bg, light_bg ] ).size ).toBe( 3 )
+        expect( dark_bg ).toBeTruthy()
 
     } )
 
-    test.describe( `Reader settings`, () => {
-
-        test.use( { app_state: `reader` } )
-
-        test( `font size change applies to reader text`, async ( { page } ) => {
-
-            await mock_openrouter( page )
-            await open_seeded_reader( page )
-
-            // Get initial font size
-            const initial_size = await page.evaluate( () => {
-                const main = document.querySelector( `main` )
-                return main ? getComputedStyle( main ).fontSize : null
-            } )
-
-            // Open settings and change font size
-            await page.getByRole( `button`, { name: `Settings` } ).click()
-            const slider = page.locator( `input[type="range"]` )
-            await slider.fill( `24` )
-
-            // Check new font size
-            const reader = page.locator( `main` )
-            await expect( reader ).not.toHaveCSS( `font-size`, initial_size )
-            await expect( reader ).toHaveCSS( `font-size`, `24px` )
-
-        } )
-
-        test( `settings drawer opens from gear icon on reader`, async ( { page } ) => {
-
-            await mock_openrouter( page )
-            await open_seeded_reader( page )
-
-            await page.getByRole( `button`, { name: `Settings` } ).click()
-
-            // Reader settings should include language and level
-            await expect( page.getByText( `FONT SIZE` ) ).toBeVisible()
-
-        } )
-
-        test( `font family change applies to reader`, async ( { page } ) => {
-
-            await mock_openrouter( page )
-            await open_seeded_reader( page )
-
-            // Open settings and change font family
-            await page.getByRole( `button`, { name: `Settings` } ).click()
-
-            // Find the font family select (not the model select)
-            const font_select = page.locator( `select` ).filter( { hasText: /Nunito|Georgia/ } )
-            await font_select.selectOption( `Georgia` )
-            await expect( page.locator( `main` ) ).toHaveCSS( `font-family`, /Georgia/ )
-
-            // Close settings and verify font applied
-            await page.keyboard.press( `Escape` )
-            await expect( page.getByRole( `dialog`, { name: `Settings` } ).filter( { hasText: `Target Language` } ) ).not.toBeVisible()
-            await expect( page.locator( `main` ) ).toHaveCSS( `font-family`, /Georgia/ )
-
-        } )
-
-    } )
-
-    test( `clear cache button works`, async ( { page } ) => {
+    test( `maintenance offers force update and shows the build commit`, async ( { page } ) => {
 
         await page.goto( `/library` )
-        await page.getByRole( `button`, { name: `Settings` } ).click()
+        await open_settings( page )
 
-        // Confirm and await the modal closing so the cache operation has
-        // definitely started before checking that settings remains usable.
-        await confirm_in_modal( page, {
-            title: `Clear all cached translations?`,
-            action: () => page.getByRole( `button`, { name: `Clear Translation Cache` } ).click()
-        } )
-
-        // Should still be functional after clearing
-        await expect( page.getByText( `FONT SIZE` ) ).toBeVisible()
-
-    } )
-
-    test( `settings exposes force update fallback`, async ( { page } ) => {
-
-        await page.goto( `/library` )
-        await page.getByRole( `button`, { name: `Settings` } ).click()
-
-        // The App Update section is now part of Maintenance
         await expect( page.getByText( `Maintenance`, { exact: true } ) ).toBeVisible()
         await expect( page.getByRole( `button`, { name: `Force Update` } ) ).toBeVisible()
-
-    } )
-
-    test( `settings shows build commit hash`, async ( { page } ) => {
-
-        await page.goto( `/library` )
-        await page.getByRole( `button`, { name: `Settings` } ).click()
-
         await expect( page.getByText( `Version: ${ expected_commit_hash() }` ) ).toBeVisible()
 
     } )
@@ -206,61 +190,159 @@ test.describe( `Settings`, () => {
     test( `remove API key returns to onboarding`, async ( { page } ) => {
 
         await page.goto( `/library` )
-        await page.getByRole( `button`, { name: `Settings` } ).click()
+        await open_settings( page )
 
-        // Confirm in the modal
         await confirm_in_modal( page, {
             title: `Remove your API key?`,
             action: () => page.getByRole( `button`, { name: `Remove API Key` } ).click()
         } )
         await page.waitForURL( `/`, { timeout: 5000 } )
 
-        // Should show onboarding
         await expect( page.locator( `input[type="password"]` ) ).toBeVisible()
 
     } )
 
-    test( `theme setting persists after page reload`, async ( { page } ) => {
-
-        await page.goto( `/library` )
-        await page.getByRole( `button`, { name: `Settings` } ).click()
-
-        // Switch to dark
-        await page.getByRole( `button`, { name: `Dark` } ).click()
-        const dark = await page.evaluate( () => document.documentElement.getAttribute( `data-theme` ) )
-        expect( dark ).toBe( `dark` )
-
-        // Close settings and reload
-        await page.keyboard.press( `Escape` )
-        await page.reload( { waitUntil: `networkidle` } )
-
-        // Theme should still be dark
-        const after_reload = await page.evaluate( () => document.documentElement.getAttribute( `data-theme` ) )
-        expect( after_reload ).toBe( `dark` )
-
-    } )
-
-    test.describe( `Reader setting persistence`, () => {
+    test.describe( `in the reader`, () => {
 
         test.use( { app_state: `reader` } )
 
-        test( `font size setting persists after page reload`, async ( { page } ) => {
-
+        test.beforeEach( async ( { page } ) => {
             await mock_openrouter( page )
-            await open_seeded_reader( page )
+        } )
 
-            // Set font size to 22
-            await page.getByRole( `button`, { name: `Settings` } ).click()
+        test( `drawer lists every section and closes via Close or Escape without leaving the reader`, async ( { page } ) => {
+
+            await open_seeded_reader( page )
+            const drawer = await open_settings( page )
+
+            for( const label of [ `Target language`, `Proficiency level`, `Font size`, `Font family`, `Theme`, `LLM Model`, `API key` ] ) {
+                await expect( drawer.getByText( label, { exact: true } ) ).toBeVisible()
+            }
+            await expect( drawer.getByRole( `button`, { name: `Clear Translation Cache` } ) ).toBeVisible()
+
+            // Every level from A0 Caveman to C1-C2 Adult
+            const levels = drawer.getByRole( `radiogroup`, { name: `Proficiency level` } ).getByRole( `radio` )
+            await expect( levels ).toHaveCount( 5 )
+            for( const name of [ /A0\s*Caveman/, /A1\s*Toddler/, /A2\s*Primary Schooler/, /C1-C2\s*Adult/ ] ) {
+                await expect( drawer.getByRole( `radio`, { name } ) ).toBeVisible()
+            }
+
+            await drawer.getByRole( `button`, { name: `Close`, exact: true } ).click()
+            await expect( drawer ).toBeHidden()
+
+            // Escape closes the drawer only; a second Escape would leave the reader
+            await open_settings( page )
+            await page.keyboard.press( `Escape` )
+            await expect( drawer ).toBeHidden()
+            await expect( page ).toHaveURL( new RegExp( `${ SEEDED_READER_URL }$` ) )
+            await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible()
+
+        } )
+
+        test( `font size applies to reader text and shows its px label`, async ( { page } ) => {
+
+            await open_seeded_reader( page )
+            const reader = page.locator( `main` )
+            const initial_size = await reader.evaluate( main => getComputedStyle( main ).fontSize )
+
+            const drawer = await open_settings( page )
+            const slider = page.locator( `input[type="range"]` )
+            await slider.fill( `24` )
+
+            await expect( slider ).toHaveValue( `24` )
+            await expect( drawer.getByText( `24px`, { exact: true } ) ).toBeVisible()
+            await expect( reader ).not.toHaveCSS( `font-size`, initial_size )
+            await expect( reader ).toHaveCSS( `font-size`, `24px` )
+
+        } )
+
+        test( `font family and model changes apply in the reader without errors`, async ( { page } ) => {
+
+            const errors = []
+            page.on( `pageerror`, error => errors.push( error.message ) )
+
+            await open_seeded_reader( page )
+            const drawer = await open_settings( page )
+            const reader = page.locator( `main` )
+
+            for( const font of [ `Georgia`, `Merriweather` ] ) {
+                await page.getByLabel( `Font family` ).selectOption( font )
+                await expect( reader ).toHaveCSS( `font-family`, new RegExp( font ) )
+            }
+
+            const model_select = page.getByLabel( `LLM Model` )
+            await model_select.selectOption( `anthropic/claude-sonnet-4.6` )
+            await expect( model_select ).toHaveValue( `anthropic/claude-sonnet-4.6` )
+
+            // Choices outlive the drawer and the reader keeps working
+            await page.keyboard.press( `Escape` )
+            await expect( drawer ).toBeHidden()
+            await expect( reader ).toHaveCSS( `font-family`, /Merriweather/ )
+            await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible()
+            expect( errors ).toEqual( [] )
+
+        } )
+
+        test( `clear cache: Cancel keeps translations, confirm empties IndexedDB`, async ( { page } ) => {
+
+            await open_seeded_reader( page )
+            await expect.poll( () => store_count( page, `translations` ), { timeout: 15_000 } ).toBeGreaterThan( 0 )
+
+            const drawer = await open_settings( page )
+            const clear_button = drawer.getByRole( `button`, { name: `Clear Translation Cache` } )
+
+            await confirm_in_modal( page, { title: `Clear all cached translations?`, action: () => clear_button.click(), cancel: true } )
+            await expect( drawer ).toBeVisible()
+            expect( await store_count( page, `translations` ) ).toBeGreaterThan( 0 )
+
+            await confirm_in_modal( page, { title: `Clear all cached translations?`, action: () => clear_button.click() } )
+            await expect( page.getByText( `Translation cache cleared` ) ).toBeVisible()
+            await expect.poll( () => store_count( page, `translations` ) ).toBe( 0 )
+
+            // Settings stays usable
+            await expect( drawer.getByText( `Font size`, { exact: true } ) ).toBeVisible()
+
+        } )
+
+        test( `theme persists across reader, library, reload and back`, async ( { page } ) => {
+
+            await open_seeded_reader( page )
+            const drawer = await open_settings( page )
+            await page.getByRole( `button`, { name: `Dark` } ).click()
+            await expect( theme_attribute( page ) ).toHaveAttribute( `data-theme`, `dark` )
+
+            await page.keyboard.press( `Escape` )
+            await expect( drawer ).toBeHidden()
+            await page.keyboard.press( `Escape` )
+            await page.waitForURL( /\/library/ )
+            await expect( theme_attribute( page ) ).toHaveAttribute( `data-theme`, `dark` )
+
+            // Fresh hydration from storage
+            await page.reload()
+            await expect( page.getByRole( `button`, { name: `Settings` } ) ).toBeVisible()
+            await expect( theme_attribute( page ) ).toHaveAttribute( `data-theme`, `dark` )
+
+            await open_seeded_reader( page )
+            await expect( theme_attribute( page ) ).toHaveAttribute( `data-theme`, `dark` )
+
+        } )
+
+        test( `font size persists after page reload`, async ( { page } ) => {
+
+            await open_seeded_reader( page )
+            const drawer = await open_settings( page )
             await page.locator( `input[type="range"]` ).fill( `22` )
             await expect( page.locator( `main` ) ).toHaveCSS( `font-size`, `22px` )
             await page.keyboard.press( `Escape` )
-            await expect( page.getByRole( `dialog`, { name: `Settings` } ).filter( { hasText: `Target Language` } ) ).not.toBeVisible()
+            await expect( drawer ).toBeHidden()
 
-            // Reload
-            await page.reload( { waitUntil: `networkidle` } )
-
-            // Font size should still be 22px
+            await page.reload()
+            await expect( page.locator( `span[data-sentence-id]` ).first() ).toBeVisible( { timeout: 10_000 } )
             await expect( page.locator( `main` ) ).toHaveCSS( `font-size`, `22px` )
+
+            // The slider hydrates too, not just the CSS
+            await open_settings( page )
+            await expect( page.locator( `input[type="range"]` ) ).toHaveValue( `22` )
 
         } )
 
