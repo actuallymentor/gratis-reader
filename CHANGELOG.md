@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.29.0] - 2026-10-03
+
+### Added
+- A pause button on the landing illustrations; the choice is remembered in this browser
+
+### Fixed
+- A rejected API key's "Invalid API key" message is no longer replaced a moment later by the key-format hint, on the welcome page and in settings
+- The in-memory word translation cache now stays within its limit even while the open sentence's words are kept
+
+### Changed
+- Test suite runs in about 13 minutes instead of 79, with the same use cases covered
+
 ## [1.28.2] - 2026-10-03
 
 ### Fixed

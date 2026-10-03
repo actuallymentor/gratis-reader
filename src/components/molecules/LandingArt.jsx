@@ -97,25 +97,31 @@ const Words = ( { x, y, widths, height = 8, gap = 6, className = `line`, highlig
 
 }
 
-// Pauses every loop while the artwork is offscreen or the document is hidden
-const ArtFrame = ( { view_box, children, ...rest } ) => {
+// Pauses every loop while the artwork is offscreen, the document is hidden, or the reader paused it
+const ArtFrame = ( { view_box, paused = false, children, ...rest } ) => {
 
     const ref = useRef( null )
+    const visible_ref = useRef( false )
+
+    // Latest pause rule; the observer and visibility listener call it without re-subscribing
+    const update_ref = useRef( null )
+    update_ref.current = () => ref.current?.toggleAttribute( `data-paused`, paused || !visible_ref.current || document.hidden )
+
+    useEffect( () => {
+        update_ref.current()
+    }, [ paused ] )
 
     useEffect( () => {
 
         // Without the observer the artwork simply stays on its static pose
         if( !( `IntersectionObserver` in window ) ) return
 
-        const svg = ref.current
-        let visible = false
-        const update = () => svg.toggleAttribute( `data-paused`, !visible || document.hidden )
-
+        const update = () => update_ref.current()
         const observer = new IntersectionObserver( ( [ entry ] ) => {
-            visible = entry.isIntersecting
+            visible_ref.current = entry.isIntersecting
             update()
         } )
-        observer.observe( svg )
+        observer.observe( ref.current )
         document.addEventListener( `visibilitychange`, update )
 
         return () => {

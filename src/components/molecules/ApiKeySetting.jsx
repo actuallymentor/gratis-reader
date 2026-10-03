@@ -130,7 +130,7 @@ export default function ApiKeySetting( { api_key, on_save } ) {
     useEffect( () => {
         if( !editing ) return
         const timer = setTimeout( () => {
-            if( draft.trim() && !looks_like_api_key( draft ) ) set_invalid( KEY_FORMAT_HINT )
+            if( draft.trim() && !looks_like_api_key( draft ) ) set_invalid( current => current || KEY_FORMAT_HINT )
             else set_invalid( current => current === KEY_FORMAT_HINT ? null : current )
         }, ATTENTION_DELAY_MS )
         return () => clearTimeout( timer )

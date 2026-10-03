@@ -35,6 +35,10 @@ test.describe( `Onboarding`, () => {
 
         // Should stay on onboarding
         await expect( page.getByText( `Invalid API key — please check and try again` ) ).toBeVisible()
+
+        // The delayed key-shape hint must not replace the server's verdict once it fires
+        await page.waitForTimeout( 1_000 )
+        await expect( page.getByText( `Invalid API key — please check and try again` ) ).toBeVisible()
         await expect( page ).not.toHaveURL( /\/library/ )
         await expect( page.locator( `input[type="password"]` ) ).toBeVisible()
 
@@ -237,6 +241,28 @@ test.describe( `Onboarding`, () => {
         await page.reload()
         await expect( page.getByText( `Your library is empty` ) ).toBeVisible( { timeout: 15_000 } )
         expect( page.url() ).toContain( `/library` )
+
+    } )
+
+    test( `landing artwork can be paused, and the choice survives a reload`, async ( { page } ) => {
+
+        await page.goto( `/` )
+        const artwork = page.locator( `svg[data-paused]` )
+        const illustrations = page.locator( `main svg[aria-hidden="true"][viewBox]` ).filter( { has: page.locator( `.drift, .sway, .breathe` ) } )
+        await expect( illustrations ).toHaveCount( 4 )
+
+        // Every illustration pauses together and the control flips its label
+        await page.getByRole( `button`, { name: `Pause animations` } ).click()
+        await expect( artwork ).toHaveCount( 4 )
+        await expect( page.getByRole( `button`, { name: `Play animations` } ) ).toBeVisible()
+
+        await page.reload()
+        await expect( page.getByRole( `button`, { name: `Play animations` } ) ).toBeVisible()
+        await expect( artwork ).toHaveCount( 4 )
+
+        // Playing again resumes whatever is on screen: the hero, at least
+        await page.getByRole( `button`, { name: `Play animations` } ).click()
+        await expect( page.locator( `svg[viewBox="0 0 440 380"]` ) ).not.toHaveAttribute( `data-paused` )
 
     } )
 

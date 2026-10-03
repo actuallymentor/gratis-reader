@@ -1,8 +1,8 @@
 import { Fragment, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import styled, { css } from 'styled-components'
-import { AlertTriangle, BookOpen, Code, Loader2 } from 'lucide-react'
-import { Button } from '../atoms/Button.jsx'
+import { AlertTriangle, BookOpen, Code, Loader2, Pause, Play } from 'lucide-react'
+import { Button, IconButton } from '../atoms/Button.jsx'
 import HelpButton from '../molecules/HelpButton.jsx'
 import use_attention from '../../hooks/use_attention.js'
 import { HeroArt, LevelArt, PeekArt, ShelfArt } from '../molecules/LandingArt.jsx'
@@ -94,6 +94,7 @@ const HeroText = styled.div`
 `
 
 const HeroArtwork = styled.div`
+    position: relative;
     order: -1;
     width: 100%;
     max-width: 16rem;
@@ -103,6 +104,15 @@ const HeroArtwork = styled.div`
         order: 0;
         max-width: 30rem;
     }
+`
+
+// Quiet corner control that stops every illustration on the page
+const MotionToggle = styled.div`
+    position: absolute;
+    right: 0;
+    bottom: 0;
+
+    @media (prefers-reduced-motion: reduce) { display: none; }
 `
 
 const Headline = styled.h1`
@@ -293,6 +303,23 @@ const SECTIONS = [
 
 const VALIDATE_DEBOUNCE_MS = 800
 
+// A per-viewer convenience: storage may be unavailable, so every access is guarded
+const MOTION_PAUSED_KEY = `landing-artwork-paused`
+const read_motion_paused = () => {
+    try {
+        return localStorage.getItem( MOTION_PAUSED_KEY ) === `1`
+    } catch {
+        return false
+    }
+}
+const save_motion_paused = paused => {
+    try {
+        localStorage.setItem( MOTION_PAUSED_KEY, paused ? `1` : `0` )
+    } catch {
+        // Not remembered, still applied for this visit
+    }
+}
+
 export default function OnboardingPage() {
 
     const navigate = useNavigate()
@@ -307,7 +334,7 @@ export default function OnboardingPage() {
     // Debounced shape check once typing pauses; a wrong-shaped key gets a hint, not a request
     useEffect( () => {
         const timer = setTimeout( () => {
-            if( key.trim() && !looks_like_api_key( key ) ) set_error( KEY_FORMAT_HINT )
+            if( key.trim() && !looks_like_api_key( key ) ) set_error( current => current || KEY_FORMAT_HINT )
             else set_error( current => current === KEY_FORMAT_HINT ? null : current )
         }, VALIDATE_DEBOUNCE_MS )
         return () => clearTimeout( timer )
@@ -340,6 +367,13 @@ export default function OnboardingPage() {
             set_loading( false )
         }
 
+    }
+
+    // Looping artwork gets a pause control, remembered in this browser
+    const [ motion_paused, set_motion_paused ] = useState( read_motion_paused )
+    const toggle_motion = () => {
+        save_motion_paused( !motion_paused )
+        set_motion_paused( !motion_paused )
     }
 
     // Connect is the next important action once a plausible key is in and typing has paused
@@ -418,7 +452,16 @@ export default function OnboardingPage() {
 
                 </HeroText>
 
-                <HeroArtwork><HeroArt /></HeroArtwork>
+                <HeroArtwork>
+                    <HeroArt paused={ motion_paused } />
+                    <MotionToggle>
+                        <IconButton
+                            label={ motion_paused ? `Play animations` : `Pause animations` }
+                            icon={ motion_paused ? <Play strokeWidth={ 1.5 } /> : <Pause strokeWidth={ 1.5 } /> }
+                            onClick={ toggle_motion }
+                        />
+                    </MotionToggle>
+                </HeroArtwork>
 
             </Hero>
 
@@ -430,7 +473,7 @@ export default function OnboardingPage() {
                             <SectionTitle id={ `feature-${ index }` }>{ title }</SectionTitle>
                             <SectionBody>{ body }</SectionBody>
                         </SectionText>
-                        <SectionArt><Art /></SectionArt>
+                        <SectionArt><Art paused={ motion_paused } /></SectionArt>
                     </Section>
                 </Fragment> ) }
                 <Rule />

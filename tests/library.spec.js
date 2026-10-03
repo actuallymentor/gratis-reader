@@ -103,8 +103,9 @@ test.describe( `Library`, () => {
 
         test( `offline banner appears and clears with the network`, async ( { page } ) => {
 
+            // The banner only needs the library mounted, not the heavy catalogue settled
             await page.goto( `/library` )
-            await expect( page.getByText( `Your library is empty` ) ).toBeVisible( { timeout: 15_000 } )
+            await expect( page.getByRole( `button`, { name: /settings/i } ).first() ).toBeVisible()
             const banner = page.getByText( `Offline · showing your saved library`, { exact: true } )
 
             await page.context().setOffline( true )

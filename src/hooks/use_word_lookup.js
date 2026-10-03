@@ -116,12 +116,17 @@ export const use_word_lookup = ( {
         const pinned_suffix = open_context ? `:${ encodeURIComponent( open_context ) }` : null
         const is_pinned = key => pinned_suffix && key.endsWith( pinned_suffix )
 
-        const evicted_keys = ordered_keys
-            .slice( 0, Math.max( 0, ordered_keys.length - WORD_LOOKUP_MEMORY_LIMIT ) )
-            .filter( key => !is_pinned( key ) )
-        const pruned_keys = evicted_keys.filter( key => !loading_words_ref.current[key] )
+        // Walk from the oldest key and evict until back under the limit, skipping keys that
+        // are pinned or still in flight, so the cap holds even when the oldest keys are pinned.
+        let excess = ordered_keys.length - WORD_LOOKUP_MEMORY_LIMIT
+        const pruned_keys = []
+        for( const key of ordered_keys ) {
+            if( excess <= 0 ) break
+            if( is_pinned( key ) || loading_words_ref.current[key] ) continue
+            pruned_keys.push( key )
+            excess -= 1
+        }
 
-        // Keep any future in-flight and pinned keys visible; the rest is trimmed to the limit.
         const evicted = new Set( pruned_keys )
         lookup_keys_ref.current = ordered_keys.filter( key => !evicted.has( key ) )
 
