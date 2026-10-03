@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.28.2] - 2026-10-03
+
+### Fixed
+- With Turbo Mode on, tapping another word in the open sentence no longer blanks its word-by-word translation to "..." and fetches it again
+
 ## [1.28.1] - 2026-10-02
 
 ### Fixed

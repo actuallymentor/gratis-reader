@@ -7,7 +7,9 @@ import { use_cache } from './use_cache.js'
 
 const WORD_BOUNDARY_PUNCTUATION_RE = /(^[\p{P}\p{S}]+)|([\p{P}\p{S}]+$)/gu
 const WORD_WITH_LETTERS_RE = /\p{L}/u
-const WORD_LOOKUP_MEMORY_LIMIT = 250
+// Glosses are a few bytes each. The limit must stay well above Turbo's working set (several
+// hundred words on a tall screen), or prefetching evicts glosses still on screen and refetches them.
+const WORD_LOOKUP_MEMORY_LIMIT = 5_000
 const WORD_LOOKUP_CONCURRENCY = 3
 // Runaway guard only: a gloss is a few tokens, but reasoning models bill their thinking
 const WORD_LOOKUP_MAX_TOKENS = 4_000
@@ -109,15 +111,19 @@ export const use_word_lookup = ( {
         const ordered_keys = lookup_keys_ref.current.filter( key => key !== cache_key )
         ordered_keys.push( cache_key )
 
-        const evicted_keys = ordered_keys.slice( 0, Math.max( 0, ordered_keys.length - WORD_LOOKUP_MEMORY_LIMIT ) )
-        const loading_evicted_keys = evicted_keys.filter( key => loading_words_ref.current[key] )
+        // The open sentence's glosses are never evicted: the sheet shows every one of them
+        const open_context = cache_by_context && default_context_ref.current
+        const pinned_suffix = open_context ? `:${ encodeURIComponent( open_context ) }` : null
+        const is_pinned = key => pinned_suffix && key.endsWith( pinned_suffix )
+
+        const evicted_keys = ordered_keys
+            .slice( 0, Math.max( 0, ordered_keys.length - WORD_LOOKUP_MEMORY_LIMIT ) )
+            .filter( key => !is_pinned( key ) )
         const pruned_keys = evicted_keys.filter( key => !loading_words_ref.current[key] )
 
-        // Keep any future in-flight keys visible until their request settles.
-        lookup_keys_ref.current = [
-            ...loading_evicted_keys,
-            ...ordered_keys.slice( -WORD_LOOKUP_MEMORY_LIMIT )
-        ]
+        // Keep any future in-flight and pinned keys visible; the rest is trimmed to the limit.
+        const evicted = new Set( pruned_keys )
+        lookup_keys_ref.current = ordered_keys.filter( key => !evicted.has( key ) )
 
         if( pruned_keys.length === 0 ) return
 
@@ -130,7 +136,7 @@ export const use_word_lookup = ( {
         word_translations_ref.current = prune_store( word_translations_ref.current )
         loading_words_ref.current = prune_store( loading_words_ref.current )
         lookup_errors_ref.current = prune_store( lookup_errors_ref.current )
-    }, [] )
+    }, [ cache_by_context ] )
 
     const acquire_lookup_slot = useCallback( () => new Promise( resolve => {
         const start_lookup = () => {

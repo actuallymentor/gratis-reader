@@ -173,3 +173,57 @@ test.describe( `Turbo Mode reader`, () => {
     }
 
 } )
+
+test.describe( `Turbo Mode keeps the open sentence's glosses`, () => {
+
+    // A tall screen gives Turbo several hundred words to warm, more than a small in-memory cache holds
+    test.use( { app_state: `reader`, viewport: { width: 1280, height: 4000 } } )
+
+    test( `a second tap in the open sentence neither blanks nor refetches its glosses`, async ( { page } ) => {
+
+        // Every gloss request, keyed by its sentence context, so repeats are detectable
+        const requested = []
+        await page.route( CHAT_URL, async route => {
+            const request = parse_chat_request( route.request().postDataJSON() )
+            request.words.forEach( word => requested.push( `${ request.sentence }::${ word }` ) )
+            await fulfil_chat( route, answer_request( request, {
+                sentence: text => `[ES] ${ text }`,
+                word: text => `gloss ${ text }`
+            } ) )
+        } )
+
+        await enable_saved_turbo( page )
+        await open_seeded_reader( page )
+
+        // The opening chapters are short title pages; walk to the first chapter with long sentences
+        const long_sentences = page.locator( `span[data-sentence-id]` ).filter( { has: page.locator( `[data-translation-word-index="8"]` ) } )
+        await expect( async () => {
+            if( await long_sentences.count() ) return
+            await page.keyboard.press( `ArrowRight` )
+            throw new Error( `no long sentence yet` )
+        } ).toPass( { timeout: 20_000, intervals: [ 1_500 ] } )
+
+        const sentence = long_sentences.first()
+        const sheet = page.locator( `[data-translation-info-sheet]` )
+        await sentence.locator( `[data-translation-word-index="1"]` ).click()
+        await expect( sheet.getByText( `...`, { exact: true } ) ).toHaveCount( 0, { timeout: 10_000 } )
+
+        // Let Turbo warm well past a few hundred words before the second tap
+        await expect.poll( () => requested.length, { timeout: 20_000 } ).toBeGreaterThan( 400 )
+
+        await sentence.locator( `[data-translation-word-index="5"]` ).click()
+        await expect( sheet.locator( `[data-selected="true"]` ) ).toHaveCount( 1 )
+
+        // Over the next second the sheet never falls back to loading dots
+        for( let sample = 0; sample < 5; sample++ ) {
+            await expect( sheet.getByText( `...`, { exact: true } ) ).toHaveCount( 0 )
+            await page.waitForTimeout( 200 )
+        }
+
+        // And no word was asked for twice in the same sentence
+        const repeats = requested.filter( ( key, index ) => requested.indexOf( key ) !== index )
+        expect( repeats ).toEqual( [] )
+
+    } )
+
+} )
